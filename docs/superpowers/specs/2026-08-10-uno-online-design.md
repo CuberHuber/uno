@@ -106,6 +106,7 @@ If only one player remains, the round ends in their favor.
 ## Realtime protocol
 
 Client → server: `joinRoom`, `startGame`, `playCard`, `drawCard`,
+  `passTurn` (keep a drawn playable card), `chooseColor` (first-flip Wild),
   `callLastCard`, `catchLastCard`, `rematch`, `continueWithout`.
 Server → client: `roomState` (the full personalized view, re-sent on every change),
   `moveRejected` (transient, for invalid attempts),

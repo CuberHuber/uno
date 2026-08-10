@@ -13,7 +13,7 @@
 - Node 22, `"type": "module"` everywhere, TypeScript `strict: true`.
 - npm workspaces: `shared/`, `server/`, `client/`; package names `@uno/shared`, `@uno/server`, `@uno/client`.
 - Server is authoritative: clients never receive another player's cards.
-- Protocol event names exactly: `joinRoom`, `startGame`, `playCard`, `drawCard`, `callLastCard`, `catchLastCard`, `rematch`, `continueWithout` (client→server); `roomState`, `moveRejected`, `effect` (server→client).
+- Protocol event names exactly: `joinRoom`, `startGame`, `playCard`, `drawCard`, `passTurn`, `chooseColor`, `callLastCard`, `catchLastCard`, `rematch`, `continueWithout` (client→server); `roomState`, `moveRejected`, `effect` (server→client). (`passTurn`/`chooseColor` added by user ruling 2026-08-10 — required by the draw-one play-or-keep and first-flip-Wild rules.)
 - Brand copy: game name **Ochre Eights**; buttons **Draw**, **Call “last card”**, **Catch**; banner pattern “\<Color\> is live · \<name\>’s turn”.
 - Visual: consume Organic DS tokens (`--color-*`, `--font-*`, `--space-*`, `--radius-*`, `--shadow-*`) from the vendored stylesheet; suit colors are new tokens `--card-red #c25f4e`, `--card-blue #5c86a8`, `--card-yellow #d9a441`, `--card-green #7f9a5c`, `--card-back #b2622d`, `--card-cream #fdf8ef` (from `design/Ochre Eights - Animated Table.dc.html`).
 - No accounts, no database, no turn timers, no house rules, no Wild Draw 4 challenge, no spectators.
