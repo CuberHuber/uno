@@ -189,10 +189,36 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       return { ok: true, state: s, effects };
     }
 
-    case 'draw':
-    case 'pass':
+    case 'draw': {
+      if (s.turn !== action.seat) return err('not your turn');
+      if (s.mustChooseColor) return err('choose a color first');
+      if (s.pendingDrawn?.seat === action.seat) return err('play the drawn card or pass');
+      s.catchWindow = null;
+      const n = drawFromPile(s, action.seat, 1);
+      effects.push({ type: 'drew', seat: action.seat, count: n });
+      if (n === 0) {
+        s.turn = nextSeat(s, action.seat);
+        return { ok: true, state: s, effects };
+      }
+      const drawnCard = player.hand.at(-1)!;
+      const top = s.discard.at(-1)!;
+      if (isPlayable(drawnCard, top, s.currentColor)) {
+        s.pendingDrawn = { seat: action.seat, cardId: drawnCard.id };
+      } else {
+        s.turn = nextSeat(s, action.seat);
+      }
+      return { ok: true, state: s, effects };
+    }
+
+    case 'pass': {
+      if (s.pendingDrawn?.seat !== action.seat) return err('nothing to pass');
+      s.pendingDrawn = null;
+      s.turn = nextSeat(s, action.seat);
+      return { ok: true, state: s, effects };
+    }
+
     case 'callLastCard':
     case 'catchLastCard':
-      return err('not implemented yet'); // Tasks 5 and 6 replace this arm
+      return err('not implemented yet'); // Task 6 replaces this arm
   }
 }
