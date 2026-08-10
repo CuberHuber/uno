@@ -217,8 +217,25 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       return { ok: true, state: s, effects };
     }
 
-    case 'callLastCard':
-    case 'catchLastCard':
-      return err('not implemented yet'); // Task 6 replaces this arm
+    case 'callLastCard': {
+      const ownWindow = s.catchWindow?.seat === action.seat;
+      const arming = s.turn === action.seat && player.hand.length <= 2 && player.hand.length > 0;
+      if (!ownWindow && !arming) return err('cannot call now');
+      player.calledLastCard = true;
+      if (ownWindow) s.catchWindow = null;
+      effects.push({ type: 'called', seat: action.seat });
+      return { ok: true, state: s, effects };
+    }
+
+    case 'catchLastCard': {
+      if (!s.catchWindow) return err('nothing to catch');
+      const target = s.catchWindow.seat;
+      if (target === action.seat) return err('cannot catch yourself');
+      s.catchWindow = null;
+      const n = drawFromPile(s, target, 2);
+      effects.push({ type: 'caught', seat: target });
+      effects.push({ type: 'drew', seat: target, count: n });
+      return { ok: true, state: s, effects };
+    }
   }
 }
