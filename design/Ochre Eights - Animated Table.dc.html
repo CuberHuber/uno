@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="_ds/organic-bda5c1fb-32bb-456d-af48-027563f741ed/styles.css">
+<script src="_ds/organic-bda5c1fb-32bb-456d-af48-027563f741ed/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:#e7dcc6;display:grid;place-items:center;min-height:100vh}
+.paper{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E")}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+a{color:#c67139}a:hover{color:#8c491a}
+</style>
+</helmet>
+
+<div style="padding:40px;display:flex;flex-direction:column;align-items:center;gap:16px">
+<div class="paper" style="width:880px;height:560px;border-radius:22px;overflow:hidden;background:var(--color-surface);box-shadow:0 12px 32px rgba(46,43,37,.22);position:relative">
+
+  <div style="position:absolute;left:50%;top:236px;transform:translate(-50%,-50%);width:620px;height:360px;border-radius:50%;background:{{ felt }};box-shadow:inset 0 0 0 10px rgba(46,43,37,.07),0 10px 30px rgba(46,43,37,.12)"></div>
+
+  <div style="position:absolute;left:26px;top:22px;font-size:13px;color:var(--color-neutral-600)">Sunday kitchen game</div>
+  <div style="position:absolute;right:26px;top:22px;font-size:13px;color:var(--color-neutral-600)">Round 3 · stacking on · force play on</div>
+
+  <div style="position:absolute;left:50%;top:36px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:7px">
+    <div style="display:flex;height:38px;opacity:{{ jFan }};transition:opacity .3s">
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8"></div>
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8;margin-left:-16px"></div>
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8;margin-left:-16px"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:#fdf8ef;border-radius:999px;padding:5px 14px 5px 5px;box-shadow:0 3px 10px rgba(46,43,37,.14);outline:{{ jRing }};outline-offset:2px;transition:outline-color .25s">
+      <div style="width:28px;height:28px;border-radius:50%;background:#7f9a5c;color:#fdf8ef;display:grid;place-items:center;font-family:Caprasimo,serif;font-size:14px">J</div>
+      <span style="font-weight:600;font-size:13.5px">Jonas</span><span style="font-size:12px;color:var(--color-neutral-600)">{{ jCount }}</span>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:44px;top:196px;display:flex;flex-direction:column;align-items:center;gap:7px">
+    <div style="display:flex;height:38px;opacity:{{ pFan }};transition:opacity .3s">
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8"></div>
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8;margin-left:-16px"></div>
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8;margin-left:-16px"></div>
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8;margin-left:-16px"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:#fdf8ef;border-radius:999px;padding:5px 14px 5px 5px;box-shadow:0 3px 10px rgba(46,43,37,.14);outline:{{ pRing }};outline-offset:2px;transition:outline-color .25s">
+      <div style="width:28px;height:28px;border-radius:50%;background:#d9a441;color:#fdf8ef;display:grid;place-items:center;font-family:Caprasimo,serif;font-size:14px">P</div>
+      <span style="font-weight:600;font-size:13.5px">Pia</span><span style="font-size:12px;color:var(--color-neutral-600)">{{ pCount }}</span>
+    </div>
+  </div>
+
+  <div style="position:absolute;right:44px;top:196px;display:flex;flex-direction:column;align-items:center;gap:7px">
+    <div style="display:flex;height:38px;opacity:{{ tFan }};transition:opacity .3s">
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8"></div>
+      <div style="width:26px;height:38px;border-radius:5px;background:#b2622d;border:2px solid #f5ead8;margin-left:-16px"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:#fdf8ef;border-radius:999px;padding:5px 14px 5px 5px;box-shadow:0 3px 10px rgba(46,43,37,.14);outline:{{ tRing }};outline-offset:2px;transition:outline-color .25s">
+      <div style="width:28px;height:28px;border-radius:50%;background:#5c86a8;color:#fdf8ef;display:grid;place-items:center;font-family:Caprasimo,serif;font-size:14px">T</div>
+      <span style="font-weight:600;font-size:13.5px">Toma</span><span style="font-size:12px;color:var(--color-neutral-600)">{{ tCount }}</span>
+    </div>
+  </div>
+
+  <div style="position:absolute;left:351px;top:170px;width:76px;height:112px;border-radius:12px;background:#b2622d;padding:7px;box-shadow:0 8px 20px rgba(46,43,37,.24)">
+    <div style="width:100%;height:100%;border-radius:7px;border:2px solid rgba(253,248,239,.85);display:grid;place-items:center"><div style="width:44px;height:66px;border-radius:50%;background:#fdf8ef;transform:rotate(-22deg);display:grid;place-items:center"><span style="font-family:Caprasimo,serif;font-size:24px;color:#b2622d;transform:rotate(22deg)">8</span></div></div>
+  </div>
+
+  <div style="position:absolute;left:453px;top:170px;width:76px;height:112px;border-radius:12px;background:{{ pileColor }};padding:7px;box-shadow:0 8px 20px rgba(46,43,37,.24);transform:{{ pileTf }};transition:background .25s">
+    <div style="width:100%;height:100%;border-radius:7px;border:2px solid rgba(253,248,239,.85);display:grid;place-items:center"><div style="width:44px;height:66px;border-radius:50%;background:#fdf8ef;transform:rotate(-22deg);display:grid;place-items:center"><span style="font-family:Caprasimo,serif;font-size:{{ pileFs }};color:{{ pileColor }};transform:rotate(22deg)">{{ pileLabel }}</span></div></div>
+  </div>
+
+  <div style="position:absolute;left:50%;top:298px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:#fdf8ef;border-radius:999px;padding:7px 18px;box-shadow:0 4px 14px rgba(46,43,37,.16);white-space:nowrap">
+    <span style="width:12px;height:12px;border-radius:50%;background:{{ liveColor }};transition:background .25s;animation:breathe 1.6s ease-in-out infinite"></span>
+    <span style="font-size:13px;font-weight:600">{{ banner }}</span>
+  </div>
+
+  <div style="position:absolute;left:0;top:0;width:880px;height:560px;pointer-events:none;z-index:5">
+    <sc-for list="{{ flyers }}" as="f" hint-placeholder-count="0">
+      <div style="position:absolute;left:0;top:0;width:76px;height:112px;border-radius:12px;background:{{ f.color }};padding:7px;box-shadow:0 12px 26px rgba(46,43,37,.3);transform:{{ f.tf }};opacity:{{ f.op }};transition:{{ f.trans }}">
+        <div style="width:100%;height:100%;border-radius:7px;border:2px solid rgba(253,248,239,.85);display:grid;place-items:center">
+          <div style="width:44px;height:66px;border-radius:50%;background:#fdf8ef;transform:rotate(-22deg);display:{{ f.oval }};place-items:center"><span style="font-family:Caprasimo,serif;font-size:{{ f.fs }};color:{{ f.color }};transform:rotate(22deg)">{{ f.label }}</span></div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="position:absolute;left:0;right:0;bottom:0;height:200px;background:linear-gradient(to top,var(--color-bg) 62%,rgba(245,234,216,0));display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:16px;gap:10px;z-index:6">
+    <div style="display:flex;align-items:flex-end;justify-content:center;padding-right:14px">
+      <sc-for list="{{ hand }}" as="c" hint-placeholder-count="6">
+        <div style="width:{{ c.w }};flex:none;transition:width .35s ease">
+          <div style="width:82px;height:120px;border-radius:13px;background:{{ c.color }};padding:7px;box-shadow:0 8px 18px rgba(46,43,37,.2);opacity:{{ c.op }};transform:{{ c.tf }};outline:{{ c.ring }};outline-offset:3px;transition:transform .4s cubic-bezier(.2,.7,.25,1),opacity .3s,outline-color .3s">
+            <div style="width:100%;height:100%;border-radius:8px;border:2px solid rgba(253,248,239,.85);display:grid;place-items:center">
+              <div style="width:48px;height:72px;border-radius:50%;background:#fdf8ef;transform:rotate(-22deg);display:grid;place-items:center"><span style="font-family:Caprasimo,serif;font-size:{{ c.fs }};color:{{ c.color }};transform:rotate(22deg)">{{ c.label }}</span></div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px;background:#fdf8ef;border-radius:999px;padding:5px 16px 5px 5px;box-shadow:0 3px 10px rgba(46,43,37,.14);outline:{{ yRing }};outline-offset:2px;transition:outline-color .25s">
+        <div style="width:30px;height:30px;border-radius:50%;background:#c25f4e;color:#fdf8ef;display:grid;place-items:center;font-family:Caprasimo,serif;font-size:15px">M</div>
+        <span style="font-weight:700;font-size:14px">You</span><span style="font-size:12px;color:var(--color-neutral-600)">{{ yCount }} cards</span>
+      </div>
+      <button class="btn btn-secondary" style="border-radius:999px;padding:11px 22px;font-size:14px;background:#fdf8ef">Draw</button>
+      <button class="btn btn-primary" style="border-radius:999px;padding:11px 26px;font-size:14px">Call “last card”</button>
+    </div>
+  </div>
+
+  <div style="position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:rgba(245,234,216,.82);opacity:{{ winOp }};pointer-events:none;transition:opacity .5s">
+    <div style="text-align:center;transform:{{ winTf }};transition:transform .5s cubic-bezier(.2,.9,.3,1)">
+      <div style="width:74px;height:74px;border-radius:50%;background:#5c86a8;color:#fdf8ef;display:grid;place-items:center;font-family:Caprasimo,serif;font-size:32px;margin:0 auto 16px">T</div>
+      <h1 style="font-size:44px;margin:0 0 6px">Toma takes it</h1>
+      <p style="color:rgba(32,30,29,.6)">Round 3 of 5 · you finish with six</p>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;align-items:center;gap:14px;font:13px Figtree,system-ui,sans-serif;color:rgba(32,30,29,.55)">
+  <span>{{ stepLabel }}</span>
+  <button class="btn btn-secondary" style="border-radius:999px;padding:8px 18px;font-size:13px;background:#fdf8ef" onClick="{{ restart }}">Replay</button>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:960,&quot;height&quot;:700},&quot;speed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:2,&quot;step&quot;:0.25,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Motion&quot;},&quot;felt&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#dfe6cd&quot;,&quot;options&quot;:[&quot;#dfe6cd&quot;,&quot;#e8dcc2&quot;,&quot;#e3d7cc&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Table&quot;}}">
+const POS = { deck:[389,226], pile:[491,226], J:[440,60], P:[104,216], T:[776,216], you:[440,470] };
+const RED='#c25f4e', BLUE='#5c86a8', YEL='#d9a441', GRN='#7f9a5c', BACK='#b2622d';
+
+class Component extends DCLogic {
+  constructor(props){ super(props); this.state = this.initial(); this.timers = []; this.fi = 0; }
+
+  initial(){
+    return {
+      hand: [
+        {color:RED, label:'3', w:'68px', op:.5, tf:'rotate(-9deg) translateY(6px)', ring:'none', fs:'28px'},
+        {color:BLUE, label:'2', w:'68px', op:1, tf:'rotate(-4deg)', ring:'none', fs:'28px'},
+        {color:BLUE, label:'+2', w:'68px', op:1, tf:'translateY(-20px)', ring:'3px solid #c67139', fs:'24px'},
+        {color:YEL, label:'9', w:'68px', op:.5, tf:'rotate(4deg)', ring:'none', fs:'28px'},
+        {color:GRN, label:'5', w:'68px', op:.5, tf:'rotate(9deg) translateY(6px)', ring:'none', fs:'28px'},
+        {color:'#3b352d', label:'★', w:'68px', op:.5, tf:'rotate(14deg) translateY(12px)', ring:'none', fs:'26px'}
+      ],
+      counts:{J:4, P:6, T:2},
+      active:'you',
+      pile:{color:BLUE, label:'7', fs:'28px', tf:'rotate(7deg)'},
+      live:BLUE,
+      banner:'Blue is live · your turn',
+      step:'Your turn',
+      win:false,
+      flyers:[0,1,2,3,4,5].map(function(){ return {color:BACK, label:'', fs:'24px', oval:'none', tf:'translate(-200px,-200px)', op:0, trans:'none'}; })
+    };
+  }
+
+  componentDidMount(){ this.run(); }
+  componentWillUnmount(){ this.clear(); }
+  clear(){ this.timers.forEach(clearTimeout); this.timers = []; }
+  at(ms, fn){ const s = this.props.speed || 1; this.timers.push(setTimeout(fn, ms / s)); }
+
+  setF(i, patch){
+    this.setState(function(st){
+      const f = st.flyers.slice(); f[i] = Object.assign({}, f[i], patch); return {flyers:f};
+    });
+  }
+
+  fly(from, to, card, dur){
+    dur = (dur || 620) / (this.props.speed || 1);
+    const i = this.fi = (this.fi + 1) % 6;
+    const a = POS[from], b = POS[to];
+    const r0 = card.r0 || 0, r1 = card.r1 || 0;
+    this.setF(i, {color:card.color, label:card.label || '', fs:card.fs || '24px', oval:card.back ? 'none' : 'grid',
+      tf:'translate(' + (a[0]-38) + 'px,' + (a[1]-56) + 'px) rotate(' + r0 + 'deg) scale(.86)', op:1, trans:'none'});
+    this.timers.push(setTimeout(() => this.setF(i, {
+      tf:'translate(' + (b[0]-38) + 'px,' + (b[1]-56) + 'px) rotate(' + r1 + 'deg) scale(1)',
+      trans:'transform ' + dur + 'ms cubic-bezier(.2,.75,.25,1), opacity 240ms'
+    }), 40));
+    this.timers.push(setTimeout(() => this.setF(i, {op:0}), dur + 90));
+  }
+
+  patchHand(idx, patch){
+    this.setState(function(st){
+      const h = st.hand.slice(); h[idx] = Object.assign({}, h[idx], patch); return {hand:h};
+    });
+  }
+  setPile(color, label, fs, rot){ this.setState({pile:{color:color, label:label, fs:fs, tf:'rotate(' + rot + 'deg)'}, live:color}); }
+  say(banner, step){ this.setState(function(s){ return {banner:banner, step:step || s.step}; }); }
+  count(who, n){ this.setState(function(st){ const c = Object.assign({}, st.counts); c[who] = n; return {counts:c}; }); }
+
+  run(){
+    this.clear();
+    this.setState(this.initial());
+
+    this.at(700, () => { this.patchHand(2, {tf:'translateY(-64px) scale(1.04)', ring:'3px solid #c67139'}); });
+    this.at(1000, () => {
+      this.patchHand(2, {op:0, tf:'translateY(-120px)'});
+      this.fly('you','pile',{color:BLUE, label:'+2', fs:'24px', r1:-6});
+      this.setState({active:'T'});
+    });
+    this.at(1450, () => this.patchHand(2, {w:'0px'}));
+    this.at(1640, () => { this.setPile(BLUE, '+2', '22px', -6); this.say('Toma must draw 2 — or stack', 'Stacking +2'); });
+
+    this.at(2500, () => {
+      this.fly('T','pile',{color:RED, label:'+2', fs:'24px', r0:12, r1:5});
+      this.count('T', 1);
+    });
+    this.at(3140, () => { this.setPile(RED, '+2', '22px', 5); this.say('Stacked — Pia draws 4', 'Penalty passes on'); this.setState({active:'P'}); });
+
+    [0,1,2,3].forEach((k) => {
+      this.at(3700 + k * 170, () => { this.fly('deck','P',{color:BACK, back:true, r1:-8}); this.count('P', 7 + k); });
+    });
+    this.at(4900, () => this.say('Pia drew 4 · red is live', 'Draw resolves'));
+
+    this.at(5500, () => { this.setState({active:'J'}); this.say('Jonas plays', 'Jonas’s turn'); });
+    this.at(5900, () => { this.fly('J','pile',{color:RED, label:'6', fs:'26px', r1:-9}); this.count('J', 3); });
+    this.at(6540, () => this.setPile(RED, '6', '26px', -9));
+
+    this.at(7000, () => { this.setState({active:'you'}); this.say('No red in hand — draw one', 'Force play'); });
+    this.at(7400, () => this.fly('deck','you',{color:BACK, back:true, r1:10}));
+    this.at(8020, () => {
+      this.setState(function(st){
+        return {hand: st.hand.concat([{color:RED, label:'9', w:'68px', op:1, tf:'translateY(-14px)', ring:'3px solid #c67139', fs:'28px'}])};
+      });
+      this.say('Force play — it goes straight down', 'Force play');
+    });
+    this.at(8700, () => {
+      this.setState(function(st){
+        const h = st.hand.slice(); const i = h.length - 1;
+        h[i] = Object.assign({}, h[i], {op:0, tf:'translateY(-120px)'}); return {hand:h};
+      });
+      this.fly('you','pile',{color:RED, label:'9', fs:'26px', r1:8});
+    });
+    this.at(9100, () => this.setState(function(st){
+      const h = st.hand.slice(); h[h.length-1] = Object.assign({}, h[h.length-1], {w:'0px'}); return {hand:h};
+    }));
+    this.at(9340, () => { this.setPile(RED, '9', '26px', 8); this.setState({active:'T'}); this.say('Toma — one card left', 'Last card'); });
+
+    this.at(10100, () => { this.fly('T','pile',{color:RED, label:'4', fs:'26px', r0:10, r1:-4}); this.count('T', 0); });
+    this.at(10740, () => { this.setPile(RED, '4', '26px', -4); this.say('Toma is out — round over', 'Round over'); });
+    this.at(11400, () => this.setState({win:true}));
+    this.at(14200, () => this.run());
+  }
+
+  renderVals(){
+    const s = this.state, a = s.active, ring = '2px solid #c67139';
+    const fade = function(n){ return n > 0 ? 1 : 0; };
+    return {
+      hand: s.hand,
+      flyers: s.flyers,
+      jCount: s.counts.J, pCount: s.counts.P, tCount: s.counts.T, yCount: s.hand.filter(c => c.w !== '0px').length,
+      jFan: fade(s.counts.J), pFan: fade(s.counts.P), tFan: fade(s.counts.T),
+      jRing: a === 'J' ? ring : '2px solid transparent',
+      pRing: a === 'P' ? ring : '2px solid transparent',
+      tRing: a === 'T' ? ring : '2px solid transparent',
+      yRing: a === 'you' ? ring : '2px solid transparent',
+      pileColor: s.pile.color, pileLabel: s.pile.label, pileFs: s.pile.fs, pileTf: s.pile.tf,
+      liveColor: s.live, banner: s.banner, stepLabel: s.step,
+      felt: this.props.felt || '#dfe6cd',
+      winOp: s.win ? 1 : 0,
+      winTf: s.win ? 'scale(1)' : 'scale(.92)',
+      restart: () => this.run()
+    };
+  }
+}
+
+</script>
+</body>
+</html>
