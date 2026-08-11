@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist-tsc", "rootDir": "src", "jsx": "react-jsx",
+    "module": "ESNext", "moduleResolution": "bundler", "noEmit": true, "composite": false
+  },
+  "include": ["src"],
+  "references": [{ "path": "../shared" }]
+}

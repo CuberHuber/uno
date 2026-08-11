@@ -1,0 +1,11 @@
+{
+  "name": "uno",
+  "private": true,
+  "type": "module",
+  "workspaces": ["shared", "server", "client"],
+  "scripts": {
+    "build": "npm run build -w shared -w client -w server && rm -rf server/public && cp -r client/dist server/public",
+    "test": "npm test -w shared -w server",
+    "typecheck": "tsc -b shared server client"
+  }
+}
