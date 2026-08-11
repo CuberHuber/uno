@@ -27,6 +27,10 @@ export interface Room {
 
 const norm = (code: string) => code.toUpperCase().replaceAll('-', '');
 
+/** Omit that distributes over a discriminated union, so each Action variant
+ *  keeps its own payload fields (plain Omit collapses them to just `type`). */
+type SeatlessAction = Action extends infer A ? (A extends Action ? Omit<A, 'seat'> : never) : never;
+
 export class RoomStore {
   private rooms = new Map<string, Room>();
   constructor(private now: () => number = Date.now) {}
@@ -99,7 +103,7 @@ export class RoomStore {
     return { ok: true as const };
   }
 
-  act(code: string, token: string, action: Omit<Action, 'seat'>) {
+  act(code: string, token: string, action: SeatlessAction) {
     const room = this.getRoom(code);
     if (!room) return { ok: false as const, error: 'table not found' };
     if (room.phase !== 'playing' || !room.game) return { ok: false as const, error: 'no round in progress' };

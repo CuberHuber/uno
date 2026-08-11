@@ -1,5 +1,7 @@
 node_modules/
 dist/
+dist-tsc/
+*.tsbuildinfo
 .env
 .DS_Store
 .superpowers/
