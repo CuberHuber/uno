@@ -4,7 +4,9 @@ An online UNO-style card game for playing with friends in private rooms.
 A host creates a room, shares an auto-generated link, and 2–4 players
   play a classic round right in the browser — laptop or mobile, no accounts.
 
-**Status:** design phase — implementation not started yet.
+**Status:** playable. `npm install && npm run build && npm start -w server`,
+  then open http://localhost:3000. For development: `npm run dev -w server`
+  and `npm run dev -w client` (Vite on :5173 proxies to :3000).
 
 ## What's here
 
