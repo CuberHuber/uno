@@ -11,6 +11,12 @@ export interface Card {
 
 export type Phase = 'lobby' | 'playing' | 'roundEnd';
 
+export interface Rules {
+  stacking: boolean;  // +2/+4 may be answered with another +2/+4 instead of drawing
+  forcePlay: boolean; // a drawn playable card goes straight down
+}
+export const CLASSIC_RULES: Rules = { stacking: false, forcePlay: false };
+
 export interface SeatView {
   seat: number;
   name: string;
@@ -34,6 +40,8 @@ export interface RoomStateView {
   pendingDrawnCardId: number | null; // you drew a playable card: play it or pass
   catchableSeat: number | null;  // catch window is open on this seat
   drawPileCount: number;
+  rules: Rules;
+  pendingDraw: number;           // cards the turn seat owes (stacking pot); 0 otherwise
   winnerSeat: number | null;
   winTally: number[];
   paused: boolean;
@@ -62,6 +70,7 @@ export interface ClientToServerEvents {
     ack: (r: JoinAck) => void
   ) => void;
   startGame: () => void;
+  setRules: (p: { rules: Rules }) => void; // host, lobby only
   playCard: (p: { cardId: number; chosenColor?: Color }) => void;
   drawCard: () => void;
   passTurn: () => void;          // decline to play a drawn playable card

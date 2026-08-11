@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Color, Effect, RoomStateView } from '@uno/shared';
+import type { Color, Effect, RoomStateView, Rules } from '@uno/shared';
 import { socket } from './socket';
+import { rulesStashKey } from './ui';
 
 export interface Store {
   view: RoomStateView | null;
@@ -10,6 +11,7 @@ export interface Store {
   join: (code: string, name?: string) => void;
   actions: {
     start: () => void;
+    setRules: (rules: Rules) => void;
     play: (cardId: number, chosenColor?: Color) => void;
     draw: () => void;
     pass: () => void;
@@ -69,11 +71,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     socket.emit('joinRoom', { code, name, token }, (ack) => {
       if (!ack.ok || !ack.token) { setError(ack.error ?? 'table not found'); return; }
       localStorage.setItem(tokenKey(code), ack.token);
+      // The host picked house rules before sitting down; apply them now that we hold the seat.
+      const stash = sessionStorage.getItem(rulesStashKey(code));
+      if (stash) {
+        sessionStorage.removeItem(rulesStashKey(code));
+        try { socket.emit('setRules', { rules: JSON.parse(stash) as Rules }); } catch { /* stale stash */ }
+      }
     });
   };
 
   const actions = useMemo<Store['actions']>(() => ({
     start: () => socket.emit('startGame'),
+    setRules: (rules) => socket.emit('setRules', { rules }),
     play: (cardId, chosenColor) => socket.emit('playCard', { cardId, chosenColor }),
     draw: () => socket.emit('drawCard'),
     pass: () => socket.emit('passTurn'),

@@ -83,6 +83,56 @@ describe('starting and playing', () => {
   });
 });
 
+describe('house rules', () => {
+  test('host sets rules in the lobby; everyone sees them', () => {
+    const store = new RoomStore();
+    const room = store.createRoom();
+    const a = store.join(room.code, 'Mira');
+    const b = store.join(room.code, 'Jonas');
+    if (!a.ok || !b.ok) throw new Error('join failed');
+    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: false, forcePlay: false });
+    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
+    expect(store.viewFor(room.code, 1).rules).toEqual({ stacking: true, forcePlay: true });
+  });
+
+  test('only the host may change the rules', () => {
+    const store = new RoomStore();
+    const room = store.createRoom();
+    const a = store.join(room.code, 'Mira');
+    const b = store.join(room.code, 'Jonas');
+    if (!a.ok || !b.ok) throw new Error('join failed');
+    expect(store.setRules(room.code, b.token, { stacking: true, forcePlay: false }).ok).toBe(false);
+    expect(store.viewFor(room.code, 0).rules.stacking).toBe(false);
+  });
+
+  test('rules lock once the game starts and reach the engine', () => {
+    const store = new RoomStore();
+    const room = store.createRoom();
+    const a = store.join(room.code, 'Mira');
+    const b = store.join(room.code, 'Jonas');
+    if (!a.ok || !b.ok) throw new Error('join failed');
+    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
+    expect(store.startGame(room.code, a.token).ok).toBe(true);
+    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: true });
+    expect(store.setRules(room.code, a.token, { stacking: false, forcePlay: false }).ok).toBe(false);
+    expect(store.viewFor(room.code, 1).rules.stacking).toBe(true);
+  });
+
+  test('rematch keeps the rules', () => {
+    const store = new RoomStore();
+    const room = store.createRoom();
+    const a = store.join(room.code, 'Mira');
+    const b = store.join(room.code, 'Jonas');
+    if (!a.ok || !b.ok) throw new Error('join failed');
+    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: false }).ok).toBe(true);
+    expect(store.startGame(room.code, a.token).ok).toBe(true);
+    store.getRoom(room.code)!.phase = 'roundEnd';
+    expect(store.rematch(room.code, a.token).ok).toBe(true);
+    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: false });
+    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: true, forcePlay: false });
+  });
+});
+
 describe('disconnects and continue-without', () => {
   test('rejected before the 2-minute grace, allowed after; cards are buried', () => {
     let clock = 1_000_000;

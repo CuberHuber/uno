@@ -1,5 +1,6 @@
 import { randomBytes, randomInt } from 'node:crypto';
-import type { Effect, Phase, RoomStateView } from '@uno/shared';
+import type { Effect, Phase, RoomStateView, Rules } from '@uno/shared';
+import { CLASSIC_RULES } from '@uno/shared';
 import {
   applyAction, createGame, removeFromRound, type Action, type GameState,
 } from './engine/game.js';
@@ -23,6 +24,7 @@ export interface Room {
   createdAtMs: number; emptySinceMs: number | null;
   phase: Phase; players: RoomPlayer[]; hostSeat: number;
   game: GameState | null; winTally: number[]; seed: number;
+  rules: Rules;
 }
 
 const norm = (code: string) => code.toUpperCase().replaceAll('-', '');
@@ -46,6 +48,7 @@ export class RoomStore {
       phase: 'lobby', players: [], hostSeat: 0,
       game: null, winTally: [],
       seed: opts.seed ?? randomInt(2 ** 31),
+      rules: { ...CLASSIC_RULES },
     };
     this.rooms.set(key, room);
     return room;
@@ -91,6 +94,17 @@ export class RoomStore {
     return room.players.findIndex((p) => p.token === token && !p.left);
   }
 
+  setRules(code: string, token: string, rules: Rules) {
+    const room = this.getRoom(code);
+    if (!room) return { ok: false as const, error: 'table not found' };
+    if (this.seatFor(room, token) !== room.hostSeat) {
+      return { ok: false as const, error: 'only the host sets the rules' };
+    }
+    if (room.phase !== 'lobby') return { ok: false as const, error: 'rules lock once the game starts' };
+    room.rules = { stacking: !!rules?.stacking, forcePlay: !!rules?.forcePlay };
+    return { ok: true as const };
+  }
+
   startGame(code: string, token: string) {
     const room = this.getRoom(code);
     if (!room) return { ok: false as const, error: 'table not found' };
@@ -98,7 +112,7 @@ export class RoomStore {
     if (seat !== room.hostSeat) return { ok: false as const, error: 'only the host can deal' };
     if (room.phase !== 'lobby') return { ok: false as const, error: 'already dealt' };
     if (room.players.length < 2) return { ok: false as const, error: 'need at least two players' };
-    room.game = createGame(room.players.length, rng(room.seed));
+    room.game = createGame(room.players.length, rng(room.seed), room.rules);
     room.phase = 'playing';
     return { ok: true as const };
   }
@@ -131,7 +145,7 @@ export class RoomStore {
     room.hostSeat = 0;
     if (room.players.length < 2) return { ok: false as const, error: 'not enough players' };
     room.seed = randomInt(2 ** 31);
-    room.game = createGame(room.players.length, rng(room.seed));
+    room.game = createGame(room.players.length, rng(room.seed), room.rules);
     room.phase = 'playing';
     return { ok: true as const };
   }
@@ -172,6 +186,7 @@ export class RoomStore {
       winTally: room.winTally,
       pausedForSeat: pausedSeat,
       pausedSinceMs: pausedSeat !== null ? room.players[pausedSeat]!.disconnectedAtMs : null,
+      rules: room.rules,
       game: room.game,
     }, seat);
   }

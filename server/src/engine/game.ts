@@ -1,6 +1,6 @@
-import type { Card, Color } from '@uno/shared';
+import type { Card, Color, Rules } from '@uno/shared';
 import { buildDeck, shuffle } from './deck.js';
-import { isPlayable, type Effect } from '@uno/shared';
+import { CLASSIC_RULES, isPlayable, type Effect } from '@uno/shared';
 import { rng } from './deck.js';
 
 export interface PlayerState { hand: Card[]; calledLastCard: boolean; removed: boolean }
@@ -16,6 +16,8 @@ export interface GameState {
   pendingDrawn: { seat: number; cardId: number } | null;
   catchWindow: { seat: number } | null;
   winner: number | null;
+  rules: Rules;
+  pendingDraw: number;   // stacking pot the turn seat owes; 0 when settled
   reshuffleSeed: number; // advances on every discard reshuffle for determinism
 }
 
@@ -30,7 +32,7 @@ export function nextSeat(state: GameState, from: number, steps = 1): number {
   return seat;
 }
 
-export function createGame(numPlayers: number, random: () => number): GameState {
+export function createGame(numPlayers: number, random: () => number, rules: Rules = CLASSIC_RULES): GameState {
   const drawPile = shuffle(buildDeck(), random);
   const players: PlayerState[] = Array.from({ length: numPlayers }, () => ({
     hand: [], calledLastCard: false, removed: false,
@@ -52,6 +54,7 @@ export function createGame(numPlayers: number, random: () => number): GameState 
     currentColor: first.color,
     mustChooseColor: false,
     pendingDrawn: null, catchWindow: null, winner: null,
+    rules: { ...rules }, pendingDraw: 0,
     reshuffleSeed: Math.floor(random() * 2 ** 31),
   };
 
@@ -64,8 +67,12 @@ export function createGame(numPlayers: number, random: () => number): GameState 
       state.turn = nextSeat({ ...state, direction: -1 }, 0);
       break;
     case 'draw2':
-      state.players[0]!.hand.push(state.drawPile.pop()!, state.drawPile.pop()!);
-      state.turn = nextSeat(state, 0);
+      if (rules.stacking) {
+        state.pendingDraw = 2; // seat 0 answers the flip: stack or take
+      } else {
+        state.players[0]!.hand.push(state.drawPile.pop()!, state.drawPile.pop()!);
+        state.turn = nextSeat(state, 0);
+      }
       break;
     case 'wild':
       state.currentColor = null;
@@ -136,7 +143,10 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (idx === -1) return err('card not in hand');
       const card = player.hand[idx]!;
       const top = s.discard.at(-1)!;
-      if (!isPlayable(card, top, s.currentColor)) return err('card does not match');
+      // Stacking: an owed +2/+4 pot may be answered with any +2/+4, colour regardless.
+      const stackAnswer = s.pendingDraw > 0 && (card.value === 'draw2' || card.value === 'wild4');
+      if (s.pendingDraw > 0 && !stackAnswer) return err(`answer the +${s.pendingDraw} or draw`);
+      if (!stackAnswer && !isPlayable(card, top, s.currentColor)) return err('card does not match');
       const isWild = card.value === 'wild' || card.value === 'wild4';
       if (isWild && !action.chosenColor) return err('wild needs a color');
 
@@ -170,6 +180,11 @@ export function applyAction(state: GameState, action: Action): ActionResult {
           }
           break;
         case 'draw2': {
+          if (s.rules.stacking) {
+            s.pendingDraw += 2;
+            s.turn = nextSeat(s, action.seat); // victim answers: stack or take
+            break;
+          }
           const victim = nextSeat(s, action.seat);
           const n = drawFromPile(s, victim, 2);
           effects.push({ type: 'drew', seat: victim, count: n });
@@ -177,6 +192,11 @@ export function applyAction(state: GameState, action: Action): ActionResult {
           break;
         }
         case 'wild4': {
+          if (s.rules.stacking) {
+            s.pendingDraw += 4;
+            s.turn = nextSeat(s, action.seat);
+            break;
+          }
           const victim = nextSeat(s, action.seat);
           const n = drawFromPile(s, victim, 4);
           effects.push({ type: 'drew', seat: victim, count: n });
@@ -194,6 +214,15 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (s.mustChooseColor) return err('choose a color first');
       if (s.pendingDrawn?.seat === action.seat) return err('play the drawn card or pass');
       s.catchWindow = null;
+      if (s.pendingDraw > 0) {
+        // Taking the stacked pot: draw it all, no play-or-pass, turn moves on.
+        const owed = s.pendingDraw;
+        s.pendingDraw = 0;
+        const n = drawFromPile(s, action.seat, owed);
+        effects.push({ type: 'drew', seat: action.seat, count: n });
+        s.turn = nextSeat(s, action.seat);
+        return { ok: true, state: s, effects };
+      }
       const n = drawFromPile(s, action.seat, 1);
       effects.push({ type: 'drew', seat: action.seat, count: n });
       if (n === 0) {
@@ -203,6 +232,12 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       const drawnCard = player.hand.at(-1)!;
       const top = s.discard.at(-1)!;
       if (isPlayable(drawnCard, top, s.currentColor)) {
+        const isWildDraw = drawnCard.value === 'wild' || drawnCard.value === 'wild4';
+        if (s.rules.forcePlay && !isWildDraw) {
+          // Force play: the drawn card goes straight down (wilds wait for a colour).
+          const played = applyAction(s, { type: 'play', seat: action.seat, cardId: drawnCard.id });
+          if (played.ok) return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
+        }
         s.pendingDrawn = { seat: action.seat, cardId: drawnCard.id };
       } else {
         s.turn = nextSeat(s, action.seat);
@@ -212,6 +247,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
 
     case 'pass': {
       if (s.pendingDrawn?.seat !== action.seat) return err('nothing to pass');
+      if (s.rules.forcePlay) return err('force play — the drawn card goes down');
       s.pendingDrawn = null;
       s.turn = nextSeat(s, action.seat);
       return { ok: true, state: s, effects };
@@ -260,6 +296,7 @@ export function removeFromRound(state: GameState, seat: number): GameState {
       s.mustChooseColor = false;
       s.currentColor = s.discard.at(-1)!.color ?? 'red';
     }
+    s.pendingDraw = 0; // an owed pot dies with the leaver
     s.turn = nextSeat(s, seat);
   }
   return s;

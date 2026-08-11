@@ -12,6 +12,7 @@ function ctx(overrides: Partial<ViewContext> = {}): ViewContext {
     names: ['Mira', 'Jonas'], hostSeat: 0,
     connected: [true, true], winTally: [0, 0],
     pausedForSeat: null, pausedSinceMs: null,
+    rules: { stacking: false, forcePlay: false },
     game, ...overrides,
   };
 }

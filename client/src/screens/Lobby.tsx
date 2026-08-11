@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import RuleRow from '../components/RuleRow';
 import { useStore } from '../store';
-import { fmtCode, initialOf, seatColor } from '../ui';
+import { RULE_DEFS, fmtCode, initialOf, ruleChips, seatColor } from '../ui';
 
 export default function Lobby() {
   const { view, actions } = useStore();
@@ -22,12 +23,21 @@ export default function Lobby() {
       <header className="lobby-top">
         <div className="brand-mark brand-mark-sm">8</div>
         <div className="lobby-title">{host?.name}’s table</div>
-        <span className="chip">Classic rules</span>
+        {ruleChips(view.rules).map((n) => <span key={n} className="chip">{n}</span>)}
         <span className="chip">{fmtCode(view.roomCode)}</span>
         <button className="btn btn-secondary btn-solid lobby-copy" onClick={copy}>
           {copied ? 'Copied' : 'Copy invite'}
         </button>
       </header>
+
+      {isHost && (
+        <div className="lobby-rules">
+          {RULE_DEFS.map((r) => (
+            <RuleRow key={r.key} name={r.name} desc={r.desc} on={view.rules[r.key]}
+              onToggle={() => actions.setRules({ ...view.rules, [r.key]: !view.rules[r.key] })} />
+          ))}
+        </div>
+      )}
 
       <div className="lobby-main">
         {view.seats.map((s) => (

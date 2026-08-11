@@ -1,4 +1,4 @@
-import type { Phase, RoomStateView } from '@uno/shared';
+import type { Phase, RoomStateView, Rules } from '@uno/shared';
 import type { GameState } from './game.js';
 
 export interface ViewContext {
@@ -10,6 +10,7 @@ export interface ViewContext {
   winTally: number[];
   pausedForSeat: number | null;
   pausedSinceMs: number | null;
+  rules: Rules;
   game: GameState | null;
 }
 
@@ -38,6 +39,8 @@ export function projectView(ctx: ViewContext, seat: number): RoomStateView {
     pendingDrawnCardId: g?.pendingDrawn?.seat === seat ? g.pendingDrawn.cardId : null,
     catchableSeat: g?.catchWindow?.seat ?? null,
     drawPileCount: g ? g.drawPile.length : 0,
+    rules: ctx.rules,
+    pendingDraw: g ? g.pendingDraw : 0,
     winnerSeat: g ? g.winner : null,
     winTally: ctx.winTally,
     paused: ctx.pausedForSeat !== null,

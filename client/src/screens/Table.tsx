@@ -5,7 +5,7 @@ import ColorPicker from '../components/ColorPicker';
 import PauseOverlay from '../components/PauseOverlay';
 import Seat from '../components/Seat';
 import { useStore } from '../store';
-import { initialOf, roundsPlayed, seatColor } from '../ui';
+import { initialOf, roundsPlayed, ruleChips, seatColor } from '../ui';
 
 export default function Table() {
   const { view, actions, rejection } = useStore();
@@ -23,15 +23,26 @@ export default function Table() {
   const turnName = view.seats.find((s) => s.seat === view.turnSeat)?.name;
   const banner = !view.currentColor
     ? 'The flip was wild — pick the colour'
-    : yourTurn
-      ? `Your turn — ${view.currentColor} is live`
-      : `${turnName}’s turn · ${view.currentColor} is live`;
+    : view.pendingDraw > 0
+      ? yourTurn
+        ? `Answer the +${view.pendingDraw} — stack or take it`
+        : `${turnName} must answer +${view.pendingDraw}`
+      : yourTurn
+        ? `Your turn — ${view.currentColor} is live`
+        : `${turnName}’s turn · ${view.currentColor} is live`;
 
   const canPlay = (c: Card) =>
     yourTurn && !view.mustChooseColor &&
     (view.pendingDrawnCardId === null || view.pendingDrawnCardId === c.id) &&
-    isPlayable(c, view.topCard!, view.currentColor);
+    (view.pendingDraw > 0
+      ? c.value === 'draw2' || c.value === 'wild4' // stacking: only an answer card goes down
+      : isPlayable(c, view.topCard!, view.currentColor));
   const canDraw = yourTurn && view.pendingDrawnCardId === null && !view.mustChooseColor;
+
+  // Force play: a drawn playable wild is held as pendingDrawn until the colour lands.
+  const forcedWildId = view.rules.forcePlay && view.pendingDrawnCardId !== null &&
+    view.hand.some((c) => c.id === view.pendingDrawnCardId && (c.value === 'wild' || c.value === 'wild4'))
+    ? view.pendingDrawnCardId : null;
 
   const playCard = (c: Card) => {
     if (c.value === 'wild' || c.value === 'wild4') setWildCardId(c.id);
@@ -50,7 +61,7 @@ export default function Table() {
         <span>{host?.name}’s table</span>
         <span className="sep" />
         <span>Round {roundsPlayed(view.winTally) + 1}</span>
-        <span className="chip">Classic rules</span>
+        {ruleChips(view.rules).map((n) => <span key={n} className="chip">{n}</span>)}
         <a className="btn btn-ghost table-leave" href="/">Leave</a>
       </div>
 
@@ -105,9 +116,11 @@ export default function Table() {
             <strong>{you?.name ?? 'You'}</strong>
             <span className="you-count">{view.hand.length} cards</span>
           </span>
-          {view.pendingDrawnCardId !== null
+          {view.pendingDrawnCardId !== null && !view.rules.forcePlay
             ? <button className="btn btn-secondary btn-solid" onClick={actions.pass}>Keep it</button>
-            : <button className="btn btn-secondary btn-solid" disabled={!canDraw} onClick={actions.draw}>Draw</button>}
+            : <button className="btn btn-secondary btn-solid" disabled={!canDraw} onClick={actions.draw}>
+                {yourTurn && view.pendingDraw > 0 ? `Take +${view.pendingDraw}` : 'Draw'}
+              </button>}
           {canCatch
             ? <button className="btn btn-primary" onClick={actions.catchCall}>Catch</button>
             : <button className="btn btn-primary" disabled={!canCall} onClick={actions.call}>Call “last card”</button>}
@@ -121,6 +134,10 @@ export default function Table() {
       {wildCardId !== null && (
         <ColorPicker title="Choose a colour"
           onPick={(c) => { actions.play(wildCardId, c); setWildCardId(null); }} />
+      )}
+      {forcedWildId !== null && wildCardId === null && (
+        <ColorPicker title="Choose a colour" subtitle="Force play — your drawn wild goes down."
+          onPick={(c) => actions.play(forcedWildId, c)} />
       )}
       <PauseOverlay />
     </main>
