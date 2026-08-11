@@ -88,7 +88,8 @@
   border-radius: 13px; background: var(--suit);
   box-shadow: var(--shadow-md); position: relative;
 }
-.cardface:disabled { cursor: default; opacity: 0.55; }
+.cardface:disabled { cursor: default; }
+.hand .cardface:disabled { opacity: 0.55; } /* dim only unplayable hand cards, not the stage/fans */
 .cardface-playable { opacity: 1; }
 .cardface-playable:not(:disabled):hover { transform: translateY(-10px); }
 .cardface-raised { transform: translateY(-14px); outline: 3px solid var(--color-accent); outline-offset: 3px; }
@@ -116,3 +117,6 @@
   cursor: pointer; box-shadow: var(--shadow-sm);
 }
 .colorpicker-dot:hover { transform: scale(1.08); }
+
+.seat-avatar-big { width: 74px; height: 74px; font-size: 32px; }
+.roundover-table { max-width: 360px; }

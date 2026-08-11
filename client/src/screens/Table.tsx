@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { isPlayable, type Card } from '@uno/shared';
 import CardFace from '../components/CardFace';
 import ColorPicker from '../components/ColorPicker';
+import PauseOverlay from '../components/PauseOverlay';
 import Seat from '../components/Seat';
 import { useStore } from '../store';
 
@@ -82,6 +83,7 @@ export default function Table() {
       {wildCardId !== null && (
         <ColorPicker title="Pick the color" onPick={(c) => { actions.play(wildCardId, c); setWildCardId(null); }} />
       )}
+      <PauseOverlay />
     </main>
   );
 }
