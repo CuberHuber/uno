@@ -1,6 +1,7 @@
 import Landing from './screens/Landing';
 import Join from './screens/Join';
 import Lobby from './screens/Lobby';
+import Table from './screens/Table';
 import { useStore } from './store';
 
 export default function App() {
@@ -20,5 +21,6 @@ export default function App() {
   if (!match) return <Landing />;
   if (!view) return <Join code={match[1]!} />;
   if (view.phase === 'lobby') return <Lobby />;
-  return <pre style={{ padding: 24 }}>{JSON.stringify(view, null, 2)}</pre>; // Tasks 12-13 replace
+  if (view.phase === 'playing') return <Table />;
+  return <pre style={{ padding: 24 }}>{JSON.stringify(view, null, 2)}</pre>; // Task 13 replaces
 }
