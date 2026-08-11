@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-tsc/
 *.tsbuildinfo
+server/public/
 .env
 .DS_Store
 .superpowers/
