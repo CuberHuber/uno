@@ -239,3 +239,28 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     }
   }
 }
+
+/** Remove a seat from the current round: bury their cards at the bottom of the
+ *  draw pile, fix the turn, and end the round if only one player remains. */
+export function removeFromRound(state: GameState, seat: number): GameState {
+  const s = structuredClone(state);
+  const p = s.players[seat]!;
+  p.removed = true;
+  s.drawPile.unshift(...p.hand);
+  p.hand = [];
+  if (s.pendingDrawn?.seat === seat) s.pendingDrawn = null;
+  if (s.catchWindow?.seat === seat) s.catchWindow = null;
+  const active = s.players.flatMap((pl, i) => (pl.removed ? [] : [i]));
+  if (active.length === 1) {
+    s.winner = active[0]!;
+    return s;
+  }
+  if (s.turn === seat) {
+    if (s.mustChooseColor) {
+      s.mustChooseColor = false;
+      s.currentColor = s.discard.at(-1)!.color ?? 'red';
+    }
+    s.turn = nextSeat(s, seat);
+  }
+  return s;
+}
