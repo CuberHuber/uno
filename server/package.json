@@ -11,7 +11,7 @@
   "dependencies": {
     "@uno/shared": "*",
     "fastify": "^5.0.0",
-    "@fastify/static": "^8.0.0",
+    "@fastify/static": "^10.1.3",
     "socket.io": "^4.8.0"
   },
   "devDependencies": {
