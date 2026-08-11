@@ -5,8 +5,7 @@ import ColorPicker from '../components/ColorPicker';
 import PauseOverlay from '../components/PauseOverlay';
 import Seat from '../components/Seat';
 import { useStore } from '../store';
-
-const COLOR_NAME = { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue' } as const;
+import { initialOf, roundsPlayed, seatColor } from '../ui';
 
 export default function Table() {
   const { view, actions, rejection } = useStore();
@@ -14,22 +13,25 @@ export default function Table() {
   if (!view || !view.topCard) return null;
 
   const yourTurn = view.turnSeat === view.yourSeat;
+  const you = view.seats.find((s) => s.seat === view.yourSeat);
+  const host = view.seats.find((s) => s.isHost);
   const opponents = view.seats.filter((s) => s.seat !== view.yourSeat);
-  // 1 opponent → top; 2 → left+right; 3 → left+top+right (matches the Sunroom mockup).
+  // 1 opponent → top; 2 → left+right; 3 → left+top+right (positions from the prototype).
   const slots: Record<number, string[]> = { 1: ['top'], 2: ['left', 'right'], 3: ['left', 'top', 'right'] };
   const slotNames = slots[opponents.length] ?? ['top'];
 
-  const turnName = view.turnSeat === null ? '' :
-    view.turnSeat === view.yourSeat ? 'your turn' :
-    `${view.seats.find((s) => s.seat === view.turnSeat)?.name}’s turn`;
-  const banner = view.currentColor
-    ? `${COLOR_NAME[view.currentColor]} is live · ${turnName}`
-    : `Pick a color · ${turnName}`;
+  const turnName = view.seats.find((s) => s.seat === view.turnSeat)?.name;
+  const banner = !view.currentColor
+    ? 'The flip was wild — pick the colour'
+    : yourTurn
+      ? `Your turn — ${view.currentColor} is live`
+      : `${turnName}’s turn · ${view.currentColor} is live`;
 
   const canPlay = (c: Card) =>
     yourTurn && !view.mustChooseColor &&
     (view.pendingDrawnCardId === null || view.pendingDrawnCardId === c.id) &&
     isPlayable(c, view.topCard!, view.currentColor);
+  const canDraw = yourTurn && view.pendingDrawnCardId === null && !view.mustChooseColor;
 
   const playCard = (c: Card) => {
     if (c.value === 'wild' || c.value === 'wild4') setWildCardId(c.id);
@@ -39,51 +41,86 @@ export default function Table() {
   const canCall = (yourTurn && view.hand.length <= 2) || view.catchableSeat === view.yourSeat;
   const canCatch = view.catchableSeat !== null && view.catchableSeat !== view.yourSeat;
 
+  // Thickness of the stock: one visible edge per ~7 cards, as in the prototype.
+  const layers = Math.max(0, Math.min(12, Math.round(view.drawPileCount / 7)));
+
   return (
     <main className="table-screen">
-      <div className="table-felt">
-        <div className="opps">
-          {opponents.map((s, i) => (
-            <div key={s.seat} className={`opp-slot opp-slot-${slotNames[i]}`}>
-              <Seat seat={s} active={view.turnSeat === s.seat} />
-            </div>
-          ))}
+      <div className="table-top">
+        <span>{host?.name}’s table</span>
+        <span className="sep" />
+        <span>Round {roundsPlayed(view.winTally) + 1}</span>
+        <span className="chip">Classic rules</span>
+        <a className="btn btn-ghost table-leave" href="/">Leave</a>
+      </div>
+
+      <div className="table-mid">
+        <div className="felt-box">
+          <div className="felt" />
+          <div className="opps">
+            {opponents.map((s, i) => (
+              <div key={s.seat} className={`opp-slot opp-slot-${slotNames[i]}`}>
+                <Seat seat={s} active={view.turnSeat === s.seat} />
+              </div>
+            ))}
+          </div>
+          <div className={`deck${canDraw ? ' deck-clickable' : ''}`}
+            onClick={canDraw ? actions.draw : undefined}>
+            {Array.from({ length: layers }, (_, i) => (
+              <div key={i} className="deck-layer"
+                style={{ bottom: i * 2.5, left: i * 1.4, background: i % 2 ? '#2a2621' : '#332f2b' }} />
+            ))}
+            <span className="deck-top" style={{ bottom: layers * 2.5, left: layers * 1.4 }}>
+              <CardFace back size="lg" onClick={canDraw ? actions.draw : undefined} />
+            </span>
+            <span className="deck-count">{view.drawPileCount} left</span>
+          </div>
+          <div className="discard">
+            <CardFace card={view.topCard} size="lg" />
+          </div>
         </div>
-        <div className="stage">
-          <CardFace back size="lg" onClick={yourTurn && view.pendingDrawnCardId === null ? actions.draw : undefined} />
-          <CardFace card={view.topCard} size="lg" />
-          <span className="live-dot" style={{ background: view.currentColor ? `var(--card-${view.currentColor})` : '#3b352d' }} />
-        </div>
-        <div className="banner">{rejection ?? banner}</div>
       </div>
 
       <div className="hand-dock">
-        <div className="hand">
+        <div className="banner">
+          <span className="live-dot"
+            style={{ background: view.currentColor ? `var(--card-${view.currentColor})` : 'var(--card-wild)' }} />
+          <span className="banner-text">{rejection ?? banner}</span>
+        </div>
+        <div className={`hand${view.hand.length > 7 ? ' hand-tight' : ''}${yourTurn ? ' hand-turn' : ''}`}>
           {view.hand.map((c) => (
-            <CardFace key={c.id} card={c}
-              playable={canPlay(c)}
-              raised={view.pendingDrawnCardId === c.id}
-              onClick={canPlay(c) ? () => playCard(c) : undefined} />
+            <span key={c.id} className="hand-slot">
+              <CardFace card={c}
+                playable={canPlay(c)}
+                raised={view.pendingDrawnCardId === c.id}
+                onClick={canPlay(c) ? () => playCard(c) : undefined} />
+            </span>
           ))}
         </div>
         <div className="hand-actions">
-          <span className="opp-pill">
-            <span className="seat-avatar">{view.seats.find((s) => s.seat === view.yourSeat)?.name[0]?.toUpperCase()}</span>
-            <strong>You</strong>
-            <span className="text-muted">{view.hand.length} cards</span>
+          <span className={`you-pill${yourTurn ? ' you-pill-turn' : ''}`}>
+            <span className="seat-avatar" style={{ background: seatColor(view.yourSeat) }}>
+              {initialOf(you?.name)}
+            </span>
+            <strong>{you?.name ?? 'You'}</strong>
+            <span className="you-count">{view.hand.length} cards</span>
           </span>
           {view.pendingDrawnCardId !== null
-            ? <button className="btn btn-secondary" onClick={actions.pass}>Keep it</button>
-            : <button className="btn btn-secondary" disabled={!yourTurn} onClick={actions.draw}>Draw</button>}
+            ? <button className="btn btn-secondary btn-solid" onClick={actions.pass}>Keep it</button>
+            : <button className="btn btn-secondary btn-solid" disabled={!canDraw} onClick={actions.draw}>Draw</button>}
           {canCatch
             ? <button className="btn btn-primary" onClick={actions.catchCall}>Catch</button>
             : <button className="btn btn-primary" disabled={!canCall} onClick={actions.call}>Call “last card”</button>}
         </div>
       </div>
 
-      {view.mustChooseColor && <ColorPicker title="The flip was wild — pick the color" onPick={actions.chooseColor} />}
+      {view.mustChooseColor && (
+        <ColorPicker title="Choose a colour" subtitle="The flip was wild — you set what plays first."
+          onPick={actions.chooseColor} />
+      )}
       {wildCardId !== null && (
-        <ColorPicker title="Pick the color" onPick={(c) => { actions.play(wildCardId, c); setWildCardId(null); }} />
+        <ColorPicker title="Choose a colour"
+          onPick={(c) => { actions.play(wildCardId, c); setWildCardId(null); }} />
       )}
       <PauseOverlay />
     </main>

@@ -11,11 +11,12 @@ export default function App() {
 
   if (error) {
     return (
-      <main className="screen">
-        <div className="brand-mark">8</div>
-        <h2>Table not found</h2>
-        <p className="text-muted">The link may have expired — tables close after a while.</p>
-        <a className="btn btn-primary" href="/">Back to start</a>
+      <main className="centered">
+        <div className="panel panel-pad join-card">
+          <h2>Table not found</h2>
+          <p className="card-sub">The link may have expired — tables close after a while.</p>
+          <a className="btn btn-primary btn-big" href="/">Back to start</a>
+        </div>
       </main>
     );
   }

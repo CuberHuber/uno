@@ -1,42 +1,68 @@
+import { useState } from 'react';
 import { useStore } from '../store';
+import { fmtCode, initialOf, seatColor } from '../ui';
 
 export default function Lobby() {
   const { view, actions } = useStore();
+  const [copied, setCopied] = useState(false);
   if (!view) return null;
+
   const you = view.seats.find((s) => s.seat === view.yourSeat);
   const isHost = you?.isHost ?? false;
+  const host = view.seats.find((s) => s.isHost);
   const link = `${window.location.origin}/r/${view.roomCode}`;
+  const copy = () => {
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1400);
+  };
 
   return (
-    <main className="screen">
-      <div className="brand-mark">8</div>
-      <h2>{view.seats.find((s) => s.isHost)?.name}’s table</h2>
-      <button className="btn btn-ghost" onClick={() => navigator.clipboard.writeText(link)}>
-        Copy invite · {view.roomCode}
-      </button>
-      <ul className="lobby-seats">
+    <main className="lobby-screen">
+      <header className="lobby-top">
+        <div className="brand-mark brand-mark-sm">8</div>
+        <div className="lobby-title">{host?.name}’s table</div>
+        <span className="chip">Classic rules</span>
+        <span className="chip">{fmtCode(view.roomCode)}</span>
+        <button className="btn btn-secondary btn-solid lobby-copy" onClick={copy}>
+          {copied ? 'Copied' : 'Copy invite'}
+        </button>
+      </header>
+
+      <div className="lobby-main">
         {view.seats.map((s) => (
-          <li key={s.seat} className="lobby-seat">
-            <span className="seat-avatar">{s.name[0]?.toUpperCase()}</span>
-            <span>{s.name}{s.seat === view.yourSeat ? ' (you)' : ''}</span>
-            {s.isHost && <span className="tag tag-accent">Host</span>}
-            {!s.connected && <span className="tag tag-neutral">away</span>}
-          </li>
+          <div key={s.seat} className="seat-card">
+            <span className="seat-avatar" style={{ background: seatColor(s.seat) }}>
+              {initialOf(s.name)}
+            </span>
+            <div className="seat-name">{s.name}{s.seat === view.yourSeat ? ' (you)' : ''}</div>
+            <span className="seat-status" style={{
+              color: !s.connected ? 'var(--color-neutral-500)'
+                : s.isHost ? 'var(--color-accent-700)' : 'var(--color-accent-2-700)',
+            }}>
+              {!s.connected ? 'away' : s.isHost ? 'Host' : 'Ready'}
+            </span>
+          </div>
         ))}
         {Array.from({ length: 4 - view.seats.length }, (_, i) => (
-          <li key={`open-${i}`} className="lobby-seat lobby-seat-open">
-            <span className="seat-avatar">+</span><span>Seat open</span>
-          </li>
+          <div key={`open-${i}`} className="seat-card seat-card-open">
+            <span className="seat-avatar">+</span>
+            <div className="seat-name">Seat open</div>
+            <span className="seat-status">waiting</span>
+          </div>
         ))}
-      </ul>
-      {isHost ? (
-        <button className="btn btn-primary" disabled={view.seats.length < 2} onClick={actions.start}>
-          Deal the first hand
-        </button>
-      ) : (
-        <p className="text-muted">Waiting for the host to deal…</p>
-      )}
-      <p className="text-muted">{view.seats.length} of 4 seated</p>
+      </div>
+
+      <footer className="lobby-foot">
+        <span className="lobby-note">
+          {view.seats.length} of 4 seated{isHost && view.seats.length >= 2 ? ' · you can start any time' : ''}
+        </span>
+        {isHost
+          ? <button className="btn btn-primary btn-big" disabled={view.seats.length < 2} onClick={actions.start}>
+              Deal the first hand
+            </button>
+          : <span className="lobby-note">Waiting for the host to deal…</span>}
+      </footer>
     </main>
   );
 }
