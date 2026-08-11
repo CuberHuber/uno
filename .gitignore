@@ -7,3 +7,4 @@ server/public/
 .DS_Store
 .superpowers/
 .remember/
+.idea/
