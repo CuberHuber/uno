@@ -42,11 +42,13 @@ export default function Table() {
   return (
     <main className="table-screen">
       <div className="table-felt">
-        {opponents.map((s, i) => (
-          <div key={s.seat} className={`opp-slot opp-slot-${slotNames[i]}`}>
-            <Seat seat={s} active={view.turnSeat === s.seat} />
-          </div>
-        ))}
+        <div className="opps">
+          {opponents.map((s, i) => (
+            <div key={s.seat} className={`opp-slot opp-slot-${slotNames[i]}`}>
+              <Seat seat={s} active={view.turnSeat === s.seat} />
+            </div>
+          ))}
+        </div>
         <div className="stage">
           <CardFace back size="lg" onClick={yourTurn && view.pendingDrawnCardId === null ? actions.draw : undefined} />
           <CardFace card={view.topCard} size="lg" />

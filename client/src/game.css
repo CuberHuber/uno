@@ -50,6 +50,7 @@
   border-radius: 50%; background: var(--felt);
   box-shadow: inset 0 0 0 10px rgb(46 43 37 / 0.07), var(--shadow-md);
 }
+.opps { display: contents; }
 .opp-slot { position: absolute; }
 .opp-slot-top { top: 0; left: 50%; transform: translateX(-50%); }
 .opp-slot-left { left: 0; top: 40%; }
@@ -120,3 +121,24 @@
 
 .seat-avatar-big { width: 74px; height: 74px; font-size: 32px; }
 .roundover-table { max-width: 360px; }
+
+@media (max-width: 720px) {
+  .table-felt { margin: var(--space-2); }
+  .table-felt::before { inset: 0; border-radius: var(--radius-lg); }
+  .opps {
+    display: flex; position: absolute; top: var(--space-2); left: 0; right: 0;
+    justify-content: center; gap: var(--space-2); flex-wrap: wrap;
+  }
+  .opp-slot, .opp-slot-top, .opp-slot-left, .opp-slot-right {
+    position: static; transform: none;
+  }
+  .opp-fan { display: none; }              /* pills only — counts carry the info */
+  .stage { gap: var(--space-2); }
+  .cardface-lg { width: 64px; height: 94px; font-size: 18px; }
+  .cardface-md { width: 56px; height: 82px; font-size: 15px; }
+  .hand { max-width: 100vw; overflow-x: auto; padding: var(--space-3) var(--space-2) 0; }
+  .hand .cardface { margin-left: -8px; }
+  .banner { bottom: 6%; font-size: 12px; }
+  .hand-dock { padding-bottom: var(--space-3); }
+  .hand-actions { flex-wrap: wrap; justify-content: center; }
+}
