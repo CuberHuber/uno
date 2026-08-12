@@ -4,9 +4,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isPlayable, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
 import PauseOverlay from '../components/PauseOverlay';
+import { useT, type MsgKey } from '../i18n';
 import { useStore } from '../store';
-import { errText, initialOf, roundsPlayed, ruleChips, seatColor } from '../ui';
-import { CardFront, COLOR_NAME, faceOf, PileBack, SUIT, type Face } from '../table/cards';
+import { initialOf, roundsPlayed, ruleChips, seatColor } from '../ui';
+import { CardFront, faceOf, PileBack, SUIT, type Face } from '../table/cards';
 import { seatSlots, stageLayout } from '../table/layout';
 
 const FLY_MS = 620;
@@ -43,6 +44,7 @@ function Flight({ from, to, ms, delay = 0, z, ease, anim, onDone, children }: {
 
 export default function Table() {
   const { view, actions, rejection, effect } = useStore();
+  const { t, terr, locale } = useT();
 
   // Viewport → stage geometry (fixed design space, scaled).
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
@@ -116,7 +118,7 @@ export default function Table() {
     processed.current = effect;
     const v = viewRef.current;
     if (!v) return;
-    const nameOf = (seat: number) => (seat === v.yourSeat ? 'You' : v.seats.find((s) => s.seat === seat)?.name ?? 'Player');
+    const nameOf = (seat: number) => (seat === v.yourSeat ? t('t.you') : v.seats.find((s) => s.seat === seat)?.name ?? 'Player');
     const stepFrom = (from: number): number => {
       const order = [...v.seats].map((s) => s.seat).sort((a, b) => a - b);
       const i = order.indexOf(from);
@@ -131,10 +133,10 @@ export default function Table() {
       } else if (!effect.cards.some((c) => leavingRef.current.has(c.id))) {
         enqueue({ kind: 'fly', slot: -1, card: last }); // force-played straight from the pile
       }
-      if (last.value === 'reverse') showToast('Direction reversed');
+      if (last.value === 'reverse') showToast(t('t.reversed'));
       if (last.value === 'skip') {
-        const t = stepFrom(effect.seat);
-        showToast(t === v.yourSeat ? 'You sit out' : `${nameOf(t)} sits out`);
+        const tgt = stepFrom(effect.seat);
+        showToast(tgt === v.yourSeat ? t('t.youSitOut') : t('t.sitsOut', { name: nameOf(tgt) }));
       }
       if (last.value === 'wild4') {
         // the +4 slam, timed to the card's landing: table quake + shadow scatter
@@ -148,8 +150,9 @@ export default function Table() {
         penaltyAt.current = Date.now(); // the matching 'drew' pops the big counter
         if (v.rules.stacking) {
           const total = v.pendingDraw + (last.value === 'draw2' ? 2 : 4);
-          const t = stepFrom(effect.seat);
-          showToast(`+${total} → ${t === v.yourSeat ? 'you' : nameOf(t)}${v.pendingDraw > 0 ? ' (stacked)' : ''}`, 2200);
+          const tgt = stepFrom(effect.seat);
+          const who = tgt === v.yourSeat ? t('t.youLower') : nameOf(tgt);
+          showToast(t('t.pot', { n: total, name: who }) + (v.pendingDraw > 0 ? t('t.stacked') : ''), 2200);
         }
       }
     } else if (effect.type === 'drew') {
@@ -174,12 +177,12 @@ export default function Table() {
         } else {
           for (let i = 0; i < Math.min(effect.count, 5); i++) enqueue({ kind: 'draw', slot, card: null });
         }
-        if (effect.count > 1) showToast(`${nameOf(effect.seat)} draws ${effect.count}`);
+        if (effect.count > 1) showToast(t('t.draws', { name: nameOf(effect.seat), n: effect.count }));
       }
     } else if (effect.type === 'called') {
-      showToast(`${nameOf(effect.seat)} called UNO!`);
+      showToast(t('t.called', { name: nameOf(effect.seat) }));
     } else if (effect.type === 'caught') {
-      showToast(`${nameOf(effect.seat)} got caught missing UNO — +2`);
+      showToast(t('t.caught', { name: nameOf(effect.seat) }));
       buzz(100);
     }
   }, [effect]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -193,7 +196,7 @@ export default function Table() {
       setTimeout(() => setShakeId(null), 550);
     }
     buzz(40);
-    showToast(errText(rejection));
+    showToast(terr(rejection));
   }, [rejection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // New hand cards enter from the pile (deal-in, draws, draw-to-match runs).
@@ -354,16 +357,16 @@ export default function Table() {
 
   const turnName = view.seats.find((s) => s.seat === view.turnSeat)?.name;
   const statusText = view.mustChooseColor
-    ? 'The flip was wild — pick the colour'
+    ? t('table.flipWild')
     : yourTurn
       ? view.pendingDraw > 0
-        ? `Answer the +${view.pendingDraw} or take it`
+        ? t('st.answer', { n: view.pendingDraw })
         : view.pendingDrawnCardId !== null
-          ? 'Play the drawn card or end your turn'
+          ? t('st.drawn')
           : picked.length > 0
-            ? `Throwing ${picked.length} together`
-            : `Your turn · ${playableCount} playable`
-      : `Waiting for ${turnName ?? '…'}…`;
+            ? t('st.throwing', { n: picked.length })
+            : t('st.turn', { n: playableCount })
+      : t('st.waiting', { name: turnName ?? '…' });
 
   const pickerOpen = view.mustChooseColor || wildIds !== null || (forcedWildId !== null && wildIds === null);
   const onPickColor = (c: Color) => {
@@ -453,10 +456,10 @@ export default function Table() {
                     fontSize: 12, color: '#f7eddc', background: '#c23b2e', borderRadius: 999,
                     padding: '4px 11px', boxShadow: 'var(--shadow-sm)', zIndex: 3,
                     animation: 'ob-pop .4s cubic-bezier(.34,1.56,.64,1) both, ob-pulse 1.6s ease-out .4s infinite',
-                  }}>UNO!</span>
+                  }}>{t('table.uno')}</span>
                 )}
               </div>
-              {active && <span className="march-badge" style={{ margin: '0 0 -6px', position: 'relative', zIndex: 2 }}>PLAYING</span>}
+              {active && <span className="march-badge" style={{ margin: '0 0 -6px', position: 'relative', zIndex: 2 }}>{t('table.playing')}</span>}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10, background: '#fdf8ef',
                 borderRadius: 999, padding: '5px 16px 5px 5px', boxShadow: 'var(--shadow-md)',
@@ -472,7 +475,7 @@ export default function Table() {
                   <div style={{
                     fontSize: 11, fontWeight: 600,
                     color: active ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
-                  }}>{!s.connected ? 'Away' : active ? 'Thinking…' : `${s.cardCount} cards`}</div>
+                  }}>{!s.connected ? t('table.away') : active ? t('table.thinking') : t('table.cards', { n: s.cardCount })}</div>
                 </div>
               </div>
             </div>
@@ -494,7 +497,9 @@ export default function Table() {
             color: canDraw ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
             background: '#fdf8ef', borderRadius: 999, padding: '4px 12px', boxShadow: 'var(--shadow-sm)',
           }}>
-            {yourTurn && view.pendingDraw > 0 ? `Take +${view.pendingDraw}` : `Draw · ${view.drawPileCount}`}
+            {yourTurn && view.pendingDraw > 0
+              ? t('table.takeN', { n: view.pendingDraw })
+              : t('table.draw', { n: view.drawPileCount })}
           </div>
           {shuffling && (
             <>
@@ -513,7 +518,7 @@ export default function Table() {
             boxShadow: 'var(--shadow-md)', whiteSpace: 'nowrap',
             animation: 'ob-pop .4s cubic-bezier(.34,1.56,.64,1) both, ob-pulse 1.6s ease-out .4s infinite',
           }}>
-            +{view.pendingDraw} on you — stack a {view.pendingDrawKind === 'wild4' ? '+4' : '+2'} or draw
+            {t('table.pend', { n: view.pendingDraw, card: view.pendingDrawKind === 'wild4' ? '+4' : '+2' })}
           </div>
         )}
         {toast && (
@@ -629,7 +634,7 @@ export default function Table() {
         }}>
           {yourTurn && (
             <span className="march-badge" style={{ fontSize: 12, padding: '5px 14px', margin: '0 0 -6px 14px', position: 'relative', zIndex: 2 }}>
-              YOUR TURN
+              {t('table.yourTurn')}
             </span>
           )}
           <div style={{
@@ -721,16 +726,16 @@ export default function Table() {
         {/* action buttons */}
         {picked.length > 0 ? (
           <div style={{ position: 'absolute', right: L.endR, bottom: L.endB, display: 'flex', gap: 10, zIndex: 45 }}>
-            <button type="button" className="btn ghost-pill" onClick={() => setPicked([])}>Clear</button>
+            <button type="button" className="btn ghost-pill" onClick={() => setPicked([])}>{t('table.clear')}</button>
             <button type="button" className="btn end-btn" onClick={() => playNow(picked)}>
-              Discard {picked.length}
+              {t('table.discardN', { n: picked.length })}
             </button>
           </div>
         ) : canPass ? (
           <button type="button" className="btn end-btn"
             style={{ position: 'absolute', right: L.endR, bottom: L.endB, zIndex: 45 }}
             onClick={actions.pass}>
-            End turn
+            {t('table.endTurn')}
           </button>
         ) : null}
 
@@ -738,7 +743,7 @@ export default function Table() {
           <button type="button" className="btn uno-btn"
             style={{ position: 'absolute', left: L.unoL, bottom: L.unoB, zIndex: 45 }}
             onClick={canCatch ? actions.catchCall : actions.call}>
-            {canCatch ? 'Catch!' : 'UNO!'}
+            {canCatch ? t('table.catch') : t('table.uno')}
             {view.catchableSeat === view.yourSeat && !canCatch && (
               <span style={{
                 position: 'absolute', left: 16, right: 16, bottom: 7, height: 4,
@@ -763,10 +768,10 @@ export default function Table() {
           }}>
             <span style={{ fontSize: 13, fontWeight: 700 }}>
               {view.mustChooseColor
-                ? 'The flip was wild — choose a colour'
+                ? t('table.flipWild')
                 : forcedWildId !== null && wildIds === null
-                  ? 'Force play — your wild goes down'
-                  : 'Choose a colour'}
+                  ? t('table.forcedWild')
+                  : t('table.chooseColour')}
             </span>
             <div style={{ display: 'flex', gap: 12 }}>
               {(['red', 'blue', 'yellow', 'green'] as Color[]).map((c) => (
@@ -788,7 +793,9 @@ export default function Table() {
             boxShadow: 'var(--shadow-sm)', zIndex: 6, animation: 'ob-pop .4s cubic-bezier(.34,1.56,.64,1) both',
           }}>
             <span style={{ width: 11, height: 11, borderRadius: '50%', background: calledHex }} />
-            <span style={{ fontSize: 12, fontWeight: 700 }}>{COLOR_NAME[view.currentColor]} called</span>
+            <span style={{ fontSize: 12, fontWeight: 700 }}>
+              {t('table.called', { color: t(`color.${view.currentColor}` as MsgKey) })}
+            </span>
           </div>
         )}
 
@@ -809,12 +816,14 @@ export default function Table() {
           position: 'absolute', left: 16, top: L.ngT, display: 'flex', gap: 8, alignItems: 'center',
           flexWrap: 'wrap', zIndex: 45, maxWidth: '60%',
         }}>
-          <span className="stage-chip">{host?.name}’s table · Round {roundsPlayed(view.winTally) + 1}</span>
-          {ruleChips(view.rules).map((n) => <span key={n} className="stage-chip stage-chip-dim">{n}</span>)}
+          <span className="stage-chip">
+            {t('table.tableOf', { name: host?.name ?? '', n: roundsPlayed(view.winTally) + 1 })}
+          </span>
+          {ruleChips(view.rules, locale).map((n) => <span key={n} className="stage-chip stage-chip-dim">{n}</span>)}
         </div>
         <a className="btn btn-ghost ghost-pill" href="/"
           style={{ position: 'absolute', right: L.ngR, top: L.ngT, zIndex: 45 }}>
-          Leave
+          {t('table.leave')}
         </a>
       </div>
       <PauseOverlay />
