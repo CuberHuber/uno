@@ -9,7 +9,7 @@ describe('calling before playing', () => {
     const called = applyAction(s, { type: 'callLastCard', seat: 0 });
     if (!called.ok) throw new Error(called.error);
     expect(called.state.players[0]!.calledLastCard).toBe(true);
-    const played = applyAction(called.state, { type: 'play', seat: 0, cardId: c0.id });
+    const played = applyAction(called.state, { type: 'play', seat: 0, cardIds: [c0.id] });
     if (!played.ok) throw new Error(played.error);
     expect(played.state.catchWindow).toBeNull();
   });
@@ -23,7 +23,7 @@ describe('forgetting to call', () => {
   function windowOpen() {
     const c0 = card('red', '3');
     const s = fixedState([[c0, card('blue', '9')], [card('green', '2')], [card('yellow', '1')]], card('red', '7'));
-    const played = applyAction(s, { type: 'play', seat: 0, cardId: c0.id });
+    const played = applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] });
     if (!played.ok) throw new Error(played.error);
     expect(played.state.catchWindow).toEqual({ seat: 0 });
     return played.state;

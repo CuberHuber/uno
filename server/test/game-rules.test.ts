@@ -12,7 +12,7 @@ describe('house rule: stacking +2/+4', () => {
     const s = fixedState(
       [[d2, card('red', '1')], [card('green', '2')], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [d2.id] });
     if (!r.ok) throw new Error(r.error);
     expect(r.state.pendingDraw).toBe(2);
     expect(r.state.turn).toBe(1);
@@ -25,9 +25,9 @@ describe('house rule: stacking +2/+4', () => {
     const s = fixedState(
       [[d2a, card('red', '1')], [d2b, card('green', '2')], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2a.id });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardIds: [d2a.id] });
     if (!r1.ok) throw new Error(r1.error);
-    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardId: d2b.id });
+    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardIds: [d2b.id] });
     if (!r2.ok) throw new Error(r2.error);
     expect(r2.state.pendingDraw).toBe(4);
     expect(r2.state.turn).toBe(2);
@@ -40,9 +40,9 @@ describe('house rule: stacking +2/+4', () => {
     const s = fixedState(
       [[d2a, card('red', '1')], [d2b, card('green', '2')], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2a.id });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardIds: [d2a.id] });
     if (!r1.ok) throw new Error(r1.error);
-    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardId: d2b.id });
+    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardIds: [d2b.id] });
     if (!r2.ok) throw new Error(r2.error);
     expect(r2.state.pendingDraw).toBe(4);
     expect(r2.state.turn).toBe(2);
@@ -55,9 +55,9 @@ describe('house rule: stacking +2/+4', () => {
     const s = fixedState(
       [[d2, card('red', '1')], [match], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardIds: [d2.id] });
     if (!r1.ok) throw new Error(r1.error);
-    expect(applyAction(r1.state, { type: 'play', seat: 1, cardId: match.id }).ok).toBe(false);
+    expect(applyAction(r1.state, { type: 'play', seat: 1, cardIds: [match.id] }).ok).toBe(false);
   });
 
   test('drawing takes the whole pot, resets it, and passes the turn', () => {
@@ -65,7 +65,7 @@ describe('house rule: stacking +2/+4', () => {
     const s = fixedState(
       [[d2, card('red', '1')], [card('green', '2')], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardIds: [d2.id] });
     if (!r1.ok) throw new Error(r1.error);
     const r2 = applyAction(r1.state, { type: 'draw', seat: 1 });
     if (!r2.ok) throw new Error(r2.error);
@@ -81,7 +81,7 @@ describe('house rule: stacking +2/+4', () => {
     const s = fixedState(
       [[d2, card('red', '1')], [card('green', '2')], [card('blue', '3')]],
       card('red', '7'));
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [d2.id] });
     if (!r.ok) throw new Error(r.error);
     expect(r.state.players[1]!.hand).toHaveLength(3); // drew both at once
     expect(r.state.turn).toBe(2);                     // and was skipped
@@ -108,9 +108,9 @@ describe('strict stacking: +2 answers +2, +4 answers +4', () => {
     const s = fixedState(
       [[d2, card('red', '1')], [w4, card('green', '2')], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardIds: [d2.id] });
     if (!r1.ok) throw new Error(r1.error);
-    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardId: w4.id, chosenColor: 'green' });
+    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardIds: [w4.id], chosenColor: 'green' });
     expect(r2).toEqual({ ok: false, error: 'answer_pot' });
   });
   test('a draw2 may NOT answer a +4 pot', () => {
@@ -119,16 +119,16 @@ describe('strict stacking: +2 answers +2, +4 answers +4', () => {
     const s = fixedState(
       [[w4, card('red', '1')], [d2, card('green', '2')], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: w4.id, chosenColor: 'red' });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardIds: [w4.id], chosenColor: 'red' });
     if (!r1.ok) throw new Error(r1.error);
-    expect(applyAction(r1.state, { type: 'play', seat: 1, cardId: d2.id }).ok).toBe(false);
+    expect(applyAction(r1.state, { type: 'play', seat: 1, cardIds: [d2.id] }).ok).toBe(false);
   });
   test('kind resets when the pot is taken', () => {
     const d2 = card('red', 'draw2');
     const s = fixedState(
       [[d2, card('red', '1')], [card('green', '2')], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardIds: [d2.id] });
     if (!r1.ok) throw new Error(r1.error);
     const r2 = applyAction(r1.state, { type: 'draw', seat: 1 });
     if (!r2.ok) throw new Error(r2.error);
@@ -147,7 +147,7 @@ describe('house rule: force play', () => {
     expect(r.state.players[0]!.hand).toHaveLength(1);
     expect(r.state.turn).toBe(1);
     expect(r.effects).toContainEqual({ type: 'drew', seat: 0, count: 1 });
-    expect(r.effects).toContainEqual({ type: 'played', seat: 0, card: drawn });
+    expect(r.effects).toContainEqual({ type: 'played', seat: 0, cards: [drawn] });
   });
 
   test('a forced draw2 still lands its penalty on the next player', () => {
@@ -171,7 +171,7 @@ describe('house rule: force play', () => {
     if (!r.ok) throw new Error(r.error);
     expect(r.state.pendingDrawn).toEqual({ seat: 0, cardId: drawn.id });
     expect(applyAction(r.state, { type: 'pass', seat: 0 }).ok).toBe(false);
-    const played = applyAction(r.state, { type: 'play', seat: 0, cardId: drawn.id, chosenColor: 'blue' });
+    const played = applyAction(r.state, { type: 'play', seat: 0, cardIds: [drawn.id], chosenColor: 'blue' });
     if (!played.ok) throw new Error(played.error);
     expect(played.state.currentColor).toBe('blue');
     expect(played.state.turn).toBe(1);

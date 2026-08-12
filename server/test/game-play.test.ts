@@ -30,18 +30,18 @@ describe('play — validation', () => {
   test('rejects out-of-turn plays', () => {
     const c0 = card('red', '3');
     const s = fixedState([[c0], [card('red', '4')]], card('red', '7'), { turn: 1 });
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: c0.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] });
     expect(r.ok).toBe(false);
   });
   test('rejects non-matching card', () => {
     const c0 = card('blue', '3');
     const s = fixedState([[c0], []], card('red', '7'));
-    expect(applyAction(s, { type: 'play', seat: 0, cardId: c0.id }).ok).toBe(false);
+    expect(applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] }).ok).toBe(false);
   });
   test('rejects card not in hand and does not mutate input', () => {
     const s = fixedState([[card('red', '3')], []], card('red', '7'));
     const before = JSON.stringify(s);
-    expect(applyAction(s, { type: 'play', seat: 0, cardId: 99999 }).ok).toBe(false);
+    expect(applyAction(s, { type: 'play', seat: 0, cardIds: [99999] }).ok).toBe(false);
     expect(JSON.stringify(s)).toBe(before);
   });
 });
@@ -50,12 +50,12 @@ describe('play — number cards', () => {
   test('moves card to discard, sets color, advances turn', () => {
     const c0 = card('blue', '7');
     const s = fixedState([[c0, card('red', '1')], [card('green', '2')]], card('red', '7'));
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: c0.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] });
     if (!r.ok) throw new Error(r.error);
     expect(r.state.discard.at(-1)!.id).toBe(c0.id);
     expect(r.state.currentColor).toBe('blue');
     expect(r.state.turn).toBe(1);
-    expect(r.effects).toContainEqual({ type: 'played', seat: 0, card: c0 });
+    expect(r.effects).toContainEqual({ type: 'played', seat: 0, cards: [c0] });
   });
 });
 
@@ -63,14 +63,14 @@ describe('play — action cards', () => {
   test('skip jumps one player (3p)', () => {
     const c0 = card('red', 'skip');
     const s = fixedState([[c0, card('red', '1')], [card('green', '2')], [card('blue', '2')]], card('red', '7'));
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: c0.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] });
     if (!r.ok) throw new Error(r.error);
     expect(r.state.turn).toBe(2);
   });
   test('reverse flips direction (3p)', () => {
     const c0 = card('red', 'reverse');
     const s = fixedState([[c0, card('red', '1')], [card('green', '2')], [card('blue', '2')]], card('red', '7'));
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: c0.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] });
     if (!r.ok) throw new Error(r.error);
     expect(r.state.direction).toBe(-1);
     expect(r.state.turn).toBe(2);
@@ -78,7 +78,7 @@ describe('play — action cards', () => {
   test('reverse acts as skip in 2p: same player goes again', () => {
     const c0 = card('red', 'reverse');
     const s = fixedState([[c0, card('red', '1')], [card('green', '2')]], card('red', '7'));
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: c0.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] });
     if (!r.ok) throw new Error(r.error);
     expect(r.state.turn).toBe(0);
     expect(r.state.direction).toBe(1);
@@ -86,7 +86,7 @@ describe('play — action cards', () => {
   test('draw2: victim draws 2 and is skipped', () => {
     const c0 = card('red', 'draw2');
     const s = fixedState([[c0, card('red', '1')], [card('green', '2')], [card('blue', '2')]], card('red', '7'));
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: c0.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] });
     if (!r.ok) throw new Error(r.error);
     expect(r.state.players[1]!.hand).toHaveLength(3);
     expect(r.state.turn).toBe(2);
@@ -98,7 +98,7 @@ describe('play — winning', () => {
   test('playing the last card ends the round', () => {
     const c0 = card('red', '3');
     const s = fixedState([[c0], [card('green', '2')]], card('red', '7'));
-    const r = applyAction(s, { type: 'play', seat: 0, cardId: c0.id });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [c0.id] });
     if (!r.ok) throw new Error(r.error);
     expect(r.state.winner).toBe(0);
     expect(r.effects).toContainEqual({ type: 'win', seat: 0 });

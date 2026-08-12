@@ -87,7 +87,7 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
 }
 
 export type Action =
-  | { type: 'play'; seat: number; cardId: number; chosenColor?: Color }
+  | { type: 'play'; seat: number; cardIds: number[]; chosenColor?: Color }
   | { type: 'draw'; seat: number }
   | { type: 'pass'; seat: number }
   | { type: 'chooseColor'; seat: number; color: Color }
@@ -139,11 +139,22 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     case 'play': {
       if (s.turn !== action.seat) return err('not_your_turn');
       if (s.mustChooseColor) return err('choose_color_first');
-      if (s.pendingDrawn && s.pendingDrawn.seat === action.seat && s.pendingDrawn.cardId !== action.cardId)
+      if (s.pendingDrawn && s.pendingDrawn.seat === action.seat
+          && (action.cardIds.length !== 1 || s.pendingDrawn.cardId !== action.cardIds[0]))
         return err('play_drawn_or_pass');
-      const idx = player.hand.findIndex((c) => c.id === action.cardId);
-      if (idx === -1) return err('card_not_in_hand');
-      const card = player.hand[idx]!;
+      if (action.cardIds.length === 0) return err('card_not_in_hand');
+      if (new Set(action.cardIds).size !== action.cardIds.length) return err('bad_stack');
+      const picked = action.cardIds.map((id) => player.hand.find((c) => c.id === id));
+      if (picked.some((c) => !c)) return err('card_not_in_hand');
+      const stack = picked as Card[];
+      const card = stack[0]!;
+      const isNumber = (c: Card) => /^\d$/.test(c.value);
+      // A multi-card stack: same-value number cards only, never onto an owed pot.
+      if (stack.length > 1) {
+        if (!s.rules.multiDiscard) return err('bad_stack');
+        if (s.pendingDraw > 0) return err('answer_pot');
+        if (!stack.every((c) => isNumber(c) && c.value === card.value)) return err('bad_stack');
+      }
       const top = s.discard.at(-1)!;
       // Strict stacking: a +2 pot is answered only by a +2, a +4 pot only by a +4.
       const stackAnswer = s.pendingDraw > 0 && card.value === s.pendingDrawKind;
@@ -154,10 +165,11 @@ export function applyAction(state: GameState, action: Action): ActionResult {
 
       s.catchWindow = null; // the next act closes any open window (may re-arm below)
       s.pendingDrawn = null;
-      player.hand.splice(idx, 1);
-      s.discard.push(card);
-      s.currentColor = isWild ? action.chosenColor! : card.color;
-      effects.push({ type: 'played', seat: action.seat, card });
+      for (const c of stack) player.hand.splice(player.hand.findIndex((h) => h.id === c.id), 1);
+      s.discard.push(...stack);
+      const last = stack.at(-1)!;
+      s.currentColor = isWild ? action.chosenColor! : last.color;
+      effects.push({ type: 'played', seat: action.seat, cards: stack });
 
       if (player.hand.length === 0) {
         s.winner = action.seat;
@@ -166,6 +178,12 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       }
       if (player.hand.length === 1 && !player.calledLastCard) {
         s.catchWindow = { seat: action.seat };
+      }
+
+      if (stack.length > 1) {
+        // Stacks are always number cards: no action effects, the turn just moves on.
+        s.turn = nextSeat(s, action.seat);
+        return { ok: true, state: s, effects };
       }
 
       const active = s.players.filter((p) => !p.removed).length;
@@ -240,7 +258,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
         const isWildDraw = drawnCard.value === 'wild' || drawnCard.value === 'wild4';
         if (s.rules.forcePlay && !isWildDraw) {
           // Force play: the drawn card goes straight down (wilds wait for a colour).
-          const played = applyAction(s, { type: 'play', seat: action.seat, cardId: drawnCard.id });
+          const played = applyAction(s, { type: 'play', seat: action.seat, cardIds: [drawnCard.id] });
           if (played.ok) return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
         }
         s.pendingDrawn = { seat: action.seat, cardId: drawnCard.id };

@@ -66,7 +66,7 @@ describe('starting and playing', () => {
     if (g.mustChooseColor) { g.mustChooseColor = false; g.currentColor = 'red'; g.players[g.turn]!.hand = [{ id: 9999, color: 'red', value: '5' }]; }
     const turnSeat = g.turn;
     const token = turnSeat === 0 ? a.token : (store.getRoom(room.code)!.players[turnSeat]!.token);
-    const r = store.act(room.code, token, { type: 'play', cardId: 9999 } as never);
+    const r = store.act(room.code, token, { type: 'play', cardIds: [9999] } as never);
     expect(r.ok).toBe(true);
     const after = store.getRoom(room.code)!;
     expect(after.phase).toBe('roundEnd');

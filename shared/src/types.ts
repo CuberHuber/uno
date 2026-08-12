@@ -59,7 +59,7 @@ export interface RoomStateView {
 }
 
 export type Effect =
-  | { type: 'played'; seat: number; card: Card }
+  | { type: 'played'; seat: number; cards: Card[] }
   | { type: 'drew'; seat: number; count: number }
   | { type: 'called'; seat: number }
   | { type: 'caught'; seat: number }
