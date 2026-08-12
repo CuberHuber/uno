@@ -246,25 +246,29 @@ export function applyAction(state: GameState, action: Action): ActionResult {
         s.turn = nextSeat(s, action.seat);
         return { ok: true, state: s, effects };
       }
-      const n = drawFromPile(s, action.seat, 1);
-      effects.push({ type: 'drew', seat: action.seat, count: n });
-      if (n === 0) {
+      // Draw one card — or, under drawToMatch, keep drawing to the first playable.
+      let total = 0;
+      let drawnCard: Card | null = null;
+      for (;;) {
+        const n = drawFromPile(s, action.seat, 1);
+        if (n === 0) { drawnCard = null; break; }
+        total += 1;
+        drawnCard = player.hand.at(-1)!;
+        const playable = isPlayable(drawnCard, s.discard.at(-1)!, s.currentColor);
+        if (playable || !s.rules.drawToMatch) break;
+      }
+      effects.push({ type: 'drew', seat: action.seat, count: total });
+      if (!drawnCard || !isPlayable(drawnCard, s.discard.at(-1)!, s.currentColor)) {
         s.turn = nextSeat(s, action.seat);
         return { ok: true, state: s, effects };
       }
-      const drawnCard = player.hand.at(-1)!;
-      const top = s.discard.at(-1)!;
-      if (isPlayable(drawnCard, top, s.currentColor)) {
-        const isWildDraw = drawnCard.value === 'wild' || drawnCard.value === 'wild4';
-        if (s.rules.forcePlay && !isWildDraw) {
-          // Force play: the drawn card goes straight down (wilds wait for a colour).
-          const played = applyAction(s, { type: 'play', seat: action.seat, cardIds: [drawnCard.id] });
-          if (played.ok) return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
-        }
-        s.pendingDrawn = { seat: action.seat, cardId: drawnCard.id };
-      } else {
-        s.turn = nextSeat(s, action.seat);
+      const isWildDraw = drawnCard.value === 'wild' || drawnCard.value === 'wild4';
+      if (s.rules.forcePlay && !isWildDraw) {
+        // Force play: the drawn card goes straight down (wilds wait for a colour).
+        const played = applyAction(s, { type: 'play', seat: action.seat, cardIds: [drawnCard.id] });
+        if (played.ok) return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
       }
+      s.pendingDrawn = { seat: action.seat, cardId: drawnCard.id };
       return { ok: true, state: s, effects };
     }
 
