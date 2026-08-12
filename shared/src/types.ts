@@ -80,7 +80,7 @@ export interface ClientToServerEvents {
   ) => void;
   startGame: () => void;
   setRules: (p: { rules: Rules }) => void; // host, lobby only
-  playCard: (p: { cardId: number; chosenColor?: Color }) => void;
+  playCards: (p: { cardIds: number[]; chosenColor?: Color }) => void;
   drawCard: () => void;
   passTurn: () => void;          // decline to play a drawn playable card
   chooseColor: (p: { color: Color }) => void; // first-flip wild

@@ -50,12 +50,12 @@ test('two clients join, deal, and play to a winner with hidden hands', { timeout
     const sock = view.yourSeat === 0 ? a : b;
     if (view.mustChooseColor) return void sock.emit('chooseColor', { color: 'red' });
     if (view.pendingDrawnCardId !== null) {
-      return void sock.emit('playCard', { cardId: view.pendingDrawnCardId, chosenColor: 'red' });
+      return void sock.emit('playCards', { cardIds: [view.pendingDrawnCardId], chosenColor: 'red' });
     }
     const playable = view.hand.find((c) => isPlayable(c, view.topCard!, view.currentColor));
     if (playable) {
       const needsColor = playable.value === 'wild' || playable.value === 'wild4';
-      sock.emit('playCard', { cardId: playable.id, chosenColor: needsColor ? 'red' : undefined });
+      sock.emit('playCards', { cardIds: [playable.id], chosenColor: needsColor ? 'red' : undefined });
     } else {
       sock.emit('drawCard');
     }

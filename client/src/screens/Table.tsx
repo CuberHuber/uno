@@ -46,7 +46,7 @@ export default function Table() {
 
   const playCard = (c: Card) => {
     if (c.value === 'wild' || c.value === 'wild4') setWildCardId(c.id);
-    else actions.play(c.id);
+    else actions.play([c.id]);
   };
 
   const canCall = (yourTurn && view.hand.length <= 2) || view.catchableSeat === view.yourSeat;
@@ -133,11 +133,11 @@ export default function Table() {
       )}
       {wildCardId !== null && (
         <ColorPicker title="Choose a colour"
-          onPick={(c) => { actions.play(wildCardId, c); setWildCardId(null); }} />
+          onPick={(c) => { actions.play([wildCardId], c); setWildCardId(null); }} />
       )}
       {forcedWildId !== null && wildCardId === null && (
         <ColorPicker title="Choose a colour" subtitle="Force play — your drawn wild goes down."
-          onPick={(c) => actions.play(forcedWildId, c)} />
+          onPick={(c) => actions.play([forcedWildId], c)} />
       )}
       <PauseOverlay />
     </main>
