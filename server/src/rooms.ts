@@ -60,9 +60,9 @@ export class RoomStore {
 
   join(code: string, name: string) {
     const room = this.getRoom(code);
-    if (!room) return { ok: false as const, error: 'table not found' };
-    if (room.phase !== 'lobby') return { ok: false as const, error: 'game already started' };
-    if (room.players.length >= MAX_SEATS) return { ok: false as const, error: 'table is full' };
+    if (!room) return { ok: false as const, error: 'table_not_found' };
+    if (room.phase !== 'lobby') return { ok: false as const, error: 'game_started' };
+    if (room.players.length >= MAX_SEATS) return { ok: false as const, error: 'table_full' };
     const token = randomBytes(16).toString('hex');
     room.players.push({
       name: name.trim().slice(0, 24) || 'Player',
@@ -74,9 +74,9 @@ export class RoomStore {
 
   resume(code: string, token: string) {
     const room = this.getRoom(code);
-    if (!room) return { ok: false as const, error: 'table not found' };
+    if (!room) return { ok: false as const, error: 'table_not_found' };
     const seat = room.players.findIndex((p) => p.token === token && !p.left);
-    if (seat === -1) return { ok: false as const, error: 'seat not found' };
+    if (seat === -1) return { ok: false as const, error: 'seat_not_found' };
     return { ok: true as const, seat };
   }
 
@@ -96,22 +96,22 @@ export class RoomStore {
 
   setRules(code: string, token: string, rules: Rules) {
     const room = this.getRoom(code);
-    if (!room) return { ok: false as const, error: 'table not found' };
+    if (!room) return { ok: false as const, error: 'table_not_found' };
     if (this.seatFor(room, token) !== room.hostSeat) {
-      return { ok: false as const, error: 'only the host sets the rules' };
+      return { ok: false as const, error: 'host_only_rules' };
     }
-    if (room.phase !== 'lobby') return { ok: false as const, error: 'rules lock once the game starts' };
+    if (room.phase !== 'lobby') return { ok: false as const, error: 'rules_locked' };
     room.rules = sanitizeRules(rules);
     return { ok: true as const };
   }
 
   startGame(code: string, token: string) {
     const room = this.getRoom(code);
-    if (!room) return { ok: false as const, error: 'table not found' };
+    if (!room) return { ok: false as const, error: 'table_not_found' };
     const seat = this.seatFor(room, token);
-    if (seat !== room.hostSeat) return { ok: false as const, error: 'only the host can deal' };
-    if (room.phase !== 'lobby') return { ok: false as const, error: 'already dealt' };
-    if (room.players.length < 2) return { ok: false as const, error: 'need at least two players' };
+    if (seat !== room.hostSeat) return { ok: false as const, error: 'host_only_deal' };
+    if (room.phase !== 'lobby') return { ok: false as const, error: 'already_dealt' };
+    if (room.players.length < 2) return { ok: false as const, error: 'need_two_players' };
     room.game = createGame(room.players.length, rng(room.seed), room.rules);
     room.phase = 'playing';
     return { ok: true as const };
@@ -119,10 +119,10 @@ export class RoomStore {
 
   act(code: string, token: string, action: SeatlessAction) {
     const room = this.getRoom(code);
-    if (!room) return { ok: false as const, error: 'table not found' };
-    if (room.phase !== 'playing' || !room.game) return { ok: false as const, error: 'no round in progress' };
+    if (!room) return { ok: false as const, error: 'table_not_found' };
+    if (room.phase !== 'playing' || !room.game) return { ok: false as const, error: 'no_round' };
     const seat = this.seatFor(room, token);
-    if (seat === -1) return { ok: false as const, error: 'seat not found' };
+    if (seat === -1) return { ok: false as const, error: 'seat_not_found' };
     const result = applyAction(room.game, { ...action, seat } as Action);
     if (!result.ok) return result;
     room.game = result.state;
@@ -135,15 +135,15 @@ export class RoomStore {
 
   rematch(code: string, token: string) {
     const room = this.getRoom(code);
-    if (!room) return { ok: false as const, error: 'table not found' };
-    if (room.phase !== 'roundEnd') return { ok: false as const, error: 'round still running' };
-    if (this.seatFor(room, token) === -1) return { ok: false as const, error: 'seat not found' };
+    if (!room) return { ok: false as const, error: 'table_not_found' };
+    if (room.phase !== 'roundEnd') return { ok: false as const, error: 'round_running' };
+    if (this.seatFor(room, token) === -1) return { ok: false as const, error: 'seat_not_found' };
     // Compact away players who left; keep everyone else's seat order and tally.
     const stayingIdx = room.players.flatMap((p, i) => (p.left ? [] : [i]));
     room.players = stayingIdx.map((i) => room.players[i]!);
     room.winTally = stayingIdx.map((i) => room.winTally[i]!);
     room.hostSeat = 0;
-    if (room.players.length < 2) return { ok: false as const, error: 'not enough players' };
+    if (room.players.length < 2) return { ok: false as const, error: 'not_enough_players' };
     room.seed = randomInt(2 ** 31);
     room.game = createGame(room.players.length, rng(room.seed), room.rules);
     room.phase = 'playing';
@@ -152,13 +152,13 @@ export class RoomStore {
 
   continueWithout(code: string, token: string, targetSeat: number) {
     const room = this.getRoom(code);
-    if (!room || !room.game) return { ok: false as const, error: 'table not found' };
-    if (this.seatFor(room, token) === -1) return { ok: false as const, error: 'seat not found' };
+    if (!room || !room.game) return { ok: false as const, error: 'table_not_found' };
+    if (this.seatFor(room, token) === -1) return { ok: false as const, error: 'seat_not_found' };
     const target = room.players[targetSeat];
-    if (!target || target.left) return { ok: false as const, error: 'no such seat' };
-    if (target.connected) return { ok: false as const, error: 'player is connected' };
+    if (!target || target.left) return { ok: false as const, error: 'no_such_seat' };
+    if (target.connected) return { ok: false as const, error: 'player_connected' };
     if (target.disconnectedAtMs === null || this.now() - target.disconnectedAtMs < CONTINUE_GRACE_MS) {
-      return { ok: false as const, error: 'grace period still running' };
+      return { ok: false as const, error: 'grace_running' };
     }
     target.left = true;
     room.game = removeFromRound(room.game, targetSeat);

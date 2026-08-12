@@ -122,33 +122,33 @@ export function applyAction(state: GameState, action: Action): ActionResult {
   const effects: Effect[] = [];
   const err = (error: string): ActionResult => ({ ok: false, error });
 
-  if (s.winner !== null) return err('round is over');
+  if (s.winner !== null) return err('round_over');
   const player = s.players[action.seat];
-  if (!player || player.removed) return err('bad seat');
+  if (!player || player.removed) return err('bad_seat');
 
   switch (action.type) {
     case 'chooseColor': {
-      if (!s.mustChooseColor || s.turn !== action.seat) return err('no color choice pending');
+      if (!s.mustChooseColor || s.turn !== action.seat) return err('no_color_pending');
       s.currentColor = action.color;
       s.mustChooseColor = false;
       return { ok: true, state: s, effects };
     }
 
     case 'play': {
-      if (s.turn !== action.seat) return err('not your turn');
-      if (s.mustChooseColor) return err('choose a color first');
+      if (s.turn !== action.seat) return err('not_your_turn');
+      if (s.mustChooseColor) return err('choose_color_first');
       if (s.pendingDrawn && s.pendingDrawn.seat === action.seat && s.pendingDrawn.cardId !== action.cardId)
-        return err('play the drawn card or pass');
+        return err('play_drawn_or_pass');
       const idx = player.hand.findIndex((c) => c.id === action.cardId);
-      if (idx === -1) return err('card not in hand');
+      if (idx === -1) return err('card_not_in_hand');
       const card = player.hand[idx]!;
       const top = s.discard.at(-1)!;
       // Stacking: an owed +2/+4 pot may be answered with any +2/+4, colour regardless.
       const stackAnswer = s.pendingDraw > 0 && (card.value === 'draw2' || card.value === 'wild4');
-      if (s.pendingDraw > 0 && !stackAnswer) return err(`answer the +${s.pendingDraw} or draw`);
-      if (!stackAnswer && !isPlayable(card, top, s.currentColor)) return err('card does not match');
+      if (s.pendingDraw > 0 && !stackAnswer) return err('answer_pot');
+      if (!stackAnswer && !isPlayable(card, top, s.currentColor)) return err('card_no_match');
       const isWild = card.value === 'wild' || card.value === 'wild4';
-      if (isWild && !action.chosenColor) return err('wild needs a color');
+      if (isWild && !action.chosenColor) return err('wild_needs_color');
 
       s.catchWindow = null; // the next act closes any open window (may re-arm below)
       s.pendingDrawn = null;
@@ -210,9 +210,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     }
 
     case 'draw': {
-      if (s.turn !== action.seat) return err('not your turn');
-      if (s.mustChooseColor) return err('choose a color first');
-      if (s.pendingDrawn?.seat === action.seat) return err('play the drawn card or pass');
+      if (s.turn !== action.seat) return err('not_your_turn');
+      if (s.mustChooseColor) return err('choose_color_first');
+      if (s.pendingDrawn?.seat === action.seat) return err('play_drawn_or_pass');
       s.catchWindow = null;
       if (s.pendingDraw > 0) {
         // Taking the stacked pot: draw it all, no play-or-pass, turn moves on.
@@ -246,8 +246,8 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     }
 
     case 'pass': {
-      if (s.pendingDrawn?.seat !== action.seat) return err('nothing to pass');
-      if (s.rules.forcePlay) return err('force play — the drawn card goes down');
+      if (s.pendingDrawn?.seat !== action.seat) return err('nothing_to_pass');
+      if (s.rules.forcePlay) return err('force_play');
       s.pendingDrawn = null;
       s.turn = nextSeat(s, action.seat);
       return { ok: true, state: s, effects };
@@ -256,7 +256,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     case 'callLastCard': {
       const ownWindow = s.catchWindow?.seat === action.seat;
       const arming = s.turn === action.seat && player.hand.length <= 2 && player.hand.length > 0;
-      if (!ownWindow && !arming) return err('cannot call now');
+      if (!ownWindow && !arming) return err('cannot_call_now');
       player.calledLastCard = true;
       if (ownWindow) s.catchWindow = null;
       effects.push({ type: 'called', seat: action.seat });
@@ -264,9 +264,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     }
 
     case 'catchLastCard': {
-      if (!s.catchWindow) return err('nothing to catch');
+      if (!s.catchWindow) return err('nothing_to_catch');
       const target = s.catchWindow.seat;
-      if (target === action.seat) return err('cannot catch yourself');
+      if (target === action.seat) return err('cannot_catch_self');
       s.catchWindow = null;
       const n = drawFromPile(s, target, 2);
       effects.push({ type: 'caught', seat: target });
