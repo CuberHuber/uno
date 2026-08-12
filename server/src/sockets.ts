@@ -1,11 +1,12 @@
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@uno/shared';
 import type { RoomStore } from './rooms.js';
+import type { ServerLimits } from './server.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 
-export function attachSockets(io: IO, store: RoomStore): void {
+export function attachSockets(io: IO, store: RoomStore, _limits?: ServerLimits): void {
   const broadcast = (code: string) => {
     const room = store.getRoom(code);
     if (!room) return;
