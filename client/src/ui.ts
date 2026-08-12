@@ -4,6 +4,8 @@ import type { Rules } from '@uno/shared';
 export const RULE_DEFS: readonly { key: keyof Rules; name: string; desc: string }[] = [
   { key: 'stacking', name: 'Stacking +2 / +4', desc: 'Pass the penalty along instead of drawing it.' },
   { key: 'forcePlay', name: 'Force play', desc: 'If a drawn card is playable, it goes down at once.' },
+  { key: 'drawToMatch', name: 'Draw to match', desc: 'No play? Draw until something plays.' },
+  { key: 'multiDiscard', name: 'Stack discard', desc: 'Same number, any colors — throw them together.' },
 ];
 
 /** Chip labels for the active rules; classic when none are on. */

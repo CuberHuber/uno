@@ -12,10 +12,18 @@ export interface Card {
 export type Phase = 'lobby' | 'playing' | 'roundEnd';
 
 export interface Rules {
-  stacking: boolean;  // +2/+4 may be answered with another +2/+4 instead of drawing
-  forcePlay: boolean; // a drawn playable card goes straight down
+  stacking: boolean;     // +2 answers only +2, +4 answers only +4; the pot rides on
+  forcePlay: boolean;    // a drawn playable card goes straight down
+  drawToMatch: boolean;  // no play → draw until a playable card arrives
+  multiDiscard: boolean; // same-value number cards may be discarded together
 }
-export const CLASSIC_RULES: Rules = { stacking: false, forcePlay: false };
+export const CLASSIC_RULES: Rules = {
+  stacking: false, forcePlay: false, drawToMatch: false, multiDiscard: false,
+};
+export const sanitizeRules = (r?: Partial<Rules> | null): Rules => ({
+  stacking: !!r?.stacking, forcePlay: !!r?.forcePlay,
+  drawToMatch: !!r?.drawToMatch, multiDiscard: !!r?.multiDiscard,
+});
 
 export interface SeatView {
   seat: number;

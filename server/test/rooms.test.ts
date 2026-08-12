@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { CLASSIC_RULES } from '@uno/shared';
 import { CONTINUE_GRACE_MS, RoomStore } from '../src/rooms.js';
 
 function makeStartedRoom(store: RoomStore) {
@@ -90,9 +91,9 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: false, forcePlay: false });
+    expect(store.viewFor(room.code, 0).rules).toEqual(CLASSIC_RULES);
     expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
-    expect(store.viewFor(room.code, 1).rules).toEqual({ stacking: true, forcePlay: true });
+    expect(store.viewFor(room.code, 1).rules).toEqual({ ...CLASSIC_RULES, stacking: true, forcePlay: true });
   });
 
   test('only the host may change the rules', () => {
@@ -113,7 +114,7 @@ describe('house rules', () => {
     if (!a.ok || !b.ok) throw new Error('join failed');
     expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
     expect(store.startGame(room.code, a.token).ok).toBe(true);
-    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: true });
+    expect(store.getRoom(room.code)!.game!.rules).toEqual({ ...CLASSIC_RULES, stacking: true, forcePlay: true });
     expect(store.setRules(room.code, a.token, { stacking: false, forcePlay: false }).ok).toBe(false);
     expect(store.viewFor(room.code, 1).rules.stacking).toBe(true);
   });
@@ -128,8 +129,8 @@ describe('house rules', () => {
     expect(store.startGame(room.code, a.token).ok).toBe(true);
     store.getRoom(room.code)!.phase = 'roundEnd';
     expect(store.rematch(room.code, a.token).ok).toBe(true);
-    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: false });
-    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: true, forcePlay: false });
+    expect(store.getRoom(room.code)!.game!.rules).toEqual({ ...CLASSIC_RULES, stacking: true });
+    expect(store.viewFor(room.code, 0).rules).toEqual({ ...CLASSIC_RULES, stacking: true });
   });
 });
 

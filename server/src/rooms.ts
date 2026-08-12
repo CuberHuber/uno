@@ -1,6 +1,6 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import type { Effect, Phase, RoomStateView, Rules } from '@uno/shared';
-import { CLASSIC_RULES } from '@uno/shared';
+import { CLASSIC_RULES, sanitizeRules } from '@uno/shared';
 import {
   applyAction, createGame, removeFromRound, type Action, type GameState,
 } from './engine/game.js';
@@ -101,7 +101,7 @@ export class RoomStore {
       return { ok: false as const, error: 'only the host sets the rules' };
     }
     if (room.phase !== 'lobby') return { ok: false as const, error: 'rules lock once the game starts' };
-    room.rules = { stacking: !!rules?.stacking, forcePlay: !!rules?.forcePlay };
+    room.rules = sanitizeRules(rules);
     return { ok: true as const };
   }
 
