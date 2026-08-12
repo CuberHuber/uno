@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/organic-bda5c1fb-32bb-456d-af48-027563f741ed/styles.css">
+<script src="_ds/organic-bda5c1fb-32bb-456d-af48-027563f741ed/_ds_bundle.js"></script>
+<style>
+body{margin:0;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text)}
+a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
+@keyframes ob-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes ob-breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes ob-shake{0%,100%{transform:translateX(0) rotate(0)}20%{transform:translateX(-9px) rotate(-2deg)}40%{transform:translateX(8px) rotate(2deg)}60%{transform:translateX(-6px) rotate(-1.5deg)}80%{transform:translateX(5px) rotate(1deg)}}
+@keyframes ob-pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+@keyframes ob-pulse{0%,100%{box-shadow:0 0 0 0 rgba(198,113,57,.5)}55%{box-shadow:0 0 0 14px rgba(198,113,57,0)}}
+@keyframes ob-glowspot{0%,100%{opacity:.55}50%{opacity:.95}}
+@keyframes ob-quake{0%,100%{transform:translate(0,0) rotate(0)}15%{transform:translate(-8px,5px) rotate(-.5deg)}30%{transform:translate(7px,-6px) rotate(.5deg)}45%{transform:translate(-6px,4px) rotate(-.3deg)}60%{transform:translate(5px,-3px)}75%{transform:translate(-3px,2px)}}
+@keyframes ob-bigpop{0%{transform:scale(.15) rotate(-10deg);opacity:0}45%{transform:scale(1.3) rotate(3deg);opacity:1}65%{transform:scale(.94)}80%{transform:scale(1.04)}100%{transform:scale(1)}}
+@keyframes ob-flyseat{0%{transform:translate(428px,263px) scale(1);opacity:1}80%{opacity:1}100%{transform:translate(140px,60px) scale(.42) rotate(-18deg);opacity:0}}
+@keyframes ob-tint{from{transform:scale(.55);opacity:0}to{transform:scale(1)}}
+@keyframes ob-march{0%{background-position:0 0}100%{background-position:28px 0}}
+@keyframes ob-tintout{to{transform:scale(.45);opacity:0}}
+@keyframes ob-drain{from{width:100%}to{width:0}}
+@keyframes ob-shufl{0%,100%{transform:translate(0,0) rotate(0)}50%{transform:translate(-66px,-14px) rotate(-14deg)}}
+@keyframes ob-shufr{0%,100%{transform:translate(0,0) rotate(0)}50%{transform:translate(66px,10px) rotate(12deg)}}
+@keyframes ob-flip{from{transform:rotateY(180deg)}to{transform:rotateY(0deg)}}
+@keyframes ob-heavy{0%{transform:scale(1) translateY(0)}42%{transform:scale(1.5) translateY(-30px) rotate(-5deg)}58%{transform:scale(1.52) translateY(-32px) rotate(-4deg)}88%{transform:scale(.95) translateY(2px)}100%{transform:scale(1) translateY(0)}}
+@keyframes ob-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+</style>
+</helmet>
+<div style="min-height:100vh;padding:48px 60px 80px;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+    <div style="width:38px;height:38px;border-radius:50%;background:var(--color-accent);color:var(--color-bg);display:grid;place-items:center;font-family:var(--font-heading);font-size:21px">8</div>
+    <h1 style="font-family:var(--font-heading);font-size:34px;margin:0">Game board</h1>
+  </div>
+  <p style="margin:0 0 30px;color:var(--color-neutral-600);font-size:14.5px;max-width:640px">The full table: three opponents up top, piles in the middle, your hand fanned below. Play a card, end your turn, and watch the round travel the table — each seat thinks, then throws or draws.</p>
+
+  <div data-screen-label="Game board" style="width:1180px;height:720px;border-radius:30px;background:{{ feltBg }};transition:background .9s ease;box-shadow:inset 0 0 0 12px rgba(0,0,0,.05),var(--shadow-lg);position:relative;overflow:hidden;animation:{{ stageAnim }}">
+
+    <div style="position:absolute;left:415px;top:158px;width:350px;height:350px;border-radius:50%;border:3px dashed rgba(42,38,33,.16);animation:ob-spin 26s linear infinite;pointer-events:none;z-index:1"></div>
+
+    <sc-if value="{{ hasTint }}" hint-placeholder-val="{{ false }}">
+      <sc-for list="{{ tintCircles }}" as="tc" hint-placeholder-count="4">
+        <div style="position:absolute;left:{{ tc.left }}px;top:{{ tc.top }}px;width:{{ tc.d }}px;height:{{ tc.d }}px;border-radius:50%;background:{{ tc.bg }};opacity:{{ tc.op }};z-index:1;pointer-events:none;animation:{{ tc.anim }}"></div>
+      </sc-for>
+    </sc-if>
+
+    <sc-if value="{{ yourTurn }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;left:250px;right:250px;bottom:-120px;height:340px;border-radius:50%;background:radial-gradient(ellipse at center,rgba(198,113,57,.32) 0%,rgba(198,113,57,0) 68%);animation:ob-glowspot 2.2s ease-in-out infinite;pointer-events:none"></div>
+    </sc-if>
+
+    <sc-for list="{{ seats }}" as="s" hint-placeholder-count="3">
+      <div style="position:absolute;left:{{ s.x }}px;top:{{ s.y }}px;width:220px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:8">
+        <div style="position:relative;width:200px;height:78px">
+          <sc-for list="{{ s.backs }}" as="b" hint-placeholder-count="5">
+            <div style="position:absolute;left:50%;top:8px;width:46px;height:70px;margin-left:-23px;border-radius:8px;background:#2a2621;border:2px solid rgba(247,237,220,.35);box-sizing:border-box;transform:{{ b.tf }};transition:transform .5s cubic-bezier(.34,1.45,.64,1);box-shadow:0 4px 10px rgba(46,43,37,.25)"></div>
+          </sc-for>
+          <sc-if value="{{ s.uno }}" hint-placeholder-val="{{ false }}">
+            <span style="position:absolute;right:-8px;top:-6px;font-family:var(--font-heading);font-size:12px;color:#f7eddc;background:#c23b2e;border-radius:999px;padding:4px 11px;box-shadow:var(--shadow-sm);animation:ob-pop .4s cubic-bezier(.34,1.56,.64,1) both,ob-pulse 1.6s ease-out .4s infinite;z-index:3">UNO!</span>
+          </sc-if>
+        </div>
+        <sc-if value="{{ s.active }}" hint-placeholder-val="{{ false }}">
+          <span style="font-family:var(--font-heading);font-size:11px;color:#fdf8ef;background:repeating-linear-gradient(45deg,var(--color-accent) 0 10px,var(--color-accent-600) 10px 20px);background-size:28px 100%;animation:ob-march 1.2s linear infinite;border-radius:999px 999px 999px 4px;padding:4px 12px;margin:0 0 -6px -70px;position:relative;z-index:2;box-shadow:var(--shadow-sm)">PLAYING</span>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:10px;background:#fdf8ef;border-radius:999px;padding:5px 16px 5px 5px;box-shadow:var(--shadow-md);border:2px solid {{ s.border }};box-sizing:border-box">
+          <div style="width:38px;height:38px;border-radius:50%;background:{{ s.color }};color:#fdf8ef;display:grid;place-items:center;font-family:var(--font-heading);font-size:16px;border:2px solid #fdf8ef;box-sizing:border-box">{{ s.initial }}</div>
+          <div>
+            <div style="font-weight:700;font-size:13.5px;line-height:1.15">{{ s.name }}</div>
+            <div style="font-size:11px;color:{{ s.statusColor }};font-weight:600">{{ s.status }}</div>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+
+    <div onClick="{{ drawClick }}" style="position:absolute;left:428px;top:243px;width:104px;height:156px;cursor:{{ pileCursor }};z-index:5" style-hover="transform:translateY(-5px)">
+      <div style="position:absolute;left:6px;top:6px;width:104px;height:156px;border-radius:15px;background:#211e1a"></div>
+      <div style="position:absolute;left:3px;top:3px;width:104px;height:156px;border-radius:15px;background:#26221d"></div>
+      <div style="position:absolute;left:0;top:0;width:104px;height:156px;border-radius:15px;background:#2a2621;padding:7px;box-sizing:border-box;box-shadow:var(--shadow-md)">
+        <div style="width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:2px solid rgba(247,237,220,.35);display:grid;place-items:center;overflow:hidden">
+          <div style="width:110px;height:110px;border-radius:50%;border:7px solid var(--color-accent);display:grid;place-items:center;flex:none">
+            <div style="width:74px;height:74px;border-radius:50%;border:7px solid #7a8a5e;display:grid;place-items:center">
+              <div style="width:38px;height:38px;border-radius:50%;border:7px solid #e0a020;box-sizing:border-box"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="position:absolute;left:50%;top:166px;transform:translateX(-50%);white-space:nowrap;font-size:12px;font-weight:700;color:{{ pileHintColor }};background:#fdf8ef;border-radius:999px;padding:4px 12px;box-shadow:var(--shadow-sm)">Draw · {{ pileCount }}</div>
+      <sc-if value="{{ shuffling }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:0;top:0;width:104px;height:156px;border-radius:15px;background:#2a2621;border:3px solid rgba(247,237,220,.4);box-sizing:border-box;z-index:3;animation:ob-shufl .45s ease-in-out 2"></div>
+        <div style="position:absolute;left:0;top:0;width:104px;height:156px;border-radius:15px;background:#26221d;border:3px solid rgba(247,237,220,.3);box-sizing:border-box;z-index:2;animation:ob-shufr .45s ease-in-out .12s 2"></div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ hasReFly }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;top:0;width:104px;height:156px;z-index:75;transform:{{ reFly.tf }};transition:transform .8s cubic-bezier(.5,.1,.3,1)">
+        <div style="width:100%;height:100%;border-radius:15px;background:#2a2621;border:3px solid rgba(247,237,220,.4);box-sizing:border-box;animation:ob-flip .8s ease-in-out both;box-shadow:0 14px 28px rgba(46,43,37,.3)"></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:50%;top:200px;transform:translateX(-50%);background:#2a2621;color:#f7eddc;border-radius:999px;padding:9px 20px;font-size:13.5px;font-weight:700;z-index:92;box-shadow:var(--shadow-md);animation:ob-pop .4s cubic-bezier(.34,1.56,.64,1) both">{{ toastText }}</div>
+    </sc-if>
+
+    <div style="position:absolute;left:648px;top:250px;width:104px;height:156px;z-index:4">
+      <div style="position:absolute;inset:0;border-radius:15px;background:rgba(0,0,0,.08);transform:{{ scat1 }};transition:transform .4s cubic-bezier(.2,.9,.3,1.2)"></div>
+      <div style="position:absolute;inset:0;border-radius:15px;background:rgba(0,0,0,.08);transform:{{ scat2 }};transition:transform .4s cubic-bezier(.2,.9,.3,1.2)"></div>
+      <div style="position:absolute;inset:0;border-radius:15px;background:{{ disc.bg }};padding:7px;box-sizing:border-box;box-shadow:var(--shadow-md);transform:rotate({{ disc.rot }}deg)">
+        <div style="width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:2.5px solid {{ disc.rim }};display:grid;place-items:center;position:relative">
+          <sc-if value="{{ disc.notWild }}" hint-placeholder-val="{{ true }}">
+            <span style="position:absolute;top:2px;left:7px;font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ disc.v }}</span>
+            <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ disc.v }}</span>
+          </sc-if>
+          <sc-if value="{{ disc.isWild }}" hint-placeholder-val="{{ false }}">
+            <span style="position:absolute;top:5px;left:7px;display:grid;grid-template-columns:5px 5px;gap:2px"><span style="width:5px;height:5px;border-radius:50%;background:#c23b2e"></span><span style="width:5px;height:5px;border-radius:50%;background:#2e6f8a"></span><span style="width:5px;height:5px;border-radius:50%;background:#66923f"></span><span style="width:5px;height:5px;border-radius:50%;background:#e0a020"></span></span>
+            <span style="position:absolute;bottom:5px;right:7px;display:grid;grid-template-columns:5px 5px;gap:2px;transform:rotate(180deg)"><span style="width:5px;height:5px;border-radius:50%;background:#c23b2e"></span><span style="width:5px;height:5px;border-radius:50%;background:#2e6f8a"></span><span style="width:5px;height:5px;border-radius:50%;background:#66923f"></span><span style="width:5px;height:5px;border-radius:50%;background:#e0a020"></span></span>
+          </sc-if>
+          <div style="width:62px;height:92px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
+            <sc-if value="{{ disc.isWild }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;grid-template-columns:21px 21px;gap:5px;transform:rotate(16deg)"><span style="width:21px;height:21px;border-radius:50%;background:#c23b2e"></span><span style="width:21px;height:21px;border-radius:50%;background:#2e6f8a"></span><span style="width:21px;height:21px;border-radius:50%;background:#66923f"></span><span style="width:21px;height:21px;border-radius:50%;background:#e0a020"></span></div>
+            </sc-if>
+            <sc-if value="{{ disc.notWild }}" hint-placeholder-val="{{ true }}">
+              <span style="font-family:var(--font-heading);font-size:{{ disc.fs }}px;color:{{ disc.bg }};transform:rotate(16deg)">{{ disc.v }}</span>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ hasOppFly }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;top:0;width:104px;height:156px;z-index:30;transform:{{ oppFly.tf }};transition:transform {{ flyT }} cubic-bezier(.34,1.4,.64,1)">
+        <div style="width:100%;height:100%;border-radius:15px;background:{{ oppFly.bg }};padding:7px;box-sizing:border-box;box-shadow:0 18px 34px rgba(46,43,37,.3)">
+          <div style="width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:2.5px solid #2a2621;display:grid;place-items:center;position:relative">
+            <span style="position:absolute;top:2px;left:7px;font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ oppFly.v }}</span>
+            <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ oppFly.v }}</span>
+            <div style="width:62px;height:92px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
+              <span style="font-family:var(--font-heading);font-size:{{ oppFly.fs }}px;color:{{ oppFly.bg }};transform:rotate(16deg)">{{ oppFly.v }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasOppDraw }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:0;top:0;width:104px;height:156px;z-index:30;transform:{{ oppDraw.tf }};transition:transform {{ flyT }} cubic-bezier(.5,.1,.4,1)">
+        <div style="width:100%;height:100%;border-radius:15px;background:#2a2621;border:3px solid rgba(247,237,220,.4);box-sizing:border-box;box-shadow:0 14px 28px rgba(46,43,37,.3)"></div>
+      </div>
+    </sc-if>
+
+    <div style="position:absolute;left:30px;bottom:26px;display:flex;flex-direction:column;align-items:flex-start;z-index:40">
+    <sc-if value="{{ yourTurn }}" hint-placeholder-val="{{ true }}">
+      <span style="font-family:var(--font-heading);font-size:12px;color:#fdf8ef;background:repeating-linear-gradient(45deg,var(--color-accent) 0 10px,var(--color-accent-600) 10px 20px);background-size:28px 100%;animation:ob-march 1.2s linear infinite;border-radius:999px 999px 999px 4px;padding:5px 14px;margin:0 0 -6px 14px;position:relative;z-index:2;box-shadow:var(--shadow-sm)">YOUR TURN</span>
+    </sc-if>
+    <div style="display:flex;align-items:center;gap:11px;background:#fdf8ef;border-radius:999px;padding:6px 18px 6px 6px;box-shadow:var(--shadow-md);border:2px solid {{ pillBorder }};box-sizing:border-box">
+      <div style="width:46px;height:46px;border-radius:50%;background:{{ ringBg }};display:grid;place-items:center">
+        <div style="width:38px;height:38px;border-radius:50%;background:{{ avatarColor }};color:#fdf8ef;display:grid;place-items:center;font-family:var(--font-heading);font-size:17px;border:2px solid #fdf8ef;box-sizing:border-box">M</div>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:14px;line-height:1.15">Mira</div>
+        <div style="font-size:11.5px;color:{{ statusColor }};font-weight:600">{{ statusText }}</div>
+      </div>
+    </div>
+    </div>
+
+    <sc-for list="{{ handView }}" as="c" hint-placeholder-count="6">
+      <div onClick="{{ c.click }}" onMouseEnter="{{ c.enter }}" onMouseLeave="{{ c.leave }}" style="position:absolute;left:0;top:0;width:104px;height:156px;transform:{{ c.tf }};transition:{{ handTrans }};z-index:{{ c.z }};cursor:{{ c.cursor }}">
+        <div style="width:100%;height:100%;animation:{{ c.anim }}">
+          <div style="width:100%;height:100%;box-sizing:border-box;border-radius:15px;background:#fdf8ef;position:relative;outline:{{ c.outline }};outline-offset:3px;box-shadow:{{ c.shadow }}">
+          <div style="position:absolute;inset:0;border-radius:15px;background:{{ c.bg }};padding:7px;box-sizing:border-box">
+            <div style="width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:2.5px solid #2a2621;display:grid;place-items:center;position:relative">
+              <sc-if value="{{ c.notWild }}" hint-placeholder-val="{{ true }}">
+                <span style="position:absolute;top:2px;left:7px;font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ c.v }}</span>
+                <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ c.v }}</span>
+              </sc-if>
+              <sc-if value="{{ c.isWild }}" hint-placeholder-val="{{ false }}">
+                <span style="position:absolute;top:5px;left:7px;display:grid;grid-template-columns:5px 5px;gap:2px"><span style="width:5px;height:5px;border-radius:50%;background:#c23b2e"></span><span style="width:5px;height:5px;border-radius:50%;background:#2e6f8a"></span><span style="width:5px;height:5px;border-radius:50%;background:#66923f"></span><span style="width:5px;height:5px;border-radius:50%;background:#e0a020"></span></span>
+                <span style="position:absolute;bottom:5px;right:7px;display:grid;grid-template-columns:5px 5px;gap:2px;transform:rotate(180deg)"><span style="width:5px;height:5px;border-radius:50%;background:#c23b2e"></span><span style="width:5px;height:5px;border-radius:50%;background:#2e6f8a"></span><span style="width:5px;height:5px;border-radius:50%;background:#66923f"></span><span style="width:5px;height:5px;border-radius:50%;background:#e0a020"></span></span>
+              </sc-if>
+              <div style="width:62px;height:92px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
+                <sc-if value="{{ c.isWild }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:grid;grid-template-columns:21px 21px;gap:5px;transform:rotate(16deg)"><span style="width:21px;height:21px;border-radius:50%;background:#c23b2e"></span><span style="width:21px;height:21px;border-radius:50%;background:#2e6f8a"></span><span style="width:21px;height:21px;border-radius:50%;background:#66923f"></span><span style="width:21px;height:21px;border-radius:50%;background:#e0a020"></span></div>
+                </sc-if>
+                <sc-if value="{{ c.notWild }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-family:var(--font-heading);font-size:{{ c.fs }}px;color:{{ c.bg }};transform:rotate(16deg)">{{ c.v }}</span>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+          <div style="position:absolute;inset:0;border-radius:15px;background:rgba(247,237,220,.5);opacity:{{ c.veil }};transition:opacity .3s;pointer-events:none"></div>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+
+    <sc-if value="{{ yourTurn }}" hint-placeholder-val="{{ true }}">
+      <button class="btn" onClick="{{ endTurn }}" style="position:absolute;right:34px;bottom:32px;border-radius:999px;padding:14px 26px;font-size:15px;z-index:45;animation:ob-pop .5s cubic-bezier(.34,1.56,.64,1) .1s both;box-shadow:var(--shadow-md);background:#ffffff;color:#201e1d;border:1.5px solid rgba(32,30,29,.22);cursor:pointer" style-hover="background:#f5ead8">End turn</button>
+    </sc-if>
+    <sc-if value="{{ unoLive }}" hint-placeholder-val="{{ false }}">
+      <button class="btn" onClick="{{ callUno }}" style="position:absolute;left:34px;bottom:120px;border-radius:999px;padding:16px 30px;font-size:17px;font-weight:800;background:#2a2621 radial-gradient(circle at 6px 6px, rgba(194,59,46,.95) 2.5px, transparent 3.2px);background-size:20px 20px;color:#f7eddc;border:2.5px solid #c23b2e;z-index:45;animation:ob-pop .5s cubic-bezier(.34,1.56,.64,1) both,ob-pulse 1.5s ease-out .5s infinite;cursor:pointer;font-family:var(--font-heading);letter-spacing:.03em" style-hover="background-color:#3b352d">{{ callLabel }}
+        <sc-if value="{{ unoWindow }}" hint-placeholder-val="{{ false }}">
+          <span style="position:absolute;left:16px;right:16px;bottom:7px;height:4px;border-radius:999px;background:rgba(247,237,220,.25);display:block"><span style="display:block;height:100%;border-radius:999px;background:#c23b2e;animation:ob-drain 2s linear forwards"></span></span>
+        </sc-if>
+      </button>
+    </sc-if>
+    <sc-if value="{{ pickingColor }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:50%;top:230px;transform:translateX(-50%);background:#fdf8ef;border-radius:22px;padding:16px 22px;box-shadow:var(--shadow-lg);z-index:90;display:flex;flex-direction:column;align-items:center;gap:12px;animation:ob-pop .45s cubic-bezier(.34,1.56,.64,1) both">
+        <span style="font-size:13px;font-weight:700">Choose a colour</span>
+        <div style="display:flex;gap:12px">
+          <sc-for list="{{ colorChoices }}" as="cc" hint-placeholder-count="4">
+            <button onClick="{{ cc.pick }}" style="width:46px;height:46px;border-radius:50%;background:{{ cc.bg }};border:3px solid #fdf8ef;box-shadow:0 0 0 2px rgba(0,0,0,.14);cursor:pointer;transition:transform .15s" style-hover="transform:scale(1.15)"></button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ hasCalled }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:772px;top:305px;display:flex;gap:7px;align-items:center;background:#fdf8ef;border-radius:999px;padding:5px 13px;box-shadow:var(--shadow-sm);z-index:6;animation:ob-pop .4s cubic-bezier(.34,1.56,.64,1) both">
+        <span style="width:11px;height:11px;border-radius:50%;background:{{ calledHex }}"></span>
+        <span style="font-size:12px;font-weight:700">{{ calledName }}</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ bigCounter }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;display:grid;place-items:center;z-index:85;pointer-events:none">
+        <span style="font-family:var(--font-heading);font-size:120px;line-height:1;color:#fdf8ef;background:var(--color-accent);padding:18px 58px 30px;border-radius:44px;box-shadow:0 24px 60px rgba(46,43,37,.4);animation:ob-bigpop .55s cubic-bezier(.34,1.56,.64,1) both">+4</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ penaltyOn }}" hint-placeholder-val="{{ false }}">
+      <sc-for list="{{ penaltyBacks }}" as="pb" hint-placeholder-count="4">
+        <div style="position:absolute;left:0;top:0;width:74px;height:110px;border-radius:11px;background:#2a2621;border:3px solid rgba(247,237,220,.4);box-sizing:border-box;z-index:70;animation:ob-flyseat .9s ease-in {{ pb.delay }} both"></div>
+      </sc-for>
+    </sc-if>
+
+    <button class="btn btn-ghost" onClick="{{ restart }}" style="position:absolute;right:24px;top:20px;border-radius:999px;padding:8px 16px;font-size:12.5px;z-index:45;background:rgba(253,248,239,.7)">Restart demo</button>
+  </div>
+
+  <p style="margin:18px 0 0;font-size:13px;color:var(--color-neutral-600);max-width:660px">Every seat is live: the marching flag walks the table with the turn, opponents throw from their fan (it tightens as it shrinks), draws fly back face-down, a +4 slams and sends four backs to the next seat, and any seat left on one card pops an UNO badge. The dashed ring turns with the direction of play.</p>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1300,&quot;height&quot;:980},&quot;speed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:1.8,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Animation&quot;},&quot;handIdle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Breathe all&quot;,&quot;options&quot;:[&quot;Breathe all&quot;,&quot;Bob playable&quot;,&quot;Still&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Animation&quot;},&quot;feltColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#dfe6cd&quot;,&quot;options&quot;:[&quot;#dfe6cd&quot;,&quot;#e8dcc0&quot;,&quot;#d5dcc0&quot;,&quot;#e7d3b8&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Table&quot;},&quot;callLabel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;UNO!&quot;,&quot;options&quot;:[&quot;UNO!&quot;,&quot;Last card!&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Call&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const deal = ['3|red','2|blue','+2|blue','9|yellow','5|green','W|wild','+4|wild'];
+    this.uid = 0;
+    this.SEATS = [
+      { name: 'Beno', initial: 'B', color: '#c23b2e', x: 70, y: 36, cx: 180, cy: 88 },
+      { name: 'Sana', initial: 'S', color: '#2e6f8a', x: 480, y: 18, cx: 590, cy: 70 },
+      { name: 'Kip', initial: 'K', color: '#66923f', x: 890, y: 36, cx: 1000, cy: 88 }
+    ];
+    this.state = this.freshState(deal);
+  }
+  freshState(deal) {
+    return {
+      hand: deal.map(s => { const [v, col] = s.split('|'); return { id: ++this.uid, v, col, fresh: true, leaving: false }; }),
+      discard: { v: '7', col: 'blue' },
+      counts: [6, 7, 4], unoSeats: [false, false, false],
+      phase: 'you', activeSeat: null, busy: true, shakeId: null, called: false,
+      pileCount: 18, oppFly: null, oppDraw: null,
+      calledColor: null, pickingColor: false,
+      shaking: false, bigCounter: false, penaltyOn: false,
+      unoWindow: false, shuffling: false, reFly: null, toast: '', tintLeaving: false, scatter: false, noTrans: false, hoverId: null
+    };
+  }
+  componentDidMount() {
+    this.state.hand.forEach((c, i) => setTimeout(() => {
+      this.setState(s => ({ hand: s.hand.map(h => h.id === c.id ? Object.assign({}, h, { fresh: false }) : h) }));
+    }, 250 + i * 150));
+    setTimeout(() => this.setState({ busy: false }), 250 + this.state.hand.length * 150 + 400);
+  }
+  spd() { return this.props.speed ?? 1; }
+  playable(c, d) {
+    if (c.col === 'wild') return true;
+    if (d.col === 'wild') return this.state.calledColor ? c.col === this.state.calledColor : true;
+    return c.col === d.col || c.v === d.v;
+  }
+  pickColor(col) {
+    const mk = () => [0, 1, 2, 3].map(i => ({
+      dx: (Math.random() - .5) * (30 + i * 45),
+      dy: (Math.random() - .5) * (24 + i * 36)
+    }));
+    if (this.state.calledColor) {
+      this.setState({ pickingColor: false, busy: false, tintLeaving: true });
+      setTimeout(() => this.setState({ calledColor: col, tintOffs: mk(), tintLeaving: false }), 640);
+    } else {
+      this.setState({ calledColor: col, pickingColor: false, busy: false, tintOffs: mk() });
+    }
+  }
+  showToast(msg, ms) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: msg });
+    this._toastT = setTimeout(() => this.setState({ toast: '' }), ms || 1800);
+  }
+  unoPenalty() {
+    clearTimeout(this._unoT);
+    this.setState({ unoWindow: false });
+    this.showToast('Missed ' + (this.props.callLabel ?? 'UNO!') + ' — penalty +2', 2000);
+    const cols = ['red', 'blue', 'yellow', 'green'];
+    [0, 1].forEach(i => setTimeout(() => {
+      const c = { id: ++this.uid, v: String(Math.floor(Math.random() * 10)), col: cols[Math.floor(Math.random() * 4)], fresh: true, leaving: false };
+      this.setState(s => ({ hand: s.hand.concat([c]), pileCount: Math.max(0, s.pileCount - 1) }));
+      setTimeout(() => this.setState(s => ({ hand: s.hand.map(h => h.id === c.id ? Object.assign({}, h, { fresh: false }) : h) })), 60);
+    }, 250 + i * 300));
+  }
+  reshuffleRun() {
+    this.setState({ busy: true, reFly: { atStart: true } });
+    setTimeout(() => this.setState({ reFly: { atStart: false } }), 60);
+    setTimeout(() => this.setState({ reFly: null, shuffling: true }), 950);
+    setTimeout(() => this.setState({ shuffling: false, pileCount: 24, busy: false }), 1950);
+  }
+  slamThenPick() {
+    this.setState({ shaking: true, bigCounter: true, busy: true });
+    setTimeout(() => this.setState({ shaking: false }), 700);
+    setTimeout(() => this.setState(s => ({ penaltyOn: true, pileCount: Math.max(0, s.pileCount - 4), counts: s.counts.map((c, j) => j === 0 ? c + 4 : c), unoSeats: s.unoSeats.map((u, j) => j === 0 ? false : u) })), 450);
+    setTimeout(() => this.setState({ penaltyOn: false, bigCounter: false, pickingColor: true }), 2000);
+  }
+  playCard(id) {
+    const st = this.state;
+    if (st.phase !== 'you' || st.busy) return;
+    const c = st.hand.find(h => h.id === id);
+    if (!c || c.leaving) return;
+    if (!this.playable(c, st.discard)) {
+      this.setState({ shakeId: id });
+      setTimeout(() => this.setState({ shakeId: null }), 500);
+      return;
+    }
+    const heavy = c.col === 'wild' && c.v === '+4';
+    this.setState({ hand: st.hand.map(h => h.id === id ? Object.assign({}, h, { leaving: true, heavy }) : h), busy: true, hoverId: null });
+    setTimeout(() => {
+      // remove with transitions off for a frame — sc-for is index-keyed
+      const isWild = c.col === 'wild';
+      const isPlus4 = isWild && c.v === '+4';
+      this.setState(s => ({
+        discard: { v: c.v, col: c.col }, busy: isWild, noTrans: true,
+        pickingColor: isWild && !isPlus4,
+        calledColor: isWild ? s.calledColor : null,
+        scatter: isPlus4,
+        hand: s.hand.filter(h => h.id !== id)
+      }));
+      setTimeout(() => this.setState({ noTrans: false }), 60);
+      if (isPlus4) setTimeout(() => this.slamThenPick(), 100);
+      const left = st.hand.filter(h => !h.leaving && h.id !== id).length;
+      if (left === 1 && !this.state.called) {
+        this.setState({ unoWindow: true });
+        clearTimeout(this._unoT);
+        this._unoT = setTimeout(() => { if (!this.state.called) this.unoPenalty(); else this.setState({ unoWindow: false }); }, 2000);
+      }
+    }, 620 / this.spd());
+  }
+  draw() {
+    const st = this.state;
+    if (st.phase !== 'you' || st.busy || st.pileCount <= 0) return;
+    const cols = ['red', 'blue', 'yellow', 'green'];
+    const c = { id: ++this.uid, v: String(Math.floor(Math.random() * 10)), col: cols[Math.floor(Math.random() * 4)], fresh: true, leaving: false };
+    this.setState(s => ({ hand: s.hand.concat([c]), busy: true, pileCount: s.pileCount - 1 }));
+    setTimeout(() => this.setState(s => ({ hand: s.hand.map(h => h.id === c.id ? Object.assign({}, h, { fresh: false }) : h), busy: false })), 60);
+    setTimeout(() => { if (this.state.pileCount <= 0 && !this.state.reFly && !this.state.shuffling) this.reshuffleRun(); }, 700);
+  }
+  endTurn() {
+    if (this.state.phase !== 'you' || this.state.busy) return;
+    if (this.state.unoWindow && !this.state.called) this.unoPenalty();
+    this.setState({ phase: 'them', activeSeat: null });
+    this.oppTurn(0);
+  }
+  oppTurn(i) {
+    const sp = this.spd();
+    if (i >= this.SEATS.length) {
+      setTimeout(() => this.setState({ activeSeat: null, phase: 'you', called: false }), 350 / sp);
+      return;
+    }
+    this.setState({ activeSeat: i });
+    setTimeout(() => {
+      if (this.state.phase !== 'them') return;
+      const drawInstead = Math.random() < .22 && this.state.pileCount > 0;
+      const seat = this.SEATS[i];
+      if (drawInstead) {
+        this.setState({ oppDraw: { seat: i, atPile: true } });
+        setTimeout(() => this.setState({ oppDraw: { seat: i, atPile: false } }), 60);
+        setTimeout(() => {
+          this.setState(s => ({ oppDraw: null, pileCount: Math.max(0, s.pileCount - 1), counts: s.counts.map((c, j) => j === i ? c + 1 : c), unoSeats: s.unoSeats.map((u, j) => j === i ? false : u) }));
+          this.oppTurn(i + 1);
+        }, 60 + 560 / sp + 180);
+      } else {
+        const cols = ['red', 'blue', 'yellow', 'green'];
+        const pool = this.state.calledColor ? [this.state.calledColor] : cols;
+        const card = { v: String(Math.floor(Math.random() * 10)), col: pool[Math.floor(Math.random() * pool.length)] };
+        this.setState({ oppFly: { seat: i, card, atSeat: true } });
+        setTimeout(() => this.setState({ oppFly: { seat: i, card, atSeat: false } }), 60);
+        setTimeout(() => {
+          this.setState(s => {
+            const counts = s.counts.map((c, j) => j === i ? Math.max(1, c - 1) : c);
+            return { discard: card, oppFly: null, calledColor: null, scatter: false, counts, unoSeats: s.unoSeats.map((u, j) => j === i ? counts[i] === 1 : u) };
+          });
+          this.oppTurn(i + 1);
+        }, 60 + 620 / sp + 200);
+      }
+    }, 850 / sp);
+  }
+  restart() {
+    clearTimeout(this._unoT); clearTimeout(this._toastT);
+    const deal = ['3|red','2|blue','+2|blue','9|yellow','5|green','W|wild','+4|wild'];
+    this.setState(Object.assign(this.freshState(deal), { noTrans: true }), () => this.componentDidMount());
+    setTimeout(() => this.setState({ noTrans: false }), 60);
+  }
+  renderVals() {
+    const C = { red:'#c23b2e', blue:'#2e6f8a', yellow:'#e0a020', green:'#66923f', wild:'#6b5f4a' };
+    const st = this.state, sp = this.spd();
+    const you = st.phase === 'you';
+    const n = st.hand.filter(h => !h.leaving).length;
+    const live = st.hand.filter(h => !h.leaving);
+    let playableCount = 0;
+    const R = 520, cx = 590, anchorY = 1030;
+    const hi = live.findIndex(h => h.id === st.hoverId);
+    const idleMode = this.props.handIdle ?? 'Breathe all';
+    const handView = st.hand.map((c, idx) => {
+      const p = this.playable(c, st.discard) && you;
+      let tf;
+      if (c.leaving) {
+        tf = 'translate(648px,250px) rotate(' + ((c.id % 11) - 5) + 'deg)';
+      } else if (c.fresh) {
+        tf = 'translate(428px,243px) rotate(0deg)';
+      } else {
+        const i = live.indexOf(c);
+        const spread = n > 1 ? Math.min(6.5, 60 / (n - 1)) : 0;
+        const a0 = (i - (n - 1) / 2) * spread, rad = a0 * Math.PI / 180;
+        let x = cx + Math.sin(rad) * R - 52;
+        let y = anchorY - Math.cos(rad) * R - 78;
+        let a = a0, scale = '';
+        if (p) y -= 9;
+        if (hi >= 0) {
+          const dd = i - hi;
+          if (dd === 0) { y -= 52; a = a0 * .3; scale = ' scale(1.06)'; }
+          else { const push = [0, 26, 14, 6][Math.min(Math.abs(dd), 3)]; x += Math.sign(dd) * push; }
+        }
+        tf = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) rotate(' + a.toFixed(2) + 'deg)' + scale;
+      }
+      if (p && !c.leaving) playableCount++;
+      const shaking = st.shakeId === c.id;
+      const hovered = st.hoverId === c.id && !c.leaving && !c.fresh;
+      const wildFace = c.col === 'wild' && c.v === 'W';
+      return {
+        v: c.v, bg: C[c.col], isWild: wildFace, notWild: !wildFace,
+        fs: c.v.length > 1 ? 34 : 42, tf,
+        z: c.leaving ? 60 : (hovered ? 50 : 10 + st.hand.indexOf(c)),
+        veil: you && !p && !c.leaving ? 1 : 0,
+        outline: p && !c.leaving ? '3px solid var(--color-accent)' : 'none',
+        shadow: c.leaving ? '0 18px 34px rgba(46,43,37,.3)' : '0 8px 18px rgba(46,43,37,.2)',
+        anim: shaking ? 'ob-shake .5s ease-in-out' : (c.leaving && c.heavy ? 'ob-heavy ' + (0.66 / sp).toFixed(2) + 's cubic-bezier(.45,0,.55,1) both' : hovered || c.leaving || idleMode === 'Still' ? 'none'
+          : (idleMode === 'Bob playable' && p ? 'ob-bob 1.6s ease-in-out ' + (idx % 4) * .2 + 's infinite'
+          : 'ob-breathe 3.2s ease-in-out ' + (idx % 5) * .3 + 's infinite')),
+        cursor: you ? 'pointer' : 'default',
+        click: () => this.playCard(c.id),
+        enter: () => this.setState({ hoverId: c.id }),
+        leave: () => this.setState(s => s.hoverId === c.id ? { hoverId: null } : null)
+      };
+    });
+    const seats = this.SEATS.map((s, i) => {
+      const m = Math.min(st.counts[i], 9);
+      const active = st.activeSeat === i && st.phase === 'them';
+      return {
+        name: s.name, initial: s.initial, color: s.color, x: s.x, y: s.y,
+        count: st.counts[i], active, uno: st.unoSeats[i],
+        border: active ? 'var(--color-accent)' : 'transparent',
+        status: active ? 'Thinking…' : st.counts[i] + ' cards',
+        statusColor: active ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
+        backs: Array.from({ length: m }, (_, k) => {
+          const off = k - (m - 1) / 2;
+          return { tf: 'translate(' + (off * Math.min(18, 120 / m)).toFixed(1) + 'px,' + (Math.abs(off) * 2.4).toFixed(1) + 'px) rotate(' + (off * 7).toFixed(1) + 'deg)' };
+        })
+      };
+    });
+    const d = st.discard;
+    const unoLive = you && n <= 2 && n > 0 && !st.called;
+    const felt = this.props.feltColor ?? '#dfe6cd';
+    const NAMES = { red: 'Red called', blue: 'Blue called', yellow: 'Yellow called', green: 'Green called' };
+    const flySec = 0.6 / sp;
+    const discWild = d.col === 'wild' && d.v === 'W';
+    const DIAM = [270, 480, 760, 1090], OPS = [.5, .32, .2, .12];
+    const offs = st.tintOffs || [0, 1, 2, 3].map(() => ({ dx: 0, dy: 0 }));
+    const flySeat = st.oppFly ? this.SEATS[st.oppFly.seat] : null;
+    const drawSeat = st.oppDraw ? this.SEATS[st.oppDraw.seat] : null;
+    return {
+      feltBg: felt,
+      hasTint: !!st.calledColor,
+      tintCircles: st.calledColor ? [3, 2, 1, 0].map(i => { const dm = DIAM[i]; return ({
+        d: dm, bg: C[st.calledColor], op: OPS[i],
+        left: Math.round(590 + offs[i].dx - dm / 2),
+        top: Math.round(330 + offs[i].dy - dm / 2),
+        anim: st.tintLeaving ? 'ob-tintout .55s cubic-bezier(.5,0,.75,.6) ' + (i * 0.05).toFixed(2) + 's both' : 'ob-tint 1.05s cubic-bezier(.25,.7,.3,1) ' + (i * 0.09).toFixed(2) + 's both'
+      }); }) : [],
+      stageAnim: st.shaking ? 'ob-quake .65s ease-in-out' : 'none',
+      callLabel: this.props.callLabel ?? 'UNO!',
+      avatarColor: '#e0a020',
+      flyT: flySec.toFixed(2) + 's',
+      handTrans: st.noTrans ? 'none' : 'transform ' + flySec.toFixed(2) + 's cubic-bezier(.34,1.45,.64,1)',
+      yourTurn: you,
+      handView, seats,
+      disc: { v: d.v, bg: C[d.col], isWild: discWild, notWild: !discWild, fs: d.v.length > 1 ? 34 : 42, rot: (d.v.charCodeAt(0) % 9) - 4, rim: d.col === 'wild' && st.calledColor ? C[st.calledColor] : '#2a2621' },
+      pickingColor: st.pickingColor,
+      colorChoices: ['red', 'blue', 'yellow', 'green'].map(col => ({ bg: C[col], pick: () => this.pickColor(col) })),
+      hasCalled: !!st.calledColor && d.col === 'wild' && !st.pickingColor,
+      calledHex: st.calledColor ? C[st.calledColor] : '#2a2621',
+      calledName: st.calledColor ? NAMES[st.calledColor] : '',
+      bigCounter: st.bigCounter, penaltyOn: st.penaltyOn,
+      penaltyBacks: [0, 1, 2, 3].map(i => ({ delay: (i * 0.14).toFixed(2) + 's' })),
+      hasOppFly: !!st.oppFly,
+      oppFly: st.oppFly ? {
+        v: st.oppFly.card.v, bg: C[st.oppFly.card.col], fs: 42,
+        tf: st.oppFly.atSeat ? 'translate(' + (flySeat.cx - 52) + 'px,' + (flySeat.cy - 50) + 'px) scale(.45) rotate(-20deg)' : 'translate(648px,250px) scale(1) rotate(3deg)'
+      } : { v: '', bg: '#000', fs: 42, tf: '' },
+      hasOppDraw: !!st.oppDraw,
+      oppDraw: st.oppDraw ? {
+        tf: st.oppDraw.atPile ? 'translate(428px,243px) scale(1) rotate(0deg)' : 'translate(' + (drawSeat.cx - 52) + 'px,' + (drawSeat.cy - 50) + 'px) scale(.45) rotate(14deg)'
+      } : { tf: '' },
+      pileCount: st.pileCount,
+      pileCursor: you && !st.busy ? 'pointer' : 'default',
+      pileHintColor: you ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
+      ringBg: you ? 'conic-gradient(var(--color-accent) 72%, var(--color-neutral-200) 0)' : 'var(--color-neutral-200)',
+      pillBorder: you ? 'var(--color-accent)' : 'transparent',
+      shuffling: st.shuffling,
+      hasReFly: !!st.reFly,
+      reFly: st.reFly ? { tf: st.reFly.atStart ? 'translate(648px,250px) rotate(3deg)' : 'translate(428px,243px) rotate(0deg)' } : { tf: '' },
+      toastOn: !!st.toast, toastText: st.toast,
+      scat1: st.scatter ? 'translate(-17px,6px) rotate(-18deg)' : 'rotate(-7deg)',
+      scat2: st.scatter ? 'translate(14px,-5px) rotate(15deg)' : 'rotate(5deg)',
+      unoWindow: st.unoWindow,
+      statusText: you ? 'Your turn · ' + playableCount + ' playable' : 'Waiting…',
+      statusColor: you ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
+      unoLive,
+      endTurn: () => this.endTurn(),
+      drawClick: () => this.draw(),
+      callUno: () => this.setState({ called: true }),
+      restart: () => this.restart()
+    };
+  }
+}
+
+</script>
+</body>
+</html>

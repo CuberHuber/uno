@@ -65,9 +65,14 @@ export default function Table() {
   const [dispTop, setDispTop] = useState<Card | null>(view?.topCard ?? null);
   const [oppQueue, setOppQueue] = useState<OppAnim[]>([]);
   const [toast, setToast] = useState('');
-  const [big, setBig] = useState<{ text: string; quake: boolean } | null>(null);
+  const [big, setBig] = useState<{ text: string } | null>(null);
   const [shakeId, setShakeId] = useState<number | null>(null);
   const [shuffling, setShuffling] = useState(false);
+  const [quaking, setQuaking] = useState(false);
+  const [scatter, setScatter] = useState(false);
+  const [reFly, setReFly] = useState<{ key: number } | null>(null);
+  const [penaltyFly, setPenaltyFly] = useState<{ key: number; slot: number; n: number } | null>(null);
+  const [tint, setTint] = useState<{ color: Color; offs: { dx: number; dy: number }[]; leaving: boolean } | null>(null);
 
   const leavingIds = useMemo(() => new Set(leaving.map((l) => l.id)), [leaving]);
   const leavingRef = useRef(leavingIds);
@@ -80,6 +85,10 @@ export default function Table() {
   // Haptics where the platform has them; silently nothing elsewhere.
   const buzz = (pattern: number | number[]) => {
     try { navigator.vibrate?.(pattern); } catch { /* unsupported */ }
+  };
+  const quake = () => {
+    setQuaking(true);
+    setTimeout(() => setQuaking(false), 700);
   };
 
   const showToast = (msg: string, ms = 2000) => {
@@ -127,6 +136,14 @@ export default function Table() {
         const t = stepFrom(effect.seat);
         showToast(t === v.yourSeat ? 'You sit out' : `${nameOf(t)} sits out`);
       }
+      if (last.value === 'wild4') {
+        // the +4 slam, timed to the card's landing: table quake + shadow scatter
+        setTimeout(() => {
+          quake(); buzz([70, 40, 90]);
+          setScatter(true);
+          setTimeout(() => setScatter(false), 2200);
+        }, 550);
+      }
       if (last.value === 'draw2' || last.value === 'wild4') {
         penaltyAt.current = Date.now(); // the matching 'drew' pops the big counter
         if (v.rules.stacking) {
@@ -141,14 +158,22 @@ export default function Table() {
       const pot = v.pendingDraw > 0 && effect.count === v.pendingDraw;
       const penalty = effect.count >= 2 && Date.now() - penaltyAt.current < 800;
       if (pot || penalty) {
-        const quake = effect.count >= 8;
-        setBig({ text: `+${effect.count}`, quake });
-        buzz(quake ? [80, 50, 120] : 80);
+        const heavy = effect.count >= 8;
+        setBig({ text: `+${effect.count}` });
+        if (heavy) quake();
+        buzz(heavy ? [80, 50, 120] : 80);
         setTimeout(() => setBig(null), 900);
       }
       if (effect.seat !== v.yourSeat) {
         const slot = slotOfSeat(effect.seat);
-        for (let i = 0; i < Math.min(effect.count, 5); i++) enqueue({ kind: 'draw', slot, card: null });
+        if (pot || penalty) {
+          // penalty backs rain sideways onto the victim's seat (board's ob-flyseat)
+          const key = animKey.current++;
+          setPenaltyFly({ key, slot, n: Math.min(effect.count, 4) });
+          setTimeout(() => setPenaltyFly((p) => (p?.key === key ? null : p)), 1550);
+        } else {
+          for (let i = 0; i < Math.min(effect.count, 5); i++) enqueue({ kind: 'draw', slot, card: null });
+        }
         if (effect.count > 1) showToast(`${nameOf(effect.seat)} draws ${effect.count}`);
       }
     } else if (effect.type === 'called') {
@@ -195,16 +220,42 @@ export default function Table() {
     return () => clearTimeout(t);
   }, [view?.topCard?.id, leaving.length, oppQueue.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A jump up in the pile count means the discard got reshuffled under it.
+  // A jump up in the pile count means the discard got reshuffled under it:
+  // the top flies back face-down (reFly + ob-flip), then the pile wiggles.
   const prevPile = useRef(view?.drawPileCount ?? 0);
   useEffect(() => {
     const n = view?.drawPileCount ?? 0;
-    if (n > prevPile.current + 3) {
-      setShuffling(true);
-      setTimeout(() => setShuffling(false), 1000);
-    }
+    if (n > prevPile.current + 3) setReFly({ key: animKey.current++ });
     prevPile.current = n;
   }, [view?.drawPileCount]);
+
+  // Called-colour tint splash follows the view, with the board's leave animation.
+  const tintRef = useRef(tint);
+  tintRef.current = tint;
+  useEffect(() => {
+    const v = view;
+    if (!v?.topCard) return;
+    const wild = v.topCard.value === 'wild' || v.topCard.value === 'wild4';
+    const target = wild && v.currentColor && !v.mustChooseColor ? v.currentColor : null;
+    const mkOffs = () => [0, 1, 2, 3].map((i) => ({
+      dx: (Math.random() - 0.5) * (30 + i * 45),
+      dy: (Math.random() - 0.5) * (24 + i * 36),
+    }));
+    const cur = tintRef.current;
+    if (target) {
+      if (cur && cur.color === target && !cur.leaving) return;
+      if (cur && !cur.leaving) {
+        setTint({ ...cur, leaving: true });
+        const t = setTimeout(() => setTint({ color: target, offs: mkOffs(), leaving: false }), 620);
+        return () => clearTimeout(t);
+      }
+      setTint({ color: target, offs: mkOffs(), leaving: false });
+    } else if (cur && !cur.leaving) {
+      setTint({ ...cur, leaving: true });
+      const t = setTimeout(() => setTint(null), 620);
+      return () => clearTimeout(t);
+    }
+  }, [view?.topCard?.id, view?.currentColor, view?.mustChooseColor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Selection dies with the turn or a hand change.
   useEffect(() => { setPicked([]); }, [view?.turnSeat, view?.hand.length]);
@@ -331,7 +382,7 @@ export default function Table() {
         transform: `translate(-50%, -50%) scale(${L.scale.toFixed(3)})`,
         ['--stage-k' as never]: L.scale.toFixed(3),
         background: 'var(--felt)',
-        animation: big?.quake ? 'ob-quake .65s ease-in-out' : 'none',
+        animation: quaking ? 'ob-quake .65s ease-in-out' : 'none',
       }}>
         {/* direction ring */}
         <div style={{
@@ -342,18 +393,21 @@ export default function Table() {
           pointerEvents: 'none', zIndex: 1,
         }} />
 
-        {/* called-colour tint splash */}
-        {topIsWild && view.currentColor && !view.mustChooseColor && (
+        {/* called-colour tint splash (pops in, folds away on colour change) */}
+        {tint && (
           [3, 2, 1, 0].map((i) => {
             const dm = [270, 480, 760, 1090][i]!;
+            const off = tint.offs[i]!;
             return (
-              <div key={i} style={{
+              <div key={`${tint.color}-${i}`} style={{
                 position: 'absolute',
-                left: Math.round(L.tintX - dm / 2), top: Math.round(L.tintY - dm / 2),
+                left: Math.round(L.tintX + off.dx - dm / 2), top: Math.round(L.tintY + off.dy - dm / 2),
                 width: dm, height: dm, borderRadius: '50%',
-                background: calledHex, opacity: [0.5, 0.32, 0.2, 0.12][i],
+                background: SUIT[tint.color], opacity: [0.5, 0.32, 0.2, 0.12][i],
                 zIndex: 1, pointerEvents: 'none',
-                animation: `ob-tint 1.05s cubic-bezier(.25,.7,.3,1) ${(i * 0.09).toFixed(2)}s both`,
+                animation: tint.leaving
+                  ? `ob-tintout .55s cubic-bezier(.5,0,.75,.6) ${(i * 0.05).toFixed(2)}s both`
+                  : `ob-tint 1.05s cubic-bezier(.25,.7,.3,1) ${(i * 0.09).toFixed(2)}s both`,
               }} />
             );
           })
@@ -475,8 +529,16 @@ export default function Table() {
         {/* discard */}
         <div data-discard={`${top.color ?? 'wild'}-${top.value}`}
           style={{ position: 'absolute', left: L.discX, top: L.discY, width: 104, height: 156, zIndex: 4, transition: 'left .5s ease, top .5s ease' }}>
-          <div style={{ position: 'absolute', inset: 0, borderRadius: 15, background: 'rgba(0,0,0,.08)', transform: 'rotate(-7deg)' }} />
-          <div style={{ position: 'absolute', inset: 0, borderRadius: 15, background: 'rgba(0,0,0,.08)', transform: 'rotate(5deg)' }} />
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: 15, background: 'rgba(0,0,0,.08)',
+            transform: scatter ? 'translate(-17px,6px) rotate(-18deg)' : 'rotate(-7deg)',
+            transition: 'transform .4s cubic-bezier(.2,.9,.3,1.2)',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: 15, background: 'rgba(0,0,0,.08)',
+            transform: scatter ? 'translate(14px,-5px) rotate(15deg)' : 'rotate(5deg)',
+            transition: 'transform .4s cubic-bezier(.2,.9,.3,1.2)',
+          }} />
           <div style={{ position: 'absolute', inset: 0, transform: `rotate(${(top.id % 9) - 4}deg)`, boxShadow: 'var(--shadow-md)', borderRadius: 15 }}>
             <CardFront face={topFace}
               rim={(top.value === 'wild' || top.value === 'wild4') && view.currentColor ? calledHex : undefined} />
@@ -510,6 +572,40 @@ export default function Table() {
             }} />
           </Flight>
         ))}
+
+        {/* reshuffle: the old top flies back face-down (flipping), then the pile wiggles */}
+        {reFly && (
+          <Flight key={reFly.key} z={75} ms={800} ease="cubic-bezier(.5,.1,.3,1)"
+            from={`translate(${L.discX}px, ${L.discY}px) rotate(3deg)`}
+            to={`translate(${L.pileX}px, ${L.pileY}px) rotate(0deg)`}
+            anim="ob-flip .8s ease-in-out both"
+            onDone={() => {
+              setReFly(null);
+              setShuffling(true);
+              setTimeout(() => setShuffling(false), 1000);
+            }}>
+            <div style={{
+              width: '100%', height: '100%', borderRadius: 15, background: '#2a2621',
+              border: '3px solid rgba(247,237,220,.4)', boxSizing: 'border-box',
+              boxShadow: '0 14px 28px rgba(46,43,37,.3)',
+            }} />
+          </Flight>
+        )}
+
+        {/* penalty backs raining sideways onto the victim's seat */}
+        {penaltyFly && (() => {
+          const seat = L.seats[penaltyFly.slot]!;
+          return Array.from({ length: penaltyFly.n }, (_, i) => (
+            <div key={`${penaltyFly.key}-${i}`} style={{
+              position: 'absolute', left: 0, top: 0, width: 74, height: 110, borderRadius: 11,
+              background: '#2a2621', border: '3px solid rgba(247,237,220,.4)', boxSizing: 'border-box',
+              zIndex: 70,
+              ['--fly-from' as never]: `translate(${L.pileX + 15}px, ${L.pileY + 20}px)`,
+              ['--fly-to' as never]: `translate(${seat.cx - 37}px, ${seat.cy - 55}px)`,
+              animation: `ob-flyseat .9s ease-in ${(i * 0.14).toFixed(2)}s both`,
+            }} />
+          ));
+        })()}
 
         {/* your played cards in flight */}
         {leaving.map((fl) => (
