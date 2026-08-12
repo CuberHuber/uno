@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { CLASSIC_RULES } from '@uno/shared';
 import { CONTINUE_GRACE_MS, RoomStore } from '../src/rooms.js';
 
 function makeStartedRoom(store: RoomStore) {
@@ -12,15 +13,15 @@ function makeStartedRoom(store: RoomStore) {
 }
 
 describe('rooms and joining', () => {
-  test('room code format XXXX-XXXX from the Crockford alphabet', () => {
-    const store = new RoomStore();
-    const { code } = store.createRoom();
-    expect(code).toMatch(/^[23456789ABCDEFGHJKMNPQRSTVWXYZ]{4}-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{4}$/);
+  test('codes are 5 chars from the safe alphabet, no hyphen', () => {
+    const room = new RoomStore().createRoom();
+    expect(room.code).toMatch(/^[34679ACDEFHKMNPRTWXY]{5}$/);
   });
-  test('getRoom ignores case and hyphens', () => {
+  test('lookup strips spaces and dashes, case-insensitive', () => {
     const store = new RoomStore();
-    const { code } = store.createRoom();
-    expect(store.getRoom(code.toLowerCase().replace('-', ''))).toBeDefined();
+    const room = store.createRoom();
+    const messy = `${room.code.toLowerCase().slice(0, 2)}-${room.code.slice(2)}`;
+    expect(store.getRoom(messy)).toBe(room);
   });
   test('first joiner is host; fifth join is rejected; join after start is rejected', () => {
     const store = new RoomStore();
@@ -65,7 +66,7 @@ describe('starting and playing', () => {
     if (g.mustChooseColor) { g.mustChooseColor = false; g.currentColor = 'red'; g.players[g.turn]!.hand = [{ id: 9999, color: 'red', value: '5' }]; }
     const turnSeat = g.turn;
     const token = turnSeat === 0 ? a.token : (store.getRoom(room.code)!.players[turnSeat]!.token);
-    const r = store.act(room.code, token, { type: 'play', cardId: 9999 } as never);
+    const r = store.act(room.code, token, { type: 'play', cardIds: [9999] } as never);
     expect(r.ok).toBe(true);
     const after = store.getRoom(room.code)!;
     expect(after.phase).toBe('roundEnd');
@@ -90,9 +91,9 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: false, forcePlay: false });
+    expect(store.viewFor(room.code, 0).rules).toEqual(CLASSIC_RULES);
     expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
-    expect(store.viewFor(room.code, 1).rules).toEqual({ stacking: true, forcePlay: true });
+    expect(store.viewFor(room.code, 1).rules).toEqual({ ...CLASSIC_RULES, stacking: true, forcePlay: true });
   });
 
   test('only the host may change the rules', () => {
@@ -113,7 +114,7 @@ describe('house rules', () => {
     if (!a.ok || !b.ok) throw new Error('join failed');
     expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
     expect(store.startGame(room.code, a.token).ok).toBe(true);
-    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: true });
+    expect(store.getRoom(room.code)!.game!.rules).toEqual({ ...CLASSIC_RULES, stacking: true, forcePlay: true });
     expect(store.setRules(room.code, a.token, { stacking: false, forcePlay: false }).ok).toBe(false);
     expect(store.viewFor(room.code, 1).rules.stacking).toBe(true);
   });
@@ -128,8 +129,8 @@ describe('house rules', () => {
     expect(store.startGame(room.code, a.token).ok).toBe(true);
     store.getRoom(room.code)!.phase = 'roundEnd';
     expect(store.rematch(room.code, a.token).ok).toBe(true);
-    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: false });
-    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: true, forcePlay: false });
+    expect(store.getRoom(room.code)!.game!.rules).toEqual({ ...CLASSIC_RULES, stacking: true });
+    expect(store.viewFor(room.code, 0).rules).toEqual({ ...CLASSIC_RULES, stacking: true });
   });
 });
 
@@ -172,5 +173,53 @@ describe('garbage collection', () => {
     clock = 25 * 60 * 60_000;
     store.sweep();
     expect(store.getRoom(keep.code)).toBeUndefined();    // 24 h cap
+  });
+});
+
+describe('5-char codes and room PIN', () => {
+  test('createRoom applies rules and pin', () => {
+    const store = new RoomStore();
+    const room = store.createRoom({ rules: { multiDiscard: true }, pin: '1234' });
+    expect(room.rules.multiDiscard).toBe(true);
+    expect(room.pin).toBe('1234');
+  });
+  test('join without pin → pin_required; wrong pin → wrong_pin; right pin seats you', () => {
+    const store = new RoomStore();
+    const room = store.createRoom({ pin: '1234' });
+    expect(store.join(room.code, 'Ann')).toEqual({ ok: false, error: 'pin_required' });
+    expect(store.join(room.code, 'Ann', '0000')).toEqual({ ok: false, error: 'wrong_pin' });
+    expect(store.join(room.code, 'Ann', '1234').ok).toBe(true);
+  });
+  test('resume by token bypasses the pin', () => {
+    const store = new RoomStore();
+    const room = store.createRoom({ pin: '1234' });
+    const j = store.join(room.code, 'Ann', '1234');
+    if (!j.ok) throw new Error(j.error);
+    expect(store.resume(room.code, j.token).ok).toBe(true);
+  });
+  test('setPin: host-only, lobby-only, format-checked, removable', () => {
+    const store = new RoomStore();
+    const room = store.createRoom();
+    const host = store.join(room.code, 'Host');
+    const guest = store.join(room.code, 'Guest');
+    if (!host.ok || !guest.ok) throw new Error('setup');
+    expect(store.setPin(room.code, guest.token, '1234')).toEqual({ ok: false, error: 'host_only_rules' });
+    expect(store.setPin(room.code, host.token, '12x4')).toEqual({ ok: false, error: 'bad_pin' });
+    expect(store.setPin(room.code, host.token, '4321').ok).toBe(true);
+    expect(room.pin).toBe('4321');
+    expect(store.setPin(room.code, host.token, null).ok).toBe(true);
+    expect(room.pin).toBeNull();
+    store.startGame(room.code, host.token);
+    expect(store.setPin(room.code, host.token, '1234')).toEqual({ ok: false, error: 'rules_locked' });
+  });
+  test('only the host view carries the pin; everyone sees hasPin', () => {
+    const store = new RoomStore();
+    const room = store.createRoom({ pin: '1234' });
+    store.join(room.code, 'Host', '1234');
+    store.join(room.code, 'Guest', '1234');
+    expect(store.viewFor(room.code, 0).pin).toBe('1234');
+    expect(store.viewFor(room.code, 0).hasPin).toBe(true);
+    expect(store.viewFor(room.code, 1).pin).toBeNull();
+    expect(store.viewFor(room.code, 1).hasPin).toBe(true);
   });
 });

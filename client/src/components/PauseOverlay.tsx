@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../i18n';
 import { useStore } from '../store';
 
 const GRACE_MS = 120_000; // mirrors CONTINUE_GRACE_MS on the server
 
 export default function PauseOverlay() {
   const { view, actions } = useStore();
+  const { t } = useT();
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, []);
   if (!view?.paused) return null;
 
@@ -19,14 +21,12 @@ export default function PauseOverlay() {
   return (
     <div className="dialog-backdrop">
       <div className="dialog">
-        <div className="dialog-title">Waiting for {view.pausedForName}…</div>
-        <div className="dialog-body">
-          Their seat is held — the game resumes the moment they reopen the link.
-        </div>
+        <div className="dialog-title">{t('pause.waiting', { name: view.pausedForName ?? '' })}</div>
+        <div className="dialog-body">{t('pause.body')}</div>
         {graceOver && awaySeat && (
           <div className="dialog-actions">
             <button className="btn btn-primary" onClick={() => actions.continueWithout(awaySeat.seat)}>
-              Continue without them
+              {t('pause.continue')}
             </button>
           </div>
         )}

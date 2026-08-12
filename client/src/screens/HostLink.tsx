@@ -1,48 +1,84 @@
 import { useState } from 'react';
-import type { Rules } from '@uno/shared';
-import { CLASSIC_RULES } from '@uno/shared';
+import { RULES_CATALOG, sanitizeRules, type Rules } from '@uno/shared';
 import RuleRow from '../components/RuleRow';
-import { RULE_DEFS, fmtCode, rulesStashKey } from '../ui';
+import { useT } from '../i18n';
 
-export default function HostLink({ code }: { code: string }) {
+// Two phases: configure (rules + optional PIN, no room yet) → share (link).
+export default function HostLink() {
+  const { t, locale } = useT();
+  const [rules, setRules] = useState<Rules>(sanitizeRules());
+  const [pin, setPin] = useState('');
+  const [code, setCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [rules, setRules] = useState<Rules>({ ...CLASSIC_RULES });
-  const link = `${window.location.origin}/r/${code}`;
-  const copy = () => {
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
+  const pinOk = pin === '' || /^\d{4}$/.test(pin);
+
+  const create = async () => {
+    const res = await fetch('/api/rooms', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rules, pin: pin || undefined }),
+    });
+    const body = (await res.json()) as { code: string };
+    setCode(body.code);
   };
-  const toggle = (key: keyof Rules) => {
-    const next = { ...rules, [key]: !rules[key] };
-    setRules(next);
-    // Applied via setRules the moment you take your seat (see store.join).
-    sessionStorage.setItem(rulesStashKey(code), JSON.stringify(next));
-  };
+
+  if (code) {
+    const link = `${window.location.origin}/r/${code}`;
+    const copy = () => {
+      navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    };
+    return (
+      <main className="centered">
+        <div className="panel host-card">
+          <div className="host-head">
+            <h2>{t('create.title')}</h2>
+            <span className="tag tag-neutral">{t('create.hostTag')}</span>
+          </div>
+          <div className="label-sm">{t('create.linkLabel')}</div>
+          <div className="invite-row">
+            <div className="mono-pill">{link}</div>
+            <button className="btn btn-primary" onClick={copy}>
+              {copied ? t('create.copied') : t('create.copy')}
+            </button>
+          </div>
+          <div className="host-foot">
+            <span className="host-token">{t('create.token', { code })}</span>
+            <a className="btn btn-primary btn-big" href={`/r/${code}`}>{t('create.open')}</a>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="centered">
       <div className="panel host-card">
         <div className="host-head">
-          <h2>House rules</h2>
-          <span className="tag tag-neutral">You’re the host</span>
+          <h2>{t('create.title')}</h2>
+          <span className="tag tag-neutral">{t('create.hostTag')}</span>
         </div>
-        <p className="card-sub">Agree these before the first deal. They lock once the game starts.</p>
+        <p className="card-sub">{t('create.sub')}</p>
         <div className="rulerows">
-          {RULE_DEFS.map((r) => (
-            <RuleRow key={r.key} name={r.name} desc={r.desc} on={rules[r.key]}
-              onToggle={() => toggle(r.key)} />
+          {RULES_CATALOG.map((r) => (
+            <RuleRow key={r.id} name={r.title[locale]} desc={r.tagline[locale]}
+              details={r.details[locale]} on={rules[r.id]}
+              onToggle={() => setRules({ ...rules, [r.id]: !rules[r.id] })} />
           ))}
         </div>
         <div className="host-divider" />
-        <div className="label-sm">Invite link</div>
-        <div className="invite-row">
-          <div className="mono-pill">{link}</div>
-          <button className="btn btn-primary" onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+        <div className="field">
+          <label htmlFor="pin">{t('create.pinLabel')}</label>
+          <input id="pin" className="input-pill input-token" value={pin}
+            inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="····"
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} />
+          <div className="hint-dot">{t('create.pinHint')}</div>
         </div>
         <div className="host-foot">
-          <span className="host-token">Token {fmtCode(code)}</span>
-          <a className="btn btn-primary btn-big" href={`/r/${code}`}>Open the room</a>
+          <span />
+          <button className="btn btn-primary btn-big" disabled={!pinOk} onClick={create}>
+            {t('create.createBtn')}
+          </button>
         </div>
       </div>
     </main>

@@ -11,6 +11,8 @@ export interface ViewContext {
   pausedForSeat: number | null;
   pausedSinceMs: number | null;
   rules: Rules;
+  hasPin: boolean;
+  pin: string | null; // the actual digits; only ever set for the host's view
   game: GameState | null;
 }
 
@@ -40,7 +42,10 @@ export function projectView(ctx: ViewContext, seat: number): RoomStateView {
     catchableSeat: g?.catchWindow?.seat ?? null,
     drawPileCount: g ? g.drawPile.length : 0,
     rules: ctx.rules,
+    hasPin: ctx.hasPin,
+    pin: ctx.pin,
     pendingDraw: g ? g.pendingDraw : 0,
+    pendingDrawKind: g ? g.pendingDrawKind : null,
     winnerSeat: g ? g.winner : null,
     winTally: ctx.winTally,
     paused: ctx.pausedForSeat !== null,

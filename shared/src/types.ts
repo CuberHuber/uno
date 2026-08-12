@@ -12,10 +12,18 @@ export interface Card {
 export type Phase = 'lobby' | 'playing' | 'roundEnd';
 
 export interface Rules {
-  stacking: boolean;  // +2/+4 may be answered with another +2/+4 instead of drawing
-  forcePlay: boolean; // a drawn playable card goes straight down
+  stacking: boolean;     // +2 answers only +2, +4 answers only +4; the pot rides on
+  forcePlay: boolean;    // a drawn playable card goes straight down
+  drawToMatch: boolean;  // no play → draw until a playable card arrives
+  multiDiscard: boolean; // same-value number cards may be discarded together
 }
-export const CLASSIC_RULES: Rules = { stacking: false, forcePlay: false };
+export const CLASSIC_RULES: Rules = {
+  stacking: false, forcePlay: false, drawToMatch: false, multiDiscard: false,
+};
+export const sanitizeRules = (r?: Partial<Rules> | null): Rules => ({
+  stacking: !!r?.stacking, forcePlay: !!r?.forcePlay,
+  drawToMatch: !!r?.drawToMatch, multiDiscard: !!r?.multiDiscard,
+});
 
 export interface SeatView {
   seat: number;
@@ -41,7 +49,10 @@ export interface RoomStateView {
   catchableSeat: number | null;  // catch window is open on this seat
   drawPileCount: number;
   rules: Rules;
+  hasPin: boolean;           // the join screen knows to ask for a PIN
+  pin: string | null;        // the digits themselves — host's view only
   pendingDraw: number;           // cards the turn seat owes (stacking pot); 0 otherwise
+  pendingDrawKind: 'draw2' | 'wild4' | null; // which kind answers the pot (strict stacking)
   winnerSeat: number | null;
   winTally: number[];
   paused: boolean;
@@ -50,7 +61,7 @@ export interface RoomStateView {
 }
 
 export type Effect =
-  | { type: 'played'; seat: number; card: Card }
+  | { type: 'played'; seat: number; cards: Card[] }
   | { type: 'drew'; seat: number; count: number }
   | { type: 'called'; seat: number }
   | { type: 'caught'; seat: number }
@@ -66,12 +77,13 @@ export interface JoinAck {
 
 export interface ClientToServerEvents {
   joinRoom: (
-    p: { code: string; name?: string; token?: string },
+    p: { code: string; name?: string; token?: string; pin?: string },
     ack: (r: JoinAck) => void
   ) => void;
   startGame: () => void;
   setRules: (p: { rules: Rules }) => void; // host, lobby only
-  playCard: (p: { cardId: number; chosenColor?: Color }) => void;
+  setPin: (p: { pin: string | null }) => void; // host, lobby only
+  playCards: (p: { cardIds: number[]; chosenColor?: Color }) => void;
   drawCard: () => void;
   passTurn: () => void;          // decline to play a drawn playable card
   chooseColor: (p: { color: Color }) => void; // first-flip wild
