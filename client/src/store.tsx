@@ -6,12 +6,14 @@ import { rulesStashKey } from './ui';
 export interface Store {
   view: RoomStateView | null;
   error: string | null;      // fatal join error → "table not found" screen
+  joinError: string | null;  // transient join failure: pin_required / wrong_pin / rate_limited…
   rejection: string | null;  // transient moveRejected, clears itself
   effect: Effect | null;
-  join: (code: string, name?: string) => void;
+  join: (code: string, name?: string, pin?: string) => void;
   actions: {
     start: () => void;
     setRules: (rules: Rules) => void;
+    setPin: (pin: string | null) => void;
     play: (cardIds: number[], chosenColor?: Color) => void;
     draw: () => void;
     pass: () => void;
@@ -35,6 +37,7 @@ const tokenKey = (code: string) => `ochre:${code.toUpperCase()}`;
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<RoomStateView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
   const [effect, setEffect] = useState<Effect | null>(null);
 
@@ -65,11 +68,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { socket.io.off('reconnect', onReconnect); };
   }, [view?.roomCode]);
 
-  const join = (code: string, name?: string) => {
+  // Failures a new attempt can fix stay on the join screen; the rest are fatal.
+  const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started'];
+
+  const join = (code: string, name?: string, pin?: string) => {
     const token = localStorage.getItem(tokenKey(code)) ?? undefined;
     if (!socket.connected) socket.connect();
-    socket.emit('joinRoom', { code, name, token }, (ack) => {
-      if (!ack.ok || !ack.token) { setError(ack.error ?? 'table not found'); return; }
+    socket.emit('joinRoom', { code, name, token, pin }, (ack) => {
+      if (!ack.ok || !ack.token) {
+        const reason = ack.error ?? 'table_not_found';
+        if (TRANSIENT.includes(reason)) setJoinError(reason);
+        else setError(reason);
+        return;
+      }
+      setJoinError(null);
       localStorage.setItem(tokenKey(code), ack.token);
       // The host picked house rules before sitting down; apply them now that we hold the seat.
       const stash = sessionStorage.getItem(rulesStashKey(code));
@@ -83,6 +95,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const actions = useMemo<Store['actions']>(() => ({
     start: () => socket.emit('startGame'),
     setRules: (rules) => socket.emit('setRules', { rules }),
+    setPin: (pin) => socket.emit('setPin', { pin }),
     play: (cardIds, chosenColor) => socket.emit('playCards', { cardIds, chosenColor }),
     draw: () => socket.emit('drawCard'),
     pass: () => socket.emit('passTurn'),
@@ -94,7 +107,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }), []);
 
   return (
-    <Ctx.Provider value={{ view, error, rejection, effect, join, actions }}>
+    <Ctx.Provider value={{ view, error, joinError, rejection, effect, join, actions }}>
       {children}
     </Ctx.Provider>
   );

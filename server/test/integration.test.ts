@@ -80,3 +80,14 @@ test('two clients join, deal, and play to a winner with hidden hands', { timeout
   expect([0, 1]).toContain(winner);
   expect(ctx.store.getRoom(room.code)!.phase).toBe('roundEnd');
 });
+
+test('pin flow over sockets: required, wrong, right', async () => {
+  const room = ctx.store.createRoom({ pin: '1234' });
+  const c = client();
+  const join = (payload: object) =>
+    new Promise<{ ok: boolean; error?: string }>((res) =>
+      c.emit('joinRoom', { code: room.code, ...payload }, res));
+  expect((await join({ name: 'Ann' })).error).toBe('pin_required');
+  expect((await join({ name: 'Ann', pin: '0000' })).error).toBe('wrong_pin');
+  expect((await join({ name: 'Ann', pin: '1234' })).ok).toBe(true);
+});

@@ -6,7 +6,7 @@ import type { ServerLimits } from './server.js';
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 
-export function attachSockets(io: IO, store: RoomStore, _limits?: ServerLimits): void {
+export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): void {
   const broadcast = (code: string) => {
     const room = store.getRoom(code);
     if (!room) return;
@@ -28,10 +28,19 @@ export function attachSockets(io: IO, store: RoomStore, _limits?: ServerLimits):
     const seatOf = () => socket.data as { code: string; seat: number; token: string };
 
     socket.on('joinRoom', (p, ack) => {
+      const ip = socket.handshake.address;
+      if (!limits.join.allow(ip)) return ack({ ok: false, error: 'rate_limited' });
       const existing = p.token ? store.resume(p.code, p.token) : { ok: false as const, error: '' };
-      const joined = existing.ok
-        ? { ok: true as const, seat: existing.seat, token: p.token! }
-        : store.join(p.code, p.name ?? 'Player');
+      let joined;
+      if (existing.ok) {
+        joined = { ok: true as const, seat: existing.seat, token: p.token! };
+      } else {
+        // Wrong PINs burn a per-IP+room budget; a blocked key cools down a minute.
+        const pinKey = `${ip}:${p.code.toUpperCase()}`;
+        if (limits.pin.blocked(pinKey)) return ack({ ok: false, error: 'rate_limited' });
+        joined = store.join(p.code, p.name ?? 'Player', p.pin);
+        if (!joined.ok && joined.error === 'wrong_pin') limits.pin.hit(pinKey);
+      }
       if (!joined.ok) return ack({ ok: false, error: joined.error });
       socket.data = { code: p.code, seat: joined.seat, token: joined.token };
       store.setConnection(p.code, joined.seat, socket.id);
@@ -54,6 +63,7 @@ export function attachSockets(io: IO, store: RoomStore, _limits?: ServerLimits):
 
     socket.on('startGame', () => handle(() => store.startGame(seatOf().code, seatOf().token)));
     socket.on('setRules', (p) => handle(() => store.setRules(seatOf().code, seatOf().token, p.rules)));
+    socket.on('setPin', (p) => handle(() => store.setPin(seatOf().code, seatOf().token, p.pin)));
     socket.on('playCards', (p) => handle(() => store.act(seatOf().code, seatOf().token, { type: 'play', cardIds: p.cardIds, chosenColor: p.chosenColor })));
     socket.on('drawCard', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'draw' })));
     socket.on('passTurn', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'pass' })));

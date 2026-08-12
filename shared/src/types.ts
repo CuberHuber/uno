@@ -77,11 +77,12 @@ export interface JoinAck {
 
 export interface ClientToServerEvents {
   joinRoom: (
-    p: { code: string; name?: string; token?: string },
+    p: { code: string; name?: string; token?: string; pin?: string },
     ack: (r: JoinAck) => void
   ) => void;
   startGame: () => void;
   setRules: (p: { rules: Rules }) => void; // host, lobby only
+  setPin: (p: { pin: string | null }) => void; // host, lobby only
   playCards: (p: { cardIds: number[]; chosenColor?: Color }) => void;
   drawCard: () => void;
   passTurn: () => void;          // decline to play a drawn playable card
