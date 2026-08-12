@@ -49,6 +49,8 @@ export interface RoomStateView {
   catchableSeat: number | null;  // catch window is open on this seat
   drawPileCount: number;
   rules: Rules;
+  hasPin: boolean;           // the join screen knows to ask for a PIN
+  pin: string | null;        // the digits themselves — host's view only
   pendingDraw: number;           // cards the turn seat owes (stacking pot); 0 otherwise
   pendingDrawKind: 'draw2' | 'wild4' | null; // which kind answers the pot (strict stacking)
   winnerSeat: number | null;

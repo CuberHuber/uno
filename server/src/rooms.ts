@@ -7,7 +7,9 @@ import {
 import { rng } from './engine/deck.js';
 import { projectView } from './engine/views.js';
 
-const ALPHABET = '23456789ABCDEFGHJKMNPQRSTVWXYZ';
+// No look-alikes (0/O/Q, 1/I/L, 5/S, 8/B, 2/Z) or sound-alikes (U/V, G/J).
+const ALPHABET = '34679ACDEFHKMNPRTWXY';
+const CODE_LEN = 5;
 export const CONTINUE_GRACE_MS = 120_000;
 const EMPTY_TTL_MS = 10 * 60_000;
 const MAX_AGE_MS = 24 * 60 * 60_000;
@@ -25,9 +27,10 @@ export interface Room {
   phase: Phase; players: RoomPlayer[]; hostSeat: number;
   game: GameState | null; winTally: number[]; seed: number;
   rules: Rules;
+  pin: string | null; // ephemeral room secret, plain text by design (rate limits guard it)
 }
 
-const norm = (code: string) => code.toUpperCase().replaceAll('-', '');
+const norm = (code: string) => code.toUpperCase().replace(/[\s-]/g, '');
 
 /** Omit that distributes over a discriminated union, so each Action variant
  *  keeps its own payload fields (plain Omit collapses them to just `type`). */
@@ -37,18 +40,19 @@ export class RoomStore {
   private rooms = new Map<string, Room>();
   constructor(private now: () => number = Date.now) {}
 
-  createRoom(opts: { seed?: number } = {}): Room {
+  createRoom(opts: { seed?: number; rules?: Partial<Rules>; pin?: string | null } = {}): Room {
     let key: string;
     do {
-      key = Array.from({ length: 8 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
+      key = Array.from({ length: CODE_LEN }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
     } while (this.rooms.has(key));
     const room: Room = {
-      code: `${key.slice(0, 4)}-${key.slice(4)}`,
+      code: key,
       createdAtMs: this.now(), emptySinceMs: this.now(),
       phase: 'lobby', players: [], hostSeat: 0,
       game: null, winTally: [],
       seed: opts.seed ?? randomInt(2 ** 31),
-      rules: { ...CLASSIC_RULES },
+      rules: sanitizeRules(opts.rules),
+      pin: opts.pin ?? null,
     };
     this.rooms.set(key, room);
     return room;
@@ -58,11 +62,14 @@ export class RoomStore {
     return this.rooms.get(norm(code));
   }
 
-  join(code: string, name: string) {
+  join(code: string, name: string, pin?: string) {
     const room = this.getRoom(code);
     if (!room) return { ok: false as const, error: 'table_not_found' };
     if (room.phase !== 'lobby') return { ok: false as const, error: 'game_started' };
     if (room.players.length >= MAX_SEATS) return { ok: false as const, error: 'table_full' };
+    if (room.pin !== null && pin !== room.pin) {
+      return { ok: false as const, error: pin === undefined ? 'pin_required' : 'wrong_pin' };
+    }
     const token = randomBytes(16).toString('hex');
     room.players.push({
       name: name.trim().slice(0, 24) || 'Player',
@@ -102,6 +109,18 @@ export class RoomStore {
     }
     if (room.phase !== 'lobby') return { ok: false as const, error: 'rules_locked' };
     room.rules = sanitizeRules(rules);
+    return { ok: true as const };
+  }
+
+  setPin(code: string, token: string, pin: string | null) {
+    const room = this.getRoom(code);
+    if (!room) return { ok: false as const, error: 'table_not_found' };
+    if (this.seatFor(room, token) !== room.hostSeat) {
+      return { ok: false as const, error: 'host_only_rules' };
+    }
+    if (room.phase !== 'lobby') return { ok: false as const, error: 'rules_locked' };
+    if (pin !== null && !/^\d{4}$/.test(pin)) return { ok: false as const, error: 'bad_pin' };
+    room.pin = pin;
     return { ok: true as const };
   }
 
@@ -187,6 +206,8 @@ export class RoomStore {
       pausedForSeat: pausedSeat,
       pausedSinceMs: pausedSeat !== null ? room.players[pausedSeat]!.disconnectedAtMs : null,
       rules: room.rules,
+      hasPin: room.pin !== null,
+      pin: seat === room.hostSeat ? room.pin : null,
       game: room.game,
     }, seat);
   }
