@@ -85,7 +85,7 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
 }
 
 export type Action =
-  | { type: 'play'; seat: number; cardId: number; chosenColor?: Color }
+  | { type: 'play'; seat: number; cardId: number; chosenColor?: Color; extraCardIds?: number[] }
   | { type: 'draw'; seat: number }
   | { type: 'pass'; seat: number }
   | { type: 'chooseColor'; seat: number; color: Color }
@@ -143,6 +143,20 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (idx === -1) return err('card not in hand');
       const card = player.hand[idx]!;
       const top = s.discard.at(-1)!;
+
+      // Multi-play: cards of the lead card's rank ride along, laid in the order given.
+      const extraIds = action.extraCardIds ?? [];
+      if (extraIds.length > 0 && !s.rules.multiPlay) return err('one card per turn');
+      const cards: Card[] = [card];
+      for (const id of extraIds) {
+        if (cards.some((c) => c.id === id)) return err('card played twice');
+        const extra = player.hand.find((c) => c.id === id);
+        if (!extra) return err('card not in hand');
+        if (extra.value !== card.value) return err('the cards must share a rank');
+        cards.push(extra);
+      }
+      const count = cards.length;
+
       // Stacking: an owed +2/+4 pot may be answered with any +2/+4, colour regardless.
       const stackAnswer = s.pendingDraw > 0 && (card.value === 'draw2' || card.value === 'wild4');
       if (s.pendingDraw > 0 && !stackAnswer) return err(`answer the +${s.pendingDraw} or draw`);
@@ -152,10 +166,11 @@ export function applyAction(state: GameState, action: Action): ActionResult {
 
       s.catchWindow = null; // the next act closes any open window (may re-arm below)
       s.pendingDrawn = null;
-      player.hand.splice(idx, 1);
-      s.discard.push(card);
-      s.currentColor = isWild ? action.chosenColor! : card.color;
-      effects.push({ type: 'played', seat: action.seat, card });
+      player.hand = player.hand.filter((c) => !cards.some((played) => played.id === c.id));
+      s.discard.push(...cards);
+      // The last card laid is the one left face up, so it sets the live colour.
+      s.currentColor = isWild ? action.chosenColor! : cards.at(-1)!.color;
+      for (const c of cards) effects.push({ type: 'played', seat: action.seat, card: c });
 
       if (player.hand.length === 0) {
         s.winner = action.seat;
@@ -166,39 +181,41 @@ export function applyAction(state: GameState, action: Action): ActionResult {
         s.catchWindow = { seat: action.seat };
       }
 
+      // Every card in the set fires: n skips walk n seats further, n +2s owe 2n,
+      // and n reverses only flip the direction when n is odd.
       const active = s.players.filter((p) => !p.removed).length;
       switch (card.value) {
         case 'skip':
-          s.turn = nextSeat(s, action.seat, 2);
+          s.turn = nextSeat(s, action.seat, count + 1);
           break;
         case 'reverse':
           if (active === 2) {
-            s.turn = action.seat; // acts as skip: same player again
+            s.turn = nextSeat(s, action.seat, count + 1); // acts as skip: same player again
           } else {
-            s.direction = s.direction === 1 ? -1 : 1;
+            if (count % 2 === 1) s.direction = s.direction === 1 ? -1 : 1;
             s.turn = nextSeat(s, action.seat);
           }
           break;
         case 'draw2': {
           if (s.rules.stacking) {
-            s.pendingDraw += 2;
+            s.pendingDraw += 2 * count;
             s.turn = nextSeat(s, action.seat); // victim answers: stack or take
             break;
           }
           const victim = nextSeat(s, action.seat);
-          const n = drawFromPile(s, victim, 2);
+          const n = drawFromPile(s, victim, 2 * count);
           effects.push({ type: 'drew', seat: victim, count: n });
           s.turn = nextSeat(s, action.seat, 2);
           break;
         }
         case 'wild4': {
           if (s.rules.stacking) {
-            s.pendingDraw += 4;
+            s.pendingDraw += 4 * count;
             s.turn = nextSeat(s, action.seat);
             break;
           }
           const victim = nextSeat(s, action.seat);
-          const n = drawFromPile(s, victim, 4);
+          const n = drawFromPile(s, victim, 4 * count);
           effects.push({ type: 'drew', seat: victim, count: n });
           s.turn = nextSeat(s, action.seat, 2);
           break;

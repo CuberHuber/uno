@@ -227,6 +227,8 @@ body {
 }
 .hand .cardface-playable:not(:disabled):hover { transform: translateY(-22px); }
 .hand .cardface-raised { transform: translateY(-26px); }
+/* Multi-play: the cards queued for this turn keep a solid ring. */
+.hand-slot-picked .cardface { opacity: 1; outline-color: var(--color-accent-2); }
 .hand-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .hand-actions .btn { padding: 11px 24px; font-size: 14px; }
 .hand-actions .btn-big { padding: 14px 28px; font-size: 15px; }

@@ -12,7 +12,7 @@ export interface Store {
   actions: {
     start: () => void;
     setRules: (rules: Rules) => void;
-    play: (cardId: number, chosenColor?: Color) => void;
+    play: (cardId: number, chosenColor?: Color, extraCardIds?: number[]) => void;
     draw: () => void;
     pass: () => void;
     chooseColor: (color: Color) => void;
@@ -83,7 +83,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const actions = useMemo<Store['actions']>(() => ({
     start: () => socket.emit('startGame'),
     setRules: (rules) => socket.emit('setRules', { rules }),
-    play: (cardId, chosenColor) => socket.emit('playCard', { cardId, chosenColor }),
+    play: (cardId, chosenColor, extraCardIds) => socket.emit('playCard', { cardId, chosenColor, extraCardIds }),
     draw: () => socket.emit('drawCard'),
     pass: () => socket.emit('passTurn'),
     chooseColor: (color) => socket.emit('chooseColor', { color }),

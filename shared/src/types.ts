@@ -14,8 +14,9 @@ export type Phase = 'lobby' | 'playing' | 'roundEnd';
 export interface Rules {
   stacking: boolean;  // +2/+4 may be answered with another +2/+4 instead of drawing
   forcePlay: boolean; // a drawn playable card goes straight down
+  multiPlay: boolean; // every card of one rank may go down in a single turn
 }
-export const CLASSIC_RULES: Rules = { stacking: false, forcePlay: false };
+export const CLASSIC_RULES: Rules = { stacking: false, forcePlay: false, multiPlay: false };
 
 export interface SeatView {
   seat: number;
@@ -71,7 +72,8 @@ export interface ClientToServerEvents {
   ) => void;
   startGame: () => void;
   setRules: (p: { rules: Rules }) => void; // host, lobby only
-  playCard: (p: { cardId: number; chosenColor?: Color }) => void;
+  // extraCardIds: further cards of the same rank, laid in order (multi-play rule).
+  playCard: (p: { cardId: number; chosenColor?: Color; extraCardIds?: number[] }) => void;
   drawCard: () => void;
   passTurn: () => void;          // decline to play a drawn playable card
   chooseColor: (p: { color: Color }) => void; // first-flip wild

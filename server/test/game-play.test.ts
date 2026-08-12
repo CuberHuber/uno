@@ -19,7 +19,7 @@ export function fixedState(hands: Card[][], top: Card, opts: Partial<GameState> 
     catchWindow: null,
     winner: null,
     reshuffleSeed: 1,
-    rules: { stacking: false, forcePlay: false },
+    rules: { stacking: false, forcePlay: false, multiPlay: false },
     pendingDraw: 0,
     ...opts,
   };

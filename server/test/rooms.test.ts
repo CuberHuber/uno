@@ -90,9 +90,9 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: false, forcePlay: false });
-    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
-    expect(store.viewFor(room.code, 1).rules).toEqual({ stacking: true, forcePlay: true });
+    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: false, forcePlay: false, multiPlay: false });
+    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true, multiPlay: true }).ok).toBe(true);
+    expect(store.viewFor(room.code, 1).rules).toEqual({ stacking: true, forcePlay: true, multiPlay: true });
   });
 
   test('only the host may change the rules', () => {
@@ -101,7 +101,7 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.setRules(room.code, b.token, { stacking: true, forcePlay: false }).ok).toBe(false);
+    expect(store.setRules(room.code, b.token, { stacking: true, forcePlay: false, multiPlay: false }).ok).toBe(false);
     expect(store.viewFor(room.code, 0).rules.stacking).toBe(false);
   });
 
@@ -111,10 +111,10 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
+    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true, multiPlay: false }).ok).toBe(true);
     expect(store.startGame(room.code, a.token).ok).toBe(true);
-    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: true });
-    expect(store.setRules(room.code, a.token, { stacking: false, forcePlay: false }).ok).toBe(false);
+    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: true, multiPlay: false });
+    expect(store.setRules(room.code, a.token, { stacking: false, forcePlay: false, multiPlay: false }).ok).toBe(false);
     expect(store.viewFor(room.code, 1).rules.stacking).toBe(true);
   });
 
@@ -124,12 +124,12 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: false }).ok).toBe(true);
+    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: false, multiPlay: false }).ok).toBe(true);
     expect(store.startGame(room.code, a.token).ok).toBe(true);
     store.getRoom(room.code)!.phase = 'roundEnd';
     expect(store.rematch(room.code, a.token).ok).toBe(true);
-    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: false });
-    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: true, forcePlay: false });
+    expect(store.getRoom(room.code)!.game!.rules).toEqual({ stacking: true, forcePlay: false, multiPlay: false });
+    expect(store.viewFor(room.code, 0).rules).toEqual({ stacking: true, forcePlay: false, multiPlay: false });
   });
 });
 

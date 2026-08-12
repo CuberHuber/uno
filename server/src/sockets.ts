@@ -53,7 +53,14 @@ export function attachSockets(io: IO, store: RoomStore): void {
 
     socket.on('startGame', () => handle(() => store.startGame(seatOf().code, seatOf().token)));
     socket.on('setRules', (p) => handle(() => store.setRules(seatOf().code, seatOf().token, p.rules)));
-    socket.on('playCard', (p) => handle(() => store.act(seatOf().code, seatOf().token, { type: 'play', cardId: p.cardId, chosenColor: p.chosenColor })));
+    socket.on('playCard', (p) => handle(() => store.act(seatOf().code, seatOf().token, {
+      type: 'play',
+      cardId: p.cardId,
+      chosenColor: p.chosenColor,
+      // A hand never holds more than eight cards of one rank; keep the payload bounded.
+      extraCardIds: (Array.isArray(p.extraCardIds) ? p.extraCardIds : [])
+        .filter((id) => Number.isInteger(id)).slice(0, 8),
+    })));
     socket.on('drawCard', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'draw' })));
     socket.on('passTurn', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'pass' })));
     socket.on('chooseColor', (p) => handle(() => store.act(seatOf().code, seatOf().token, { type: 'chooseColor', color: p.color })));

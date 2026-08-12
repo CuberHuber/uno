@@ -1,15 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { isPlayable, type Card } from '@uno/shared';
 import CardFace from '../components/CardFace';
 import ColorPicker from '../components/ColorPicker';
 import PauseOverlay from '../components/PauseOverlay';
 import Seat from '../components/Seat';
 import { useStore } from '../store';
-import { initialOf, roundsPlayed, ruleChips, seatColor } from '../ui';
+import { initialOf, rankLabel, roundsPlayed, ruleChips, seatColor } from '../ui';
 
 export default function Table() {
   const { view, actions, rejection } = useStore();
-  const [wildCardId, setWildCardId] = useState<number | null>(null);
+  // A wild waits on its colour; `picked` is the multi-play set, lead card first.
+  const [wild, setWild] = useState<{ cardId: number; extras: number[] } | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const turnSeat = view?.turnSeat ?? null;
+  const handSize = view?.hand.length ?? 0;
+  useEffect(() => { setPicked([]); }, [turnSeat, handSize]); // a new turn drops a half-built set
   if (!view || !view.topCard) return null;
 
   const yourTurn = view.turnSeat === view.yourSeat;
@@ -44,10 +49,34 @@ export default function Table() {
     view.hand.some((c) => c.id === view.pendingDrawnCardId && (c.value === 'wild' || c.value === 'wild4'))
     ? view.pendingDrawnCardId : null;
 
-  const playCard = (c: Card) => {
-    if (c.value === 'wild' || c.value === 'wild4') setWildCardId(c.id);
-    else actions.play(c.id);
+  const lead = picked.length ? view.hand.find((c) => c.id === picked[0]) ?? null : null;
+  const lastPicked = view.hand.find((c) => c.id === picked.at(-1)) ?? null;
+  const staysLive = lead && lead.value !== 'wild' && lead.value !== 'wild4' ? lastPicked?.color : null;
+
+  const send = (cardId: number, value: Card['value'], extras: number[]) => {
+    if (value === 'wild' || value === 'wild4') { setWild({ cardId, extras }); return; }
+    actions.play(cardId, undefined, extras);
+    setPicked([]);
   };
+
+  // Multi-play: tapping a rank you hold more of opens a set you can trim, then play.
+  const tapCard = (c: Card) => {
+    if (lead) {
+      if (c.id === lead.id) { setPicked([]); return; }  // tap the lead again to call it off
+      if (c.value !== lead.value) return;
+      setPicked((prev) => prev.includes(c.id)
+        ? prev.filter((id) => id !== c.id)
+        : [...prev, c.id]);                             // a re-added card goes down last
+      return;
+    }
+    const rest = view.rules.multiPlay
+      ? view.hand.filter((x) => x.value === c.value && x.id !== c.id) : [];
+    if (rest.length === 0) { send(c.id, c.value, []); return; }
+    setPicked([c.id, ...rest.map((x) => x.id)]);
+  };
+
+  // While a set is open only its rank stays live — everything else is inert.
+  const canTap = (c: Card) => (lead ? c.id === lead.id || c.value === lead.value : canPlay(c));
 
   const canCall = (yourTurn && view.hand.length <= 2) || view.catchableSeat === view.yourSeat;
   const canCatch = view.catchableSeat !== null && view.catchableSeat !== view.yourSeat;
@@ -96,15 +125,17 @@ export default function Table() {
         <div className="banner">
           <span className="live-dot"
             style={{ background: view.currentColor ? `var(--card-${view.currentColor})` : 'var(--card-wild)' }} />
-          <span className="banner-text">{rejection ?? banner}</span>
+          <span className="banner-text">{rejection ?? (lead
+            ? `${picked.length} × ${rankLabel(lead.value)}${staysLive ? ` — ${staysLive} stays live` : ''} · tap to trim`
+            : banner)}</span>
         </div>
         <div className={`hand${view.hand.length > 7 ? ' hand-tight' : ''}${yourTurn ? ' hand-turn' : ''}`}>
           {view.hand.map((c) => (
-            <span key={c.id} className="hand-slot">
+            <span key={c.id} className={`hand-slot${picked.includes(c.id) ? ' hand-slot-picked' : ''}`}>
               <CardFace card={c}
-                playable={canPlay(c)}
-                raised={view.pendingDrawnCardId === c.id}
-                onClick={canPlay(c) ? () => playCard(c) : undefined} />
+                playable={canTap(c)}
+                raised={view.pendingDrawnCardId === c.id || picked.includes(c.id)}
+                onClick={canTap(c) ? () => tapCard(c) : undefined} />
             </span>
           ))}
         </div>
@@ -116,14 +147,20 @@ export default function Table() {
             <strong>{you?.name ?? 'You'}</strong>
             <span className="you-count">{view.hand.length} cards</span>
           </span>
-          {view.pendingDrawnCardId !== null && !view.rules.forcePlay
-            ? <button className="btn btn-secondary btn-solid" onClick={actions.pass}>Keep it</button>
-            : <button className="btn btn-secondary btn-solid" disabled={!canDraw} onClick={actions.draw}>
-                {yourTurn && view.pendingDraw > 0 ? `Take +${view.pendingDraw}` : 'Draw'}
-              </button>}
-          {canCatch
-            ? <button className="btn btn-primary" onClick={actions.catchCall}>Catch</button>
-            : <button className="btn btn-primary" disabled={!canCall} onClick={actions.call}>Call “last card”</button>}
+          {lead
+            ? <button className="btn btn-secondary btn-solid" onClick={() => setPicked([])}>Cancel</button>
+            : view.pendingDrawnCardId !== null && !view.rules.forcePlay
+              ? <button className="btn btn-secondary btn-solid" onClick={actions.pass}>Keep it</button>
+              : <button className="btn btn-secondary btn-solid" disabled={!canDraw} onClick={actions.draw}>
+                  {yourTurn && view.pendingDraw > 0 ? `Take +${view.pendingDraw}` : 'Draw'}
+                </button>}
+          {lead
+            ? <button className="btn btn-primary" onClick={() => send(lead.id, lead.value, picked.slice(1))}>
+                Play {picked.length} × {rankLabel(lead.value)}
+              </button>
+            : canCatch
+              ? <button className="btn btn-primary" onClick={actions.catchCall}>Catch</button>
+              : <button className="btn btn-primary" disabled={!canCall} onClick={actions.call}>Call “last card”</button>}
         </div>
       </div>
 
@@ -131,11 +168,12 @@ export default function Table() {
         <ColorPicker title="Choose a colour" subtitle="The flip was wild — you set what plays first."
           onPick={actions.chooseColor} />
       )}
-      {wildCardId !== null && (
+      {wild !== null && (
         <ColorPicker title="Choose a colour"
-          onPick={(c) => { actions.play(wildCardId, c); setWildCardId(null); }} />
+          subtitle={wild.extras.length ? `All ${wild.extras.length + 1} go down on this colour.` : undefined}
+          onPick={(c) => { actions.play(wild.cardId, c, wild.extras); setWild(null); setPicked([]); }} />
       )}
-      {forcedWildId !== null && wildCardId === null && (
+      {forcedWildId !== null && wild === null && (
         <ColorPicker title="Choose a colour" subtitle="Force play — your drawn wild goes down."
           onPick={(c) => actions.play(forcedWildId, c)} />
       )}
