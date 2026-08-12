@@ -75,6 +75,12 @@ export default function Table() {
   const animKey = useRef(1);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTry = useRef<number[]>([]);
+  const penaltyAt = useRef(0);
+
+  // Haptics where the platform has them; silently nothing elsewhere.
+  const buzz = (pattern: number | number[]) => {
+    try { navigator.vibrate?.(pattern); } catch { /* unsupported */ }
+  };
 
   const showToast = (msg: string, ms = 2000) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -121,15 +127,23 @@ export default function Table() {
         const t = stepFrom(effect.seat);
         showToast(t === v.yourSeat ? 'You sit out' : `${nameOf(t)} sits out`);
       }
-      if ((last.value === 'draw2' || last.value === 'wild4') && v.rules.stacking) {
-        const total = v.pendingDraw + (last.value === 'draw2' ? 2 : 4);
-        const t = stepFrom(effect.seat);
-        showToast(`+${total} → ${t === v.yourSeat ? 'you' : nameOf(t)}${v.pendingDraw > 0 ? ' (stacked)' : ''}`, 2200);
+      if (last.value === 'draw2' || last.value === 'wild4') {
+        penaltyAt.current = Date.now(); // the matching 'drew' pops the big counter
+        if (v.rules.stacking) {
+          const total = v.pendingDraw + (last.value === 'draw2' ? 2 : 4);
+          const t = stepFrom(effect.seat);
+          showToast(`+${total} → ${t === v.yourSeat ? 'you' : nameOf(t)}${v.pendingDraw > 0 ? ' (stacked)' : ''}`, 2200);
+        }
       }
     } else if (effect.type === 'drew') {
+      // A pot being taken (stacking) or a +2/+4 landing (classic): big counter,
+      // and from +8 the whole table quakes — straight from the prototype.
       const pot = v.pendingDraw > 0 && effect.count === v.pendingDraw;
-      if (pot) {
-        setBig({ text: `+${effect.count}`, quake: effect.count >= 8 });
+      const penalty = effect.count >= 2 && Date.now() - penaltyAt.current < 800;
+      if (pot || penalty) {
+        const quake = effect.count >= 8;
+        setBig({ text: `+${effect.count}`, quake });
+        buzz(quake ? [80, 50, 120] : 80);
         setTimeout(() => setBig(null), 900);
       }
       if (effect.seat !== v.yourSeat) {
@@ -138,9 +152,10 @@ export default function Table() {
         if (effect.count > 1) showToast(`${nameOf(effect.seat)} draws ${effect.count}`);
       }
     } else if (effect.type === 'called') {
-      showToast(`${nameOf(effect.seat)} called “last card!”`);
+      showToast(`${nameOf(effect.seat)} called UNO!`);
     } else if (effect.type === 'caught') {
-      showToast(`${nameOf(effect.seat)} got caught — +2`);
+      showToast(`${nameOf(effect.seat)} got caught missing UNO — +2`);
+      buzz(100);
     }
   }, [effect]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -152,6 +167,7 @@ export default function Table() {
       setShakeId(lastTry.current[0] ?? null);
       setTimeout(() => setShakeId(null), 550);
     }
+    buzz(40);
     showToast(errText(rejection));
   }, [rejection]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -192,6 +208,14 @@ export default function Table() {
 
   // Selection dies with the turn or a hand change.
   useEffect(() => { setPicked([]); }, [view?.turnSeat, view?.hand.length]);
+
+  // A short pulse when the turn lands on you.
+  const prevTurn = useRef<number | null>(null);
+  useEffect(() => {
+    const t = view?.turnSeat ?? null;
+    if (t !== prevTurn.current && t === view?.yourSeat) buzz(30);
+    prevTurn.current = t;
+  }, [view?.turnSeat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!view || !view.topCard) return null;
 
@@ -246,6 +270,7 @@ export default function Table() {
 
   const shake = (id: number) => {
     setShakeId(id);
+    buzz(40);
     setTimeout(() => setShakeId(null), 550);
   };
 
@@ -374,7 +399,7 @@ export default function Table() {
                     fontSize: 12, color: '#f7eddc', background: '#c23b2e', borderRadius: 999,
                     padding: '4px 11px', boxShadow: 'var(--shadow-sm)', zIndex: 3,
                     animation: 'ob-pop .4s cubic-bezier(.34,1.56,.64,1) both, ob-pulse 1.6s ease-out .4s infinite',
-                  }}>{s.calledLastCard ? 'Last card!' : 'One left'}</span>
+                  }}>UNO!</span>
                 )}
               </div>
               {active && <span className="march-badge" style={{ margin: '0 0 -6px', position: 'relative', zIndex: 2 }}>PLAYING</span>}
@@ -617,7 +642,18 @@ export default function Table() {
           <button type="button" className="btn uno-btn"
             style={{ position: 'absolute', left: L.unoL, bottom: L.unoB, zIndex: 45 }}
             onClick={canCatch ? actions.catchCall : actions.call}>
-            {canCatch ? 'Catch!' : 'Last card!'}
+            {canCatch ? 'Catch!' : 'UNO!'}
+            {view.catchableSeat === view.yourSeat && !canCatch && (
+              <span style={{
+                position: 'absolute', left: 16, right: 16, bottom: 7, height: 4,
+                borderRadius: 999, background: 'rgba(247,237,220,.25)', display: 'block',
+              }}>
+                <span style={{
+                  display: 'block', height: '100%', borderRadius: 999, background: '#c23b2e',
+                  animation: 'ob-drain 2s linear forwards',
+                }} />
+              </span>
+            )}
           </button>
         )}
 
