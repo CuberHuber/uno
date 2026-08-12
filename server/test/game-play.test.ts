@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { applyAction, type GameState } from '../src/engine/game.js';
-import type { Card } from '@uno/shared';
+import { CLASSIC_RULES, type Card } from '@uno/shared';
 
 let nextId = 1000;
 export const card = (color: Card['color'], value: Card['value']): Card =>
@@ -19,8 +19,9 @@ export function fixedState(hands: Card[][], top: Card, opts: Partial<GameState> 
     catchWindow: null,
     winner: null,
     reshuffleSeed: 1,
-    rules: { stacking: false, forcePlay: false },
+    rules: { ...CLASSIC_RULES },
     pendingDraw: 0,
+    pendingDrawKind: null,
     ...opts,
   };
 }

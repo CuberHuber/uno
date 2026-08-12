@@ -18,6 +18,7 @@ export interface GameState {
   winner: number | null;
   rules: Rules;
   pendingDraw: number;   // stacking pot the turn seat owes; 0 when settled
+  pendingDrawKind: 'draw2' | 'wild4' | null; // which kind answers the pot (strict stacking)
   reshuffleSeed: number; // advances on every discard reshuffle for determinism
 }
 
@@ -54,7 +55,7 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
     currentColor: first.color,
     mustChooseColor: false,
     pendingDrawn: null, catchWindow: null, winner: null,
-    rules: { ...rules }, pendingDraw: 0,
+    rules: { ...rules }, pendingDraw: 0, pendingDrawKind: null,
     reshuffleSeed: Math.floor(random() * 2 ** 31),
   };
 
@@ -69,6 +70,7 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
     case 'draw2':
       if (rules.stacking) {
         state.pendingDraw = 2; // seat 0 answers the flip: stack or take
+        state.pendingDrawKind = 'draw2';
       } else {
         state.players[0]!.hand.push(state.drawPile.pop()!, state.drawPile.pop()!);
         state.turn = nextSeat(state, 0);
@@ -143,8 +145,8 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (idx === -1) return err('card_not_in_hand');
       const card = player.hand[idx]!;
       const top = s.discard.at(-1)!;
-      // Stacking: an owed +2/+4 pot may be answered with any +2/+4, colour regardless.
-      const stackAnswer = s.pendingDraw > 0 && (card.value === 'draw2' || card.value === 'wild4');
+      // Strict stacking: a +2 pot is answered only by a +2, a +4 pot only by a +4.
+      const stackAnswer = s.pendingDraw > 0 && card.value === s.pendingDrawKind;
       if (s.pendingDraw > 0 && !stackAnswer) return err('answer_pot');
       if (!stackAnswer && !isPlayable(card, top, s.currentColor)) return err('card_no_match');
       const isWild = card.value === 'wild' || card.value === 'wild4';
@@ -182,6 +184,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
         case 'draw2': {
           if (s.rules.stacking) {
             s.pendingDraw += 2;
+            s.pendingDrawKind = 'draw2';
             s.turn = nextSeat(s, action.seat); // victim answers: stack or take
             break;
           }
@@ -194,6 +197,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
         case 'wild4': {
           if (s.rules.stacking) {
             s.pendingDraw += 4;
+            s.pendingDrawKind = 'wild4';
             s.turn = nextSeat(s, action.seat);
             break;
           }
@@ -218,6 +222,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
         // Taking the stacked pot: draw it all, no play-or-pass, turn moves on.
         const owed = s.pendingDraw;
         s.pendingDraw = 0;
+        s.pendingDrawKind = null;
         const n = drawFromPile(s, action.seat, owed);
         effects.push({ type: 'drew', seat: action.seat, count: n });
         s.turn = nextSeat(s, action.seat);
@@ -297,6 +302,7 @@ export function removeFromRound(state: GameState, seat: number): GameState {
       s.currentColor = s.discard.at(-1)!.color ?? 'red';
     }
     s.pendingDraw = 0; // an owed pot dies with the leaver
+    s.pendingDrawKind = null;
     s.turn = nextSeat(s, seat);
   }
   return s;

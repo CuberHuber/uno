@@ -3,8 +3,8 @@ import { applyAction, createGame } from '../src/engine/game.js';
 import { rng } from '../src/engine/deck.js';
 import { card, fixedState } from './game-play.test.js';
 
-const STACK = { stacking: true, forcePlay: false };
-const FORCE = { stacking: false, forcePlay: true };
+const STACK = { stacking: true, forcePlay: false, drawToMatch: false, multiDiscard: false };
+const FORCE = { stacking: false, forcePlay: true, drawToMatch: false, multiDiscard: false };
 
 describe('house rule: stacking +2/+4', () => {
   test('draw2 defers the penalty: victim gets the turn owing 2, nothing drawn yet', () => {
@@ -34,17 +34,17 @@ describe('house rule: stacking +2/+4', () => {
     expect(r2.state.currentColor).toBe('blue');
   });
 
-  test('a wild4 stacks on a draw2 and sets the chosen colour (pot 6)', () => {
-    const d2 = card('red', 'draw2');
-    const w4 = card(null, 'wild4');
+  test('a second draw2 stacks (pot 4); colour follows the answer card', () => {
+    const d2a = card('red', 'draw2');
+    const d2b = card('green', 'draw2');
     const s = fixedState(
-      [[d2, card('red', '1')], [w4, card('green', '2')], [card('blue', '3')]],
+      [[d2a, card('red', '1')], [d2b, card('green', '2')], [card('blue', '3')]],
       card('red', '7'), { rules: STACK });
-    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2a.id });
     if (!r1.ok) throw new Error(r1.error);
-    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardId: w4.id, chosenColor: 'green' });
+    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardId: d2b.id });
     if (!r2.ok) throw new Error(r2.error);
-    expect(r2.state.pendingDraw).toBe(6);
+    expect(r2.state.pendingDraw).toBe(4);
     expect(r2.state.turn).toBe(2);
     expect(r2.state.currentColor).toBe('green');
   });
@@ -98,6 +98,41 @@ describe('house rule: stacking +2/+4', () => {
     expect(g.pendingDraw).toBe(2);
     expect(g.turn).toBe(0);
     expect(g.players[0]!.hand).toHaveLength(7); // nothing auto-drawn
+  });
+});
+
+describe('strict stacking: +2 answers +2, +4 answers +4', () => {
+  test('a wild4 may NOT answer a +2 pot', () => {
+    const d2 = card('red', 'draw2');
+    const w4 = card(null, 'wild4');
+    const s = fixedState(
+      [[d2, card('red', '1')], [w4, card('green', '2')], [card('blue', '3')]],
+      card('red', '7'), { rules: STACK });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    if (!r1.ok) throw new Error(r1.error);
+    const r2 = applyAction(r1.state, { type: 'play', seat: 1, cardId: w4.id, chosenColor: 'green' });
+    expect(r2).toEqual({ ok: false, error: 'answer_pot' });
+  });
+  test('a draw2 may NOT answer a +4 pot', () => {
+    const w4 = card(null, 'wild4');
+    const d2 = card('blue', 'draw2');
+    const s = fixedState(
+      [[w4, card('red', '1')], [d2, card('green', '2')], [card('blue', '3')]],
+      card('red', '7'), { rules: STACK });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: w4.id, chosenColor: 'red' });
+    if (!r1.ok) throw new Error(r1.error);
+    expect(applyAction(r1.state, { type: 'play', seat: 1, cardId: d2.id }).ok).toBe(false);
+  });
+  test('kind resets when the pot is taken', () => {
+    const d2 = card('red', 'draw2');
+    const s = fixedState(
+      [[d2, card('red', '1')], [card('green', '2')], [card('blue', '3')]],
+      card('red', '7'), { rules: STACK });
+    const r1 = applyAction(s, { type: 'play', seat: 0, cardId: d2.id });
+    if (!r1.ok) throw new Error(r1.error);
+    const r2 = applyAction(r1.state, { type: 'draw', seat: 1 });
+    if (!r2.ok) throw new Error(r2.error);
+    expect(r2.state.pendingDrawKind).toBeNull();
   });
 });
 

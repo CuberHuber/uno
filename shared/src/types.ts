@@ -50,6 +50,7 @@ export interface RoomStateView {
   drawPileCount: number;
   rules: Rules;
   pendingDraw: number;           // cards the turn seat owes (stacking pot); 0 otherwise
+  pendingDrawKind: 'draw2' | 'wild4' | null; // which kind answers the pot (strict stacking)
   winnerSeat: number | null;
   winTally: number[];
   paused: boolean;

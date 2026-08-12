@@ -41,6 +41,7 @@ export function projectView(ctx: ViewContext, seat: number): RoomStateView {
     drawPileCount: g ? g.drawPile.length : 0,
     rules: ctx.rules,
     pendingDraw: g ? g.pendingDraw : 0,
+    pendingDrawKind: g ? g.pendingDrawKind : null,
     winnerSeat: g ? g.winner : null,
     winTally: ctx.winTally,
     paused: ctx.pausedForSeat !== null,
