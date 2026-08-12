@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Color, Effect, RoomStateView, Rules } from '@uno/shared';
 import { socket } from './socket';
-import { rulesStashKey } from './ui';
 
 export interface Store {
   view: RoomStateView | null;
@@ -83,12 +82,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       setJoinError(null);
       localStorage.setItem(tokenKey(code), ack.token);
-      // The host picked house rules before sitting down; apply them now that we hold the seat.
-      const stash = sessionStorage.getItem(rulesStashKey(code));
-      if (stash) {
-        sessionStorage.removeItem(rulesStashKey(code));
-        try { socket.emit('setRules', { rules: JSON.parse(stash) as Rules }); } catch { /* stale stash */ }
-      }
     });
   };
 
