@@ -31,8 +31,8 @@ describe('draw', () => {
     s.drawPile = [drawnCard];
     const afterDraw = applyAction(s, { type: 'draw', seat: 0 });
     if (!afterDraw.ok) throw new Error(afterDraw.error);
-    expect(applyAction(afterDraw.state, { type: 'play', seat: 0, cardId: other.id }).ok).toBe(false);
-    const played = applyAction(afterDraw.state, { type: 'play', seat: 0, cardId: drawnCard.id });
+    expect(applyAction(afterDraw.state, { type: 'play', seat: 0, cardIds: [other.id] }).ok).toBe(false);
+    const played = applyAction(afterDraw.state, { type: 'play', seat: 0, cardIds: [drawnCard.id] });
     if (!played.ok) throw new Error(played.error);
     expect(played.state.discard.at(-1)!.id).toBe(drawnCard.id);
   });

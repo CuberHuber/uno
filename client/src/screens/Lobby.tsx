@@ -1,11 +1,15 @@
 import { useState } from 'react';
+import { RULES_CATALOG } from '@uno/shared';
 import RuleRow from '../components/RuleRow';
+import { LangSwitcher, useT } from '../i18n';
 import { useStore } from '../store';
-import { RULE_DEFS, fmtCode, initialOf, ruleChips, seatColor } from '../ui';
+import { fmtCode, initialOf, ruleChips, seatColor } from '../ui';
 
 export default function Lobby() {
   const { view, actions } = useStore();
+  const { t, locale } = useT();
   const [copied, setCopied] = useState(false);
+  const [pinDraft, setPinDraft] = useState('');
   if (!view) return null;
 
   const you = view.seats.find((s) => s.seat === view.yourSeat);
@@ -17,25 +21,49 @@ export default function Lobby() {
     setCopied(true);
     setTimeout(() => setCopied(false), 1400);
   };
+  const chips = ruleChips(view.rules, locale);
 
   return (
     <main className="lobby-screen">
       <header className="lobby-top">
         <div className="brand-mark brand-mark-sm">8</div>
-        <div className="lobby-title">{host?.name}’s table</div>
-        {ruleChips(view.rules).map((n) => <span key={n} className="chip">{n}</span>)}
+        <div className="lobby-title">{t('lobby.tableOf', { name: host?.name ?? '' })}</div>
+        {(chips.length ? chips : [t('rules.classic')]).map((n) => <span key={n} className="chip">{n}</span>)}
+        {view.hasPin && !isHost && <span className="chip">PIN</span>}
         <span className="chip">{fmtCode(view.roomCode)}</span>
+        <LangSwitcher />
         <button className="btn btn-secondary btn-solid lobby-copy" onClick={copy}>
-          {copied ? 'Copied' : 'Copy invite'}
+          {copied ? t('lobby.copied') : t('lobby.copy')}
         </button>
       </header>
 
       {isHost && (
         <div className="lobby-rules">
-          {RULE_DEFS.map((r) => (
-            <RuleRow key={r.key} name={r.name} desc={r.desc} on={view.rules[r.key]}
-              onToggle={() => actions.setRules({ ...view.rules, [r.key]: !view.rules[r.key] })} />
+          {RULES_CATALOG.map((r) => (
+            <RuleRow key={r.id} name={r.title[locale]} desc={r.tagline[locale]}
+              details={r.details[locale]} on={view.rules[r.id]}
+              onToggle={() => actions.setRules({ ...view.rules, [r.id]: !view.rules[r.id] })} />
           ))}
+          <div className="pin-row">
+            {view.pin !== null ? (
+              <>
+                <span className="chip">{t('lobby.pinChip', { pin: view.pin })}</span>
+                <button className="btn btn-ghost" onClick={() => actions.setPin(null)}>
+                  {t('lobby.pinRemove')}
+                </button>
+              </>
+            ) : (
+              <>
+                <input className="input-pill input-token pin-input" value={pinDraft}
+                  inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="····"
+                  onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, ''))} />
+                <button className="btn btn-secondary btn-solid" disabled={!/^\d{4}$/.test(pinDraft)}
+                  onClick={() => { actions.setPin(pinDraft); setPinDraft(''); }}>
+                  {t('lobby.pinSet')}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -45,33 +73,34 @@ export default function Lobby() {
             <span className="seat-avatar" style={{ background: seatColor(s.seat) }}>
               {initialOf(s.name)}
             </span>
-            <div className="seat-name">{s.name}{s.seat === view.yourSeat ? ' (you)' : ''}</div>
+            <div className="seat-name">{s.name}{s.seat === view.yourSeat ? ` ${t('lobby.you')}` : ''}</div>
             <span className="seat-status" style={{
               color: !s.connected ? 'var(--color-neutral-500)'
                 : s.isHost ? 'var(--color-accent-700)' : 'var(--color-accent-2-700)',
             }}>
-              {!s.connected ? 'away' : s.isHost ? 'Host' : 'Ready'}
+              {!s.connected ? t('lobby.away') : s.isHost ? t('lobby.host') : t('lobby.ready')}
             </span>
           </div>
         ))}
         {Array.from({ length: 4 - view.seats.length }, (_, i) => (
           <div key={`open-${i}`} className="seat-card seat-card-open">
             <span className="seat-avatar">+</span>
-            <div className="seat-name">Seat open</div>
-            <span className="seat-status">waiting</span>
+            <div className="seat-name">{t('lobby.seatOpen')}</div>
+            <span className="seat-status">{t('lobby.waiting')}</span>
           </div>
         ))}
       </div>
 
       <footer className="lobby-foot">
         <span className="lobby-note">
-          {view.seats.length} of 4 seated{isHost && view.seats.length >= 2 ? ' · you can start any time' : ''}
+          {t('lobby.seated', { n: view.seats.length })}
+          {isHost && view.seats.length >= 2 ? t('lobby.canStart') : ''}
         </span>
         {isHost
           ? <button className="btn btn-primary btn-big" disabled={view.seats.length < 2} onClick={actions.start}>
-              Deal the first hand
+              {t('lobby.deal')}
             </button>
-          : <span className="lobby-note">Waiting for the host to deal…</span>}
+          : <span className="lobby-note">{t('lobby.waitHost')}</span>}
       </footer>
     </main>
   );
