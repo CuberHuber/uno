@@ -250,6 +250,18 @@ describe('house rule: play a whole rank', () => {
     expect(r.state.turn).toBe(1);
   });
 
+  test('head to head, a pair of reverses chains two skips and hands the turn over', () => {
+    const r1 = card('red', 'reverse');
+    const r2 = card('blue', 'reverse');
+    const s = fixedState([[r1, r2, card('green', '1')], [card('green', '2')]], card('red', '9'), { rules: MULTI });
+    const one = applyAction(s, { type: 'play', seat: 0, cardId: r1.id });
+    if (!one.ok) throw new Error(one.error);
+    expect(one.state.turn).toBe(0); // a single reverse still bounces back to you
+    const two = applyAction(s, { type: 'play', seat: 0, cardId: r1.id, extraCardIds: [r2.id] });
+    if (!two.ok) throw new Error(two.error);
+    expect(two.state.turn).toBe(1); // the second skip lands on the opponent
+  });
+
   test('two wilds go down on one chosen colour', () => {
     const w1 = card(null, 'wild');
     const w2 = card(null, 'wild');

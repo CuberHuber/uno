@@ -190,7 +190,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
           break;
         case 'reverse':
           if (active === 2) {
-            s.turn = nextSeat(s, action.seat, count + 1); // acts as skip: same player again
+            // Each one acts as a skip, so a set chains: an odd count comes back
+            // to you, an even count hands the turn over.
+            s.turn = nextSeat(s, action.seat, count + 1);
           } else {
             if (count % 2 === 1) s.direction = s.direction === 1 ? -1 : 1;
             s.turn = nextSeat(s, action.seat);
