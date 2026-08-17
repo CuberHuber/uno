@@ -22,7 +22,8 @@ export interface GameState {
   reshuffleSeed: number; // advances on every discard reshuffle for determinism
 }
 
-/** Number cards are the only ones a stack discard may combine. */
+/** Number cards are the only ones a stack discard may combine, and the only ones
+ *  allowed to open a round. */
 const isNumberCard = (c: Card) => /^\d$/.test(c.value);
 
 export function nextSeat(state: GameState, from: number, steps = 1): number {
@@ -45,14 +46,17 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
     for (const p of players) p.hand.push(drawPile.pop()!);
   }
 
-  // Flip the first discard; a wild4 is buried and the next card flipped instead.
+  // Only a number card may open a round. Anything else is buried at the bottom of
+  // the pile — it stays in play, just not as the opener — and the next card is
+  // flipped instead. Dealing is a pre-round phase: whatever it had to dig through,
+  // the round it hands over always starts from the same clean position.
   let first = drawPile.pop()!;
-  while (first.value === 'wild4') {
+  while (!isNumberCard(first)) {
     drawPile.unshift(first);
     first = drawPile.pop()!;
   }
 
-  const state: GameState = {
+  return {
     players, drawPile, discard: [first],
     turn: 0, direction: 1,
     currentColor: first.color,
@@ -61,32 +65,6 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
     rules: { ...rules }, pendingDraw: 0, pendingDrawKind: null,
     reshuffleSeed: Math.floor(random() * 2 ** 31),
   };
-
-  switch (first.value) {
-    case 'skip':
-      state.turn = nextSeat(state, 0);
-      break;
-    case 'reverse':
-      state.direction = -1;
-      state.turn = nextSeat({ ...state, direction: -1 }, 0);
-      break;
-    case 'draw2':
-      if (rules.stacking) {
-        state.pendingDraw = 2; // seat 0 answers the flip: stack or take
-        state.pendingDrawKind = 'draw2';
-      } else {
-        state.players[0]!.hand.push(state.drawPile.pop()!, state.drawPile.pop()!);
-        state.turn = nextSeat(state, 0);
-      }
-      break;
-    case 'wild':
-      state.currentColor = null;
-      state.mustChooseColor = true;
-      break;
-    default:
-      break; // number card: seat 0 starts on the card's color
-  }
-  return state;
 }
 
 export type Action =
