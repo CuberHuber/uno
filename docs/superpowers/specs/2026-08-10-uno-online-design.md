@@ -75,9 +75,14 @@ Per color (four colors): one 0, two each of 1–9, two Skip, two Reverse, two Dr
     Wild Draw 4 makes the next player draw four and lose the turn (no challenge).
 - A player who cannot or will not play draws exactly one card;
     if it is playable they may play it immediately, otherwise the turn passes.
-- First discard flip: action cards take effect on the starting player;
-    a flipped Wild lets the starting player choose the color;
-    a flipped Wild Draw 4 is shuffled back and re-flipped.
+- First discard flip: **only a number card may open a round**
+    (amended 2026-08-17, superseding "action cards take effect on the starting player").
+  Dealing is a phase of its own, run before the round starts: the deck is shuffled,
+    hands are dealt, and cards are turned over until a number appears.
+  Anything else turned over is buried at the bottom of the draw pile and stays in play.
+  However much the deal had to dig through, the round it hands over always begins
+    from the same position — seat 0 to act, play running forward, the discard's own
+    color current, nothing owed and no color pending.
 - When the draw pile empties, the discard pile minus its top card is reshuffled.
 - Last-card call: playing the second-to-last card arms a catch window.
   The player presses **Call "last card"** (before or immediately after playing) to be safe.
@@ -106,7 +111,7 @@ If only one player remains, the round ends in their favor.
 ## Realtime protocol
 
 Client → server: `joinRoom`, `startGame`, `playCard`, `drawCard`,
-  `passTurn` (keep a drawn playable card), `chooseColor` (first-flip Wild),
+  `passTurn` (keep a drawn playable card), `chooseColor` (a played Wild),
   `callLastCard`, `catchLastCard`, `rematch`, `continueWithout`.
 Server → client: `roomState` (the full personalized view, re-sent on every change),
   `moveRejected` (transient, for invalid attempts),
@@ -162,7 +167,7 @@ Card faces follow the animated-table reference:
 
 The rules engine carries the real coverage:
   unit tests on the pure reducer with seeded decks covering every card effect,
-  the 2-player Reverse, first-flip handling, reshuffle,
+  the 2-player Reverse, the number-only opening, reshuffle,
   the last-card call and catch window, and deck-exhaustion edge cases.
 The socket layer gets one integration test where two simulated clients
   play a scripted round against a real server instance.

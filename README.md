@@ -25,7 +25,11 @@ One container, deployable to any small always-on host.
 
 ## Rules in one breath
 
-Official classic rules: match by color, number, or symbol; Skip, Reverse, Draw 2,
+Classic rules: match by color, number, or symbol; Skip, Reverse, Draw 2,
   Wild, and Wild Draw 4; draw one if you can't play; call **"last card"** before
   your final card or get caught for two.
 First to empty their hand takes the round; rematch keeps the seats and the tally.
+
+One deliberate departure from the official rules: **a round always opens on a number
+  card.** Dealing turns cards over until it finds one, burying anything else at the
+  bottom of the pile, so nobody is skipped or penalised before they have played.

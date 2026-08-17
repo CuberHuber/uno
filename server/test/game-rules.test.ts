@@ -88,16 +88,15 @@ describe('house rule: stacking +2/+4', () => {
     expect(r.state.pendingDraw).toBe(0);
   });
 
-  test('first flip draw2 with stacking: seat 0 owes 2 and keeps the turn', () => {
-    let seed = -1;
-    for (let i = 0; i < 10_000; i++) {
-      if (createGame(2, rng(i), STACK).discard[0]!.value === 'draw2') { seed = i; break; }
+  test('the opening flip never owes a pot: a round can only open on a number', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const g = createGame(2, rng(seed), STACK);
+      expect(g.discard[0]!.value).toMatch(/^\d$/);
+      expect(g.pendingDraw).toBe(0);
+      expect(g.pendingDrawKind).toBeNull();
+      expect(g.players[0]!.hand).toHaveLength(7); // nothing auto-drawn
+      expect(g.turn).toBe(0);
     }
-    expect(seed).toBeGreaterThanOrEqual(0);
-    const g = createGame(2, rng(seed), STACK);
-    expect(g.pendingDraw).toBe(2);
-    expect(g.turn).toBe(0);
-    expect(g.players[0]!.hand).toHaveLength(7); // nothing auto-drawn
   });
 });
 

@@ -68,7 +68,8 @@ A pending +2 pot may be answered **only with another +2**; a pending +4 pot **on
 Color is irrelevant for the answer, as before.
 The pot accumulates in `pendingDraw`; a player who cannot or will not answer takes the whole pot
   and loses the turn.
-First-flip +2 with stacking on: seat 0 may answer only with a +2.
+A round never opens on a pot: only a number card may open one (amended 2026-08-17, see below),
+  so the first pot of a round is always one a player put there.
 This replaces the current mixed behavior (`game.ts` today accepts any +2/+4 on any pot).
 
 ### 2. `forcePlay` — unchanged
@@ -98,6 +99,37 @@ Interactions:
 - Emptying the hand with a stack wins the round, exactly like a single card.
 - If one card remains after a stack, the last-card call/catch window works as today.
 - No interaction with stacking pots: pots are answered with a single +2/+4, which are not number cards.
+
+## Dealing (amended 2026-08-17)
+
+Dealing is a phase of its own, run **before** the round begins: shuffle the deck,
+  deal seven to each seat, then turn cards over until a number appears.
+**Only a number card may open a round.**
+Anything else turned over is buried at the bottom of the draw pile — it stays in play,
+  it just does not get to be the opener — and the next card is turned over instead.
+
+This supersedes the MVP spec's first-flip rule, where a flipped action card took effect
+  on the starting player and only a Wild Draw 4 was buried.
+The rule it replaces is gone in every combination: no opening penalty, no opening skip,
+  no reversed direction before anyone has played, no colour choice owed at the table.
+
+**The deal does not reach into the round.**
+However many cards it had to dig through, and whichever house rules the host switched on,
+  the position it hands over is always the same:
+  seat 0 to act, play running forward, the discard's own colour current,
+  `pendingDraw` 0, `pendingDrawKind` and `pendingDrawn` null, `mustChooseColor` false,
+  and seven cards in every hand.
+This invariant is what makes the phase safe to animate: the client may take as long as it
+  likes showing the shuffle and the deal, because there is no opening state to get wrong.
+
+**Presentation.**
+The deal plays as an animation before the round: cards fly from the pile to each seat,
+  then the opening card turns over.
+It is pure presentation over state the server has already settled in one atomic
+  `createGame` — the client animates a result, it never drives it, and no protocol event
+  reports the burials.
+The animation runs on entering a round (lobby → playing, and again on rematch);
+  a player reconnecting into a round already in progress skips straight to the table.
 
 ## Rules catalog (`shared/src/rulesCatalog.ts`)
 
@@ -207,6 +239,9 @@ New engine tests (seeded decks, pure reducer):
     the last card sets the color; winning by stack; the catch window after a stack.
 - Rooms: PIN accept/reject/absent, rate-limit cooldowns, 5-char code format and alphabet.
 - Sockets: one integration test driving `playCards` end to end.
+- Dealing: the opening card is always a number; a run of specials is buried in the order
+    it was turned over and the deck still holds 108 cards; the opening position is
+    identical with every house rule on.
 
 ## Out of scope for sub-project A
 
