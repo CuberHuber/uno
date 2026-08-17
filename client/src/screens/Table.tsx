@@ -334,7 +334,10 @@ export default function Table() {
     if (picked.length > 0 && stackAddable(c)) { setPicked((p) => [...p, c.id]); return; }
     if (!canPlay(c)) { shake(c.id); return; }
     if (c.value === 'wild' || c.value === 'wild4') { setWildIds([c.id]); return; }
-    if (view.rules.multiDiscard && isNumberCard(c) && view.pendingDrawnCardId === null
+    // A just-drawn card may lead a stack too: it stays the first pick, so it is
+    // always part of what goes down, and its twins can be tapped on after it.
+    if (view.rules.multiDiscard && isNumberCard(c)
+        && (view.pendingDrawnCardId === null || view.pendingDrawnCardId === c.id)
         && hand.some((h) => h.id !== c.id && isNumberCard(h) && h.value === c.value)) {
       setPicked([c.id]); // twins in hand: start a stack; Discard 1 or tap the twin
       return;
