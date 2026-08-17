@@ -22,6 +22,9 @@ export interface GameState {
   reshuffleSeed: number; // advances on every discard reshuffle for determinism
 }
 
+/** Number cards are the only ones a stack discard may combine. */
+const isNumberCard = (c: Card) => /^\d$/.test(c.value);
+
 export function nextSeat(state: GameState, from: number, steps = 1): number {
   const n = state.players.length;
   let seat = from;
@@ -139,8 +142,10 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     case 'play': {
       if (s.turn !== action.seat) return err('not_your_turn');
       if (s.mustChooseColor) return err('choose_color_first');
+      // A drawn card has to be part of whatever goes down — but under stack discard
+      // it may bring the rest of its rank along, so membership is all we require.
       if (s.pendingDrawn && s.pendingDrawn.seat === action.seat
-          && (action.cardIds.length !== 1 || s.pendingDrawn.cardId !== action.cardIds[0]))
+          && !action.cardIds.includes(s.pendingDrawn.cardId))
         return err('play_drawn_or_pass');
       if (action.cardIds.length === 0) return err('card_not_in_hand');
       if (new Set(action.cardIds).size !== action.cardIds.length) return err('bad_stack');
@@ -148,12 +153,11 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (picked.some((c) => !c)) return err('card_not_in_hand');
       const stack = picked as Card[];
       const card = stack[0]!;
-      const isNumber = (c: Card) => /^\d$/.test(c.value);
       // A multi-card stack: same-value number cards only, never onto an owed pot.
       if (stack.length > 1) {
         if (!s.rules.multiDiscard) return err('bad_stack');
         if (s.pendingDraw > 0) return err('answer_pot');
-        if (!stack.every((c) => isNumber(c) && c.value === card.value)) return err('bad_stack');
+        if (!stack.every((c) => isNumberCard(c) && c.value === card.value)) return err('bad_stack');
       }
       const top = s.discard.at(-1)!;
       // Strict stacking: a +2 pot is answered only by a +2, a +4 pot only by a +4.
@@ -263,7 +267,12 @@ export function applyAction(state: GameState, action: Action): ActionResult {
         return { ok: true, state: s, effects };
       }
       const isWildDraw = drawnCard.value === 'wild' || drawnCard.value === 'wild4';
-      if (s.rules.forcePlay && !isWildDraw) {
+      // Under stack discard a drawn card with rank mates in hand is not slammed down
+      // alone: the player still decides how much of that rank goes with it. Force
+      // play only removes the option to walk away, which `pass` keeps refusing.
+      const hasRankMates = s.rules.multiDiscard && isNumberCard(drawnCard)
+        && player.hand.some((c) => c.id !== drawnCard!.id && c.value === drawnCard!.value);
+      if (s.rules.forcePlay && !isWildDraw && !hasRankMates) {
         // Force play: the drawn card goes straight down (wilds wait for a colour).
         const played = applyAction(s, { type: 'play', seat: action.seat, cardIds: [drawnCard.id] });
         if (played.ok) return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
