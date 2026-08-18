@@ -3,7 +3,9 @@
 // The server stays authoritative; effects and view diffs drive the choreography.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isPlayable, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
+import HelpSheet from '../components/HelpSheet';
 import PauseOverlay from '../components/PauseOverlay';
+import RulesSlide, { hasSeenSlide, markSlideSeen } from './RulesSlide';
 import { useT, type MsgKey } from '../i18n';
 import { useStore } from '../store';
 import { initialOf, roundsPlayed, ruleChips, seatColor } from '../ui';
@@ -67,6 +69,14 @@ export default function Table() {
   const [dispTop, setDispTop] = useState<Card | null>(view?.topCard ?? null);
   const [oppQueue, setOppQueue] = useState<OppAnim[]>([]);
   const [toast, setToast] = useState('');
+  // The rules sheet. Nothing but the "?" ever opens it — no first run, no prompt.
+  const [helpOpen, setHelpOpen] = useState(false);
+  // The pre-round slide, once per browser per room. It cannot hold the deal back: the
+  // server deals the moment the host asks and knows nothing about a slide. So it lies
+  // over a table that is already live and steps aside by itself when the turn reaches
+  // this seat — a slow reader never loses a turn, and nobody waits for one.
+  const [slideOpen, setSlideOpen] = useState(false);
+  const slideAsked = useRef(false);
   const [big, setBig] = useState<{ text: string } | null>(null);
   const [shakeId, setShakeId] = useState<number | null>(null);
   const [shuffling, setShuffling] = useState(false);
@@ -270,6 +280,20 @@ export default function Table() {
     if (t !== prevTurn.current && t === view?.yourSeat) buzz(30);
     prevTurn.current = t;
   }, [view?.turnSeat]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ask localStorage once, as soon as the room code is known. A browser that has read
+  // the slide for this room stays quiet through every rematch played in it.
+  const roomCode = view?.roomCode ?? '';
+  useEffect(() => {
+    if (slideAsked.current || !roomCode) return;
+    slideAsked.current = true;
+    setSlideOpen(!hasSeenSlide(roomCode));
+  }, [roomCode]);
+  useEffect(() => {
+    if (!slideOpen || !view || view.turnSeat !== view.yourSeat) return;
+    markSlideSeen(roomCode);
+    setSlideOpen(false);
+  }, [slideOpen, roomCode, view?.turnSeat, view?.yourSeat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!view || !view.topCard) return null;
 
@@ -823,12 +847,27 @@ export default function Table() {
             {t('table.tableOf', { name: host?.name ?? '', n: roundsPlayed(view.winTally) + 1 })}
           </span>
           {ruleChips(view.rules, locale).map((n) => <span key={n} className="stage-chip stage-chip-dim">{n}</span>)}
+          {/* Help sits right after the chips that name the house rules: the chip is the
+              title, this is the rest of the sentence. Off to the side of the felt, and
+              it opens nothing until it is asked to. */}
+          <button type="button" className="btn btn-ghost ghost-pill"
+            aria-label={t('rules.helpOpen')} title={t('rules.helpOpen')}
+            onClick={() => setHelpOpen(true)}>?</button>
         </div>
         <a className="btn btn-ghost ghost-pill" href="/"
           style={{ position: 'absolute', right: L.ngR, top: L.ngT, zIndex: 45 }}>
           {t('table.leave')}
         </a>
       </div>
+      {/* Outside .stage on purpose: the stage is transform-scaled, which would trap
+          the sheet's position:fixed scrim inside it. */}
+      <HelpSheet open={helpOpen} rules={view.rules} onClose={() => setHelpOpen(false)} />
+      {/* Everyone reads it, the host included: they picked the house rules on the create
+          screen, but nobody has yet been shown how the base game runs. */}
+      {slideOpen && (
+        <RulesSlide rules={view.rules}
+          onDismiss={() => { markSlideSeen(roomCode); setSlideOpen(false); }} />
+      )}
       <PauseOverlay />
     </main>
   );
