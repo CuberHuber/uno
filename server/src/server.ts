@@ -11,17 +11,12 @@ import { RoomStore } from './rooms.js';
 import { attachSockets } from './sockets.js';
 import { Analytics } from './analytics.js';
 import { registerGameMetrics } from './metrics.js';
-import { ADMIN_HTML } from './adminPanel.js';
 
-export interface ServerLimits {
-  create: RateLimiter; join: RateLimiter; pin: RateLimiter;
-  beacon?: RateLimiter;
-}
+export interface ServerLimits { create: RateLimiter; join: RateLimiter; pin: RateLimiter }
 export const defaultLimits = (): ServerLimits => ({
   create: new RateLimiter(10, 60_000),
   join: new RateLimiter(20, 60_000),
   pin: new RateLimiter(5, 60_000),
-  beacon: new RateLimiter(60, 60_000),
 });
 
 export interface BuildOptions {
@@ -43,7 +38,6 @@ export async function buildServer(
   const register = new Registry();
   const analytics = opts.analytics ?? new Analytics({ log: app.log, register });
   registerGameMetrics(register, store, analytics);
-  const beacon = limits.beacon ?? new RateLimiter(60, 60_000);
 
   app.post('/api/rooms', async (req, reply) => {
     if (!limits.create.allow(req.ip)) return reply.code(429).send({ error: 'rate_limited' });
@@ -62,32 +56,11 @@ export async function buildServer(
     ...store.stats(),
   }));
 
+  // Machine endpoint for Fly's Prometheus scraper (see [metrics] in fly.toml);
+  // humans look at fly-metrics.net, not at the app.
   app.get('/metrics', async (_req, reply) => {
     reply.type(register.contentType);
     return register.metrics();
-  });
-
-  app.post('/api/analytics/event', async (req, reply) => {
-    if (!beacon.allow(req.ip)) return reply.code(429).send({ error: 'rate_limited' });
-    const body = (req.body ?? {}) as { type?: unknown; vid?: unknown };
-    if (body.type !== 'visit' || typeof body.vid !== 'string' || !/^[\w-]{8,64}$/.test(body.vid)) {
-      return reply.code(400).send({ error: 'bad_event' });
-    }
-    analytics.visit(body.vid);
-    return reply.code(204).send();
-  });
-
-  app.get('/api/admin/stats', async (req, reply) => {
-    const token = process.env.ADMIN_TOKEN;
-    if (!token) return reply.code(404).send({ error: 'not_enabled' });
-    if (req.headers.authorization !== `Bearer ${token}`) {
-      return reply.code(401).send({ error: 'unauthorized' });
-    }
-    return analytics.summary(store.stats());
-  });
-
-  app.get('/admin', async (_req, reply) => {
-    return reply.type('text/html; charset=utf-8').send(ADMIN_HTML);
   });
 
   // import.meta.dirname needs Node 20.11+; derive it portably so Node 18 dev machines work too.
@@ -118,13 +91,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const limits = process.env.RATE_LIMITS === 'off'
     ? {
         create: new RateLimiter(1e9, 60_000), join: new RateLimiter(1e9, 60_000),
-        pin: new RateLimiter(1e9, 60_000), beacon: new RateLimiter(1e9, 60_000),
+        pin: new RateLimiter(1e9, 60_000),
       }
     : defaultLimits();
   const { app, store } = await buildServer(undefined, limits, { logger });
   setInterval(() => {
     store.sweep();
-    limits.create.sweep(); limits.join.sweep(); limits.pin.sweep(); limits.beacon?.sweep();
+    limits.create.sweep(); limits.join.sweep(); limits.pin.sweep();
   }, 60_000).unref();
   const port = Number(process.env.PORT ?? 3000);
   await app.listen({ port, host: '0.0.0.0' });
