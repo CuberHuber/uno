@@ -56,11 +56,25 @@ export async function buildServer(
     ...store.stats(),
   }));
 
-  // Machine endpoint for Fly's Prometheus scraper (see [metrics] in fly.toml);
-  // humans look at fly-metrics.net, not at the app.
+  // Machine endpoint for an external Prometheus scraper (e.g. Grafana Cloud's
+  // agentless Metrics Endpoint integration); humans never look at it directly.
   app.get('/metrics', async (_req, reply) => {
     reply.type(register.contentType);
     return register.metrics();
+  });
+
+  // Runtime analytics config: the client reads window.__OE_CONF before its
+  // bundle runs, so keys are set in the hosting panel's env vars (Timeweb App
+  // Platform applies env at launch, not at Docker build) without a rebuild.
+  app.get('/config.js', async (_req, reply) => {
+    const conf = {
+      umamiWebsiteId: process.env.UMAMI_WEBSITE_ID ?? null,
+      umamiSrc: process.env.UMAMI_SRC ?? null,
+      gaGameKey: process.env.GA_GAME_KEY ?? null,
+      gaSecretKey: process.env.GA_SECRET_KEY ?? null,
+    };
+    reply.type('application/javascript').header('cache-control', 'no-store');
+    return `window.__OE_CONF=${JSON.stringify(conf)};`;
   });
 
   // import.meta.dirname needs Node 20.11+; derive it portably so Node 18 dev machines work too.

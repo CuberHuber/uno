@@ -52,6 +52,26 @@ test('metrics exposes node runtime and game series', async () => {
   expect(res.body).toContain('nodejs_');
 });
 
+test('config.js reflects server env at request time', async () => {
+  const prev = process.env.UMAMI_WEBSITE_ID;
+  const prevGa = process.env.GA_GAME_KEY;
+  process.env.UMAMI_WEBSITE_ID = 'site-123';
+  delete process.env.GA_GAME_KEY;
+  try {
+    const res = await ctx.app.inject({ method: 'GET', url: '/config.js' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toContain('javascript');
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.body).toContain('window.__OE_CONF=');
+    expect(res.body).toContain('"site-123"');
+    expect(res.body).toContain('"gaGameKey":null');
+  } finally {
+    if (prev === undefined) delete process.env.UMAMI_WEBSITE_ID;
+    else process.env.UMAMI_WEBSITE_ID = prev;
+    if (prevGa !== undefined) process.env.GA_GAME_KEY = prevGa;
+  }
+});
+
 test('room creation over HTTP is counted', async () => {
   const res = await ctx.app.inject({ method: 'POST', url: '/api/rooms' });
   expect(res.statusCode).toBe(200);

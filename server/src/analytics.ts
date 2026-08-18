@@ -9,8 +9,8 @@ export interface AnalyticsOptions {
 
 /** Game telemetry with no in-app dashboard: every lifecycle event becomes a
  *  structured log line and, when a registry is attached, a Prometheus series
- *  scraped by Fly. Humans watch fly-metrics.net (server health) and the
- *  external analytics services wired into the client (player behaviour). */
+ *  at /metrics. Humans watch external dashboards only — the hosting panel and
+ *  Grafana Cloud for server health, Umami/GameAnalytics for player behaviour. */
 export class Analytics {
   private readonly now: () => number;
   private readonly log?: FastifyBaseLogger;

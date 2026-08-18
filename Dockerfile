@@ -6,16 +6,9 @@ COPY server/package.json server/
 COPY client/package.json client/
 RUN npm ci
 COPY . .
-# External analytics keys are baked into the client bundle at build time;
-# pass them with `fly deploy --build-arg VITE_...=...` (all optional).
-ARG VITE_UMAMI_WEBSITE_ID
-ARG VITE_UMAMI_SRC
-ARG VITE_GA_GAME_KEY
-ARG VITE_GA_SECRET_KEY
-ENV VITE_UMAMI_WEBSITE_ID=$VITE_UMAMI_WEBSITE_ID \
-    VITE_UMAMI_SRC=$VITE_UMAMI_SRC \
-    VITE_GA_GAME_KEY=$VITE_GA_GAME_KEY \
-    VITE_GA_SECRET_KEY=$VITE_GA_SECRET_KEY
+# Analytics keys are NOT baked in: the server serves them at runtime via
+# GET /config.js from its env vars (UMAMI_WEBSITE_ID, GA_GAME_KEY, ...),
+# so the hosting panel controls them without a rebuild.
 RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine

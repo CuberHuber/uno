@@ -2,9 +2,10 @@ import { collectDefaultMetrics, Gauge, type Registry } from 'prom-client';
 import type { Analytics } from './analytics.js';
 import type { RoomStore } from './rooms.js';
 
-/** Node runtime defaults plus live game gauges on the server's own registry.
- *  Monotonic counters and histograms are owned by Analytics on the same
- *  registry; gauges read fresh values at scrape time via collect(). */
+/** Node runtime defaults plus live game gauges on the server's own registry,
+ *  served at /metrics for an external scraper (e.g. Grafana Cloud). Monotonic
+ *  counters and histograms are owned by Analytics on the same registry;
+ *  gauges read fresh values at scrape time via collect(). */
 export function registerGameMetrics(register: Registry, store: RoomStore, analytics: Analytics): void {
   collectDefaultMetrics({ register });
   new Gauge({
