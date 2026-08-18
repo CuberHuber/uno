@@ -44,7 +44,7 @@ function Flight({ from, to, ms, delay = 0, z, ease, anim, onDone, children }: {
 
 export default function Table() {
   const { view, actions, rejection, effect } = useStore();
-  const { t, terr, locale } = useT();
+  const { t, tn, terr, locale } = useT();
 
   // Viewport → stage geometry (fixed design space, scaled).
   const [vp, setVp] = useState({ w: window.innerWidth, h: window.innerHeight });
@@ -478,7 +478,7 @@ export default function Table() {
                   <div style={{
                     fontSize: 11, fontWeight: 600,
                     color: active ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
-                  }}>{!s.connected ? t('table.away') : active ? t('table.thinking') : t('table.cards', { n: s.cardCount })}</div>
+                  }}>{!s.connected ? t('table.away') : active ? t('table.thinking') : tn('table.cards', s.cardCount)}</div>
                 </div>
               </div>
             </div>

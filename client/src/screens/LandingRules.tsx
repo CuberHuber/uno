@@ -122,11 +122,15 @@ function SceneDraw() {
 
 /** The call and the closing window — played once safely, once a beat too late. */
 function SceneLastCard() {
+  const { t } = useT();
   return (
     <>
       <div data-anim style={{ position: 'absolute', left: '50%', top: '50%', width: 74, height: 74, margin: '-37px 0 0 -37px', borderRadius: '50%', border: '2px dashed var(--color-accent)', borderTopColor: 'transparent', animation: 'eo-close 6s linear infinite', ['--freeze' as string]: '-2.4s' }} />
-      <div className="eo-badge" data-anim style={{ left: '50%', marginLeft: -38, background: 'var(--color-accent)', ...anim('eo-badge', 0, -2) }}>LAST CARD</div>
-      <div className="eo-badge" data-anim style={{ left: '50%', marginLeft: -27, background: RED, ...anim('eo-caught', 0, -5) }}>CAUGHT</div>
+      {/* The label the table actually shows, read from the same key the game button
+          uses — an illustration that named a different button would teach the wrong
+          thing, and a hard-coded English one would survive the language switch. */}
+      <div className="eo-badge" data-anim style={{ left: '50%', background: 'var(--color-accent)', ...anim('eo-badge', 0, -2) }}>{t('table.uno')}</div>
+      <div className="eo-badge" data-anim style={{ left: '50%', background: RED, ...anim('eo-caught', 0, -5) }}>{t('play.caught')}</div>
       <div className="eo-hand" style={{ left: '50%', marginLeft: -32, background: face(GREEN), color: INK.green }}>8</div>
       <div className="eo-hand" data-anim style={{ left: '50%', marginLeft: 2, background: face(RED), color: INK.red, ...anim('eo-leave', 0, -0.5) }}>8</div>
       <div className="eo-back" data-anim style={{ position: 'absolute', left: '50%', bottom: 10, marginLeft: 2, width: 26, height: 37, borderRadius: 5, ...anim('eo-flyback', 0, -5.6) }} />

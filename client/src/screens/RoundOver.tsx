@@ -4,7 +4,7 @@ import { initialOf, roundsPlayed, seatColor } from '../ui';
 
 export default function RoundOver() {
   const { view, actions } = useStore();
-  const { t } = useT();
+  const { t, tn } = useT();
   if (!view) return null;
 
   const winner = view.seats.find((s) => s.seat === view.winnerSeat);
@@ -30,7 +30,7 @@ export default function RoundOver() {
               <span className="score-dot" style={{ background: seatColor(s.seat) }} />
               <span className="score-name">{s.name}{s.seat === view.yourSeat ? ` ${t('lobby.you')}` : ''}</span>
               <span className="score-left">{s.cardCount === 0 ? t('over.out') : t('over.left', { n: s.cardCount })}</span>
-              <span className="score-wins">{wins} {wins === 1 ? t('over.win') : t('over.wins')}</span>
+              <span className="score-wins">{tn('over.wins', wins)}</span>
             </div>
           );
         })}

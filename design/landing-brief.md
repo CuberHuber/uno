@@ -37,7 +37,7 @@ All under `client/public/clips/`, served from `/clips/…`. Each has a WebM, an 
 
 | File | Size | Length | What it shows |
 |---|---|---|---|
-| `hero.*` | 1600×900 | 7.0 s | **The hero.** Pick a colour → the +4 lands → shockwave → the pot passed on |
+| `hero.*` | 2400×900 | 7.0 s | **The hero.** Pick a colour → the +4 lands → shockwave → the pot passed on |
 | `slam.*` | 720 px sq | 7.0 s | The same beat, square, uncropped |
 | `turn.*` | 720 px sq | 5.0 s | A plain turn: four full hands, a card chosen and played |
 | `wild.*` | 720 px sq | 7.0 s | A wild going down, the called-colour wash flooding the table |
@@ -55,10 +55,12 @@ Total weight about 1.4 MB for all fifteen files. Re-cut everything with
 The tone-map chain is in the cut script; do not hand-roll a second one.
 
 **It is square.** The recording is 2294×2242. The hero clip is therefore *widened*,
-  not cropped: the whole square sits centred at full height and the gutters are
-  filled with a blurred, scaled-up copy of the same frame. A straight 16:9 crop
-  would cut the player chips off the top, and those chips are the only thing on
-  screen saying four people are at this table.
+  not cropped: the whole square sits centred at full height, and the gutters repeat
+  the recording's own edge colour outwards (`fillborders=mode=smear`) so the join is
+  invisible. A straight 16:9 crop would cut the player chips off the top, and those
+  chips are the only thing on screen saying four people are at this table.
+A blurred copy of the frame was tried in the gutters first, and it is what NOT to do:
+  it put a hard vertical line across the hero where the sharp recording met it.
 
 ## Design system
 
@@ -111,14 +113,11 @@ Things it has to get right, and where a designer earns their keep:
 
 Honest list — these are the things worth fixing first.
 
-1. **A faint vertical seam** around 84% of the frame width, where the hero's sharp
-     square meets its blurred fill. The right-hand rise in the scrim mostly hides it.
-     A softer edge, a wider blur, or a different fill treatment would kill it.
-2. **The right third of the hero is empty.** The composition is centre-weighted, so
+1. **The right third of the hero is empty.** The composition is centre-weighted, so
      on a wide screen the copy sits left and the right side carries nothing.
-3. **The mobile hero is unresolved.** The copy stacks centred over a portrait crop of
+2. **The mobile hero is unresolved.** The copy stacks centred over a portrait crop of
      a landscape clip. It works; it is not designed.
-4. **The scrim is doing a lot of work.** Two stacked gradients, tuned by hand. If the
+3. **The scrim is doing a lot of work.** Two stacked gradients, tuned by hand. If the
      hero composition changes, they need retuning.
 
 ## Constraints that are not negotiable
