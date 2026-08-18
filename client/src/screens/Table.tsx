@@ -502,7 +502,7 @@ export default function Table() {
           }}>
             {yourTurn && view.pendingDraw > 0
               ? t('table.takeN', { n: view.pendingDraw })
-              : t('table.draw', { n: view.drawPileCount })}
+              : t(view.rules.drawToMatch ? 'table.drawMatch' : 'table.draw', { n: view.drawPileCount })}
           </div>
           {shuffling && (
             <>
