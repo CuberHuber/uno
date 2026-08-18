@@ -5,8 +5,10 @@ Everything the game measures about itself,
 Dashboards live in external services on purpose —
   the app itself serves no admin pages.
 The game runs on Timeweb App Platform
-  (app "Uno Game", https://uno.johngames.ru, Dockerfile build,
-  auto-deploy on push to `main`).
+  (Dockerfile build, auto-deploy on push to `main`).
+Real identifiers — the app domain, Umami website ID, analytics keys —
+  live only in the panel's env vars, never in tracked files;
+  `<app-domain>` below stands for the deployed hostname.
 The research behind these choices lives in the
   "Ochre Eights Observability" report artifact.
 
@@ -33,7 +35,7 @@ Machine endpoints only — nothing here is meant for a browser:
   Timeweb does not scrape custom metrics;
   to get dashboards, add a free Grafana Cloud account and create a
   "Metrics Endpoint" scrape job pointing at
-  `https://uno.johngames.ru/metrics`
+  `https://<app-domain>/metrics`
   (agentless, scrapes every 60 s, free tier holds 10k series).
 - `GET /config.js` — runtime analytics keys for the client,
   generated from the server's env vars (see below). Not secret.
@@ -62,6 +64,7 @@ Configuration is runtime-first:
 |---|---|
 | `UMAMI_WEBSITE_ID` | Umami website ID from cloud.umami.is |
 | `UMAMI_SRC` | Only for self-hosted Umami; defaults to the cloud script |
+| `UMAMI_DOMAINS` | Comma-separated hostnames Umami records (keeps localhost/preview noise out) |
 | `GA_GAME_KEY` / `GA_SECRET_KEY` | GameAnalytics keys (client-side by design) |
 
 For local dev without the backend, `client/.env` (see `client/.env.example`)
@@ -69,11 +72,14 @@ For local dev without the backend, `client/.env` (see `client/.env.example`)
 
 - **Umami** (open-source, cookie-less, no consent banner):
   pageviews, visitors, and the custom events below.
+  Set `UMAMI_WEBSITE_ID` (and `UMAMI_DOMAINS` with the prod hostnames)
+  in the panel; the tracking script only loads when the ID is present.
   Free cloud tier: 100K events/month.
 - **GameAnalytics** (free, built for games):
   sessions/retention/playtime automatically once initialized,
   plus the game events as design events (`game:room_created`, …).
   The SDK loads as its own lazy chunk only when keys are present.
+  Account/keys walkthrough: [gameanalytics-setup.md](gameanalytics-setup.md).
 
 Events sent to both services:
   `room_created`, `room_joined` (fresh seats only, resumes excluded),

@@ -70,6 +70,7 @@ export async function buildServer(
     const conf = {
       umamiWebsiteId: process.env.UMAMI_WEBSITE_ID ?? null,
       umamiSrc: process.env.UMAMI_SRC ?? null,
+      umamiDomains: process.env.UMAMI_DOMAINS ?? null,
       gaGameKey: process.env.GA_GAME_KEY ?? null,
       gaSecretKey: process.env.GA_SECRET_KEY ?? null,
     };
