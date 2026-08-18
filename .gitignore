@@ -12,3 +12,5 @@ server/public/
 # video assets under client/public/ stay tracked.
 /*.mov
 .gstack/
+# Seam previews from tools/make-music-loop.sh — for listening, never for shipping.
+.audio-preview/
