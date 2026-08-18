@@ -30,7 +30,8 @@ const GA_SECRET = conf.gaSecretKey || env.VITE_GA_SECRET_KEY;
 
 // Set once the SDK chunk loads; the dynamic import keeps ~50 KB of
 // GameAnalytics out of the game bundle when no keys are configured.
-let ga: (typeof import('gameanalytics'))['default'] | null = null;
+type GASdk = (typeof import('gameanalytics'))['default'];
+let ga: GASdk | null = null;
 
 /** Boot whichever external analytics are configured at build time.
  *  Umami (open-source, cookie-less) counts visits/uniques/pageviews on its
@@ -49,8 +50,14 @@ export function initAnalytics(): void {
     if (GA_KEY && GA_SECRET) {
       void import('gameanalytics')
         .then((m) => {
-          m.default.initialize(GA_KEY, GA_SECRET);
-          ga = m.default;
+          // Typings put the API on the default export, but at runtime the
+          // ESM bundle's default is a bare stub with no statics — the working
+          // class sits on m.gameanalytics.GameAnalytics (verified in-browser).
+          // The cast bridges that typings/runtime mismatch.
+          const sdk = (m as unknown as { gameanalytics: { GameAnalytics: GASdk } })
+            .gameanalytics.GameAnalytics;
+          sdk.initialize(GA_KEY, GA_SECRET);
+          ga = sdk;
         })
         .catch(() => undefined);
     }
