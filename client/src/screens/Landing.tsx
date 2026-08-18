@@ -9,11 +9,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { RULES_CATALOG } from '@uno/shared';
 import { LangSwitcher, useT } from '../i18n';
+import { cue, isMuted, setMuted, startMusic, stopMusic } from '../sound';
 import HostLink from './HostLink';
 import LandingRules from './LandingRules';
 
 const SUITS = ['#c23b2e', '#e0a020', '#66923f', '#2e6f8a'];
-const MUTE_KEY = 'ochre:muted';
 
 /** Reveal on scroll: fade and lift, once, when the block first comes into view. */
 function useReveal<T extends HTMLElement>() {
@@ -48,7 +48,7 @@ export default function Landing() {
   const [creating, setCreating] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [code, setCode] = useState('');
-  const [muted, setMuted] = useState(() => localStorage.getItem(MUTE_KEY) !== 'off');
+  const [muted, setMutedState] = useState(isMuted);
   // Demo toggles. The landing shows what the switches do; the host sets the real
   // ones on the create screen.
   const [demo, setDemo] = useState([true, false, true, false]);
@@ -79,10 +79,14 @@ export default function Landing() {
     const c = code.trim().replace(/[\s-]/g, '').toUpperCase();
     if (c.length === 5) window.location.href = `/r/${c}`;
   };
-  const toggleMute = () => setMuted((m) => {
-    localStorage.setItem(MUTE_KEY, m ? 'off' : 'on');
-    return !m;
-  });
+  // The switch owns both halves of the audio layer. Turning it on is itself the
+  // gesture the browser was waiting for, so the music may start on the same click.
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    setMutedState(next);
+    if (next) stopMusic(); else void startMusic();
+  };
 
   const rules = RULES_CATALOG.map((r, i) => ({ ...r, suit: SUITS[i]!, on: demo[i]! }));
   const flip = (i: number) => setDemo((d) => d.map((v, k) => (k === i ? !v : v)));
@@ -95,7 +99,7 @@ export default function Landing() {
         <span className="lp-name">Ochre Eights</span>
         <div className="lp-head-right">
           <LangSwitcher />
-          {/* Quiet UI sounds are sub-project C; this stores the preference it will read. */}
+          {/* One switch for the lot: the room's music and every cue at the table. */}
           <button type="button" className="btn btn-ghost" aria-pressed={!muted}
             onClick={toggleMute}>{muted ? '○' : '●'}</button>
         </div>
@@ -110,7 +114,7 @@ export default function Landing() {
             <h1>{t('landing.h1a')}<br />{t('landing.h1b')}</h1>
             <p>{t('landing.sub')}</p>
             <div className="lp-ctas" ref={ctaRef}>
-              <button className="btn btn-primary btn-big" onClick={() => setCreating(true)}>
+              <button className="btn btn-primary btn-big" onClick={() => { cue('press'); setCreating(true); }}>
                 {t('landing.create')}
               </button>
               <button className="btn btn-secondary btn-solid btn-big" onClick={() => setJoinOpen(true)}>
@@ -205,7 +209,7 @@ export default function Landing() {
           <h2>{t('close.title')}</h2>
           <p>{t('close.sub')}</p>
           <button className="btn btn-big" style={{ marginTop: 32, background: '#fffdf8', color: 'var(--color-text)' }}
-            onClick={() => setCreating(true)}>{t('landing.create')}</button>
+            onClick={() => { cue('press'); setCreating(true); }}>{t('landing.create')}</button>
         </div>
       </section>
 
@@ -220,7 +224,7 @@ export default function Landing() {
           {!joinOpen ? (
             <div className="lp-bar-row">
               <button className="btn btn-primary" style={{ flex: 1, minHeight: 46 }}
-                onClick={() => setCreating(true)}>{t('landing.create')}</button>
+                onClick={() => { cue('press'); setCreating(true); }}>{t('landing.create')}</button>
               <button className="btn btn-secondary btn-solid" style={{ minHeight: 46 }}
                 onClick={() => setJoinOpen(true)}>{t('bar.join')}</button>
             </div>

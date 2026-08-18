@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RULES_CATALOG } from '@uno/shared';
 import RuleRow from '../components/RuleRow';
 import { LangSwitcher, useT } from '../i18n';
+import { cue } from '../sound';
 import { useStore } from '../store';
 import { fmtCode, initialOf, ruleChips, seatColor } from '../ui';
 
@@ -10,6 +11,16 @@ export default function Lobby() {
   const { t, locale } = useT();
   const [copied, setCopied] = useState(false);
   const [pinDraft, setPinDraft] = useState('');
+
+  // Someone new sat down. Only on a rise: seats also empty when a player leaves, and
+  // an arrival and a departure should not sound the same.
+  const seated = view?.seats.length ?? 0;
+  const prevSeated = useRef(seated);
+  useEffect(() => {
+    if (seated > prevSeated.current) cue('seat');
+    prevSeated.current = seated;
+  }, [seated]);
+
   if (!view) return null;
 
   const you = view.seats.find((s) => s.seat === view.yourSeat);
@@ -97,7 +108,8 @@ export default function Lobby() {
           {isHost && view.seats.length >= 2 ? t('lobby.canStart') : ''}
         </span>
         {isHost
-          ? <button className="btn btn-primary btn-big" disabled={view.seats.length < 2} onClick={actions.start}>
+          ? <button className="btn btn-primary btn-big" disabled={view.seats.length < 2}
+              onClick={() => { cue('deal'); actions.start(); }}>
               {t('lobby.deal')}
             </button>
           : <span className="lobby-note">{t('lobby.waitHost')}</span>}
