@@ -11,3 +11,4 @@ server/public/
 # Screen recordings dropped at the repo root; anchored so the hero-loop
 # video assets under client/public/ stay tracked.
 /*.mov
+.gstack/
