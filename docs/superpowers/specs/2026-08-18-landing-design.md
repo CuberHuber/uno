@@ -111,23 +111,42 @@ Constraints:
 - `prefers-reduced-motion: reduce` disables the section animations and swaps every clip
     for its poster frame.
 
-## Clips to cut
+## Clips cut
 
-Chosen for what they prove, one moment each, 3–6 seconds, silent, seamless enough to loop:
+Cut and checked frame by frame; `tools/cut-landing-clips.sh` re-makes all of them in
+  one command, so a redesign costs a re-run rather than an afternoon.
 
-| Clip | Shows |
-|---|---|
-| A turn | The basic loop — pick a card, it lands, play passes on |
-| A rank stack | `multiDiscard`: several cards of one value going down together |
-| A penalty | The +4 slam and the pot riding on under `stacking` |
-| The last card | The call, and a hand emptying |
+| Clip | In | Length | Shows |
+|---|---|---|---|
+| `turn` | 35.5 s | 5.0 s | Four full hands, a card chosen and played |
+| `slam` | 41.0 s | 7.0 s | The +4 arc: pick a colour, the slam, the shockwave, the pot passed on |
+| `wild` | 64.0 s | 7.0 s | A wild going down, the called-colour wash flooding the table |
+| `lastcard` | 109.5 s | 6.5 s | UNO called, the catch window, the last card down, the +2 counter |
 
-Exact timestamps come from a pass over the recording during implementation;
-  the frame at 78 s (a called green, a hand down to two) is already a candidate for the hero.
+All four sit in the first two minutes. That is deliberate: past roughly 150 s the
+  recorder has finished the round and is spectating, so the frame carries a
+  "watching" chip and greyed-out seats — true to the product, wrong for a landing.
 
-The transcode is scripted, not hand-run — a `tools/` script taking in-points and durations,
-  so re-cutting after a redesign is one command.
-Poster frames are extracted from frame 0 of each clip, so a paused or unloaded video is
+**The recording contains no multi-discard.** It is a classic-rules game, so the
+  rank-stack clip the earlier draft of this spec planned cannot be cut from this
+  footage. `slam` shows a `stacking` pot riding on instead, which is the more
+  dramatic of the two anyway. A `multiDiscard` clip needs a fresh recording with
+  that rule switched on — worth doing, not worth blocking on.
+
+Measured output, at 720 px and 30 fps:
+
+| | WebM | MP4 | Poster |
+|---|---|---|---|
+| Total, four clips | 447 KB | 391 KB | 92 KB |
+
+About 930 KB for the set — above the 600 KB first estimate because the clips run
+  longer than five seconds and the crop keeps more of the frame, and still a quarter
+  of what the superseded authored loop budgeted for one hero.
+
+The crop keeps the bottom of the frame. An earlier 0.80 pass cut the player's fanned
+  hand in half, which is the most human thing on screen; 0.93 trims the recorder's
+  status chip and nothing else.
+Posters are each clip's own first frame, so a paused or unloaded video is
   indistinguishable from a playing one.
 
 ## Sound
