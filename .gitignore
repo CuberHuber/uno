@@ -11,4 +11,7 @@ server/public/
 # Screen recordings dropped at the repo root; anchored so the hero-loop
 # video assets under client/public/ stay tracked.
 /*.mov
+# Local-only project backlog: the repo is public, unpublished ideas stay
+# off GitHub. Entries are mirrored to issues only after explicit approval.
+/docs/backlog*.md
 .gstack/
