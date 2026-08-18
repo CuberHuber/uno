@@ -1,12 +1,13 @@
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@uno/shared';
+import type { Analytics } from './analytics.js';
 import type { RoomStore } from './rooms.js';
 import type { ServerLimits } from './server.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 
-export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): void {
+export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, analytics?: Analytics): void {
   const broadcast = (code: string) => {
     const room = store.getRoom(code);
     if (!room) return;
@@ -25,6 +26,7 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): v
   };
 
   io.on('connection', (socket: Sock) => {
+    analytics?.sessionStarted(socket.id);
     const seatOf = () => socket.data as { code: string; seat: number; token: string };
 
     socket.on('joinRoom', (p, ack) => {
@@ -45,6 +47,7 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): v
       socket.data = { code: p.code, seat: joined.seat, token: joined.token };
       store.setConnection(p.code, joined.seat, socket.id);
       const room = store.getRoom(p.code)!;
+      if (!existing.ok) analytics?.playerJoined(room.code, joined.seat);
       ack({ ok: true, seat: joined.seat, token: joined.token, roomName: `${room.players[room.hostSeat]!.name}’s table` });
       broadcast(p.code);
     });
@@ -52,10 +55,21 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): v
     const handle = (fn: () => { ok: boolean; error?: string; effects?: never[] } | { ok: boolean; error?: string }) => {
       const { code } = seatOf();
       if (!code) return;
+      const room = store.getRoom(code);
+      const phaseBefore = room?.phase;
       const result = fn() as { ok: boolean; error?: string; effects?: never[] };
       if (!result.ok) {
         socket.emit('moveRejected', { reason: result.error ?? 'rejected' });
         return;
+      }
+      // Rounds start and end only through phase flips, so watching the flip
+      // here covers startGame, rematch, the winning play, and continueWithout.
+      if (analytics && room && room.phase !== phaseBefore) {
+        if (room.phase === 'playing') {
+          analytics.roundStarted(room.code, room.players.filter((pl) => !pl.left).length);
+        } else if (phaseBefore === 'playing' && room.phase === 'roundEnd') {
+          analytics.roundFinished(room.code, room.game?.winner ?? null);
+        }
       }
       emitEffects(code, result.effects);
       broadcast(code);
@@ -74,6 +88,7 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): v
     socket.on('continueWithout', (p) => handle(() => store.continueWithout(seatOf().code, seatOf().token, p.seat)));
 
     socket.on('disconnect', () => {
+      analytics?.sessionEnded(socket.id);
       const { code, seat } = seatOf();
       if (!code) return;
       store.setConnection(code, seat, null);

@@ -212,6 +212,21 @@ export class RoomStore {
     }, seat);
   }
 
+  stats() {
+    let lobby = 0, playing = 0, roundEnd = 0, seated = 0, connected = 0;
+    for (const room of this.rooms.values()) {
+      if (room.phase === 'lobby') lobby += 1;
+      else if (room.phase === 'playing') playing += 1;
+      else roundEnd += 1;
+      for (const p of room.players) {
+        if (p.left) continue;
+        seated += 1;
+        if (p.connected) connected += 1;
+      }
+    }
+    return { rooms: this.rooms.size, lobby, playing, roundEnd, seated, connected };
+  }
+
   sweep(): void {
     for (const [key, room] of this.rooms) {
       const age = this.now() - room.createdAtMs;

@@ -1,23 +1,49 @@
-import Fastify from 'fastify';
+import Fastify, { LogController, type FastifyServerOptions } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { Server } from 'socket.io';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Registry } from 'prom-client';
 import type { ClientToServerEvents, ServerToClientEvents, Rules } from '@uno/shared';
 import { RateLimiter } from './limiter.js';
 import { RoomStore } from './rooms.js';
 import { attachSockets } from './sockets.js';
+import { Analytics } from './analytics.js';
+import { registerGameMetrics } from './metrics.js';
+import { ADMIN_HTML } from './adminPanel.js';
 
-export interface ServerLimits { create: RateLimiter; join: RateLimiter; pin: RateLimiter }
+export interface ServerLimits {
+  create: RateLimiter; join: RateLimiter; pin: RateLimiter;
+  beacon?: RateLimiter;
+}
 export const defaultLimits = (): ServerLimits => ({
   create: new RateLimiter(10, 60_000),
   join: new RateLimiter(20, 60_000),
   pin: new RateLimiter(5, 60_000),
+  beacon: new RateLimiter(60, 60_000),
 });
 
-export async function buildServer(store = new RoomStore(), limits: ServerLimits = defaultLimits()) {
-  const app = Fastify();
+export interface BuildOptions {
+  logger?: FastifyServerOptions['logger'];
+  analytics?: Analytics;
+}
+
+export async function buildServer(
+  store = new RoomStore(),
+  limits: ServerLimits = defaultLimits(),
+  opts: BuildOptions = {},
+) {
+  // Request logging stays off even with a logger: the interesting traffic is
+  // websockets, and per-asset HTTP lines would drown the game events.
+  const app = Fastify({
+    logger: opts.logger ?? false,
+    logController: new LogController({ disableRequestLogging: true }),
+  });
+  const register = new Registry();
+  const analytics = opts.analytics ?? new Analytics({ log: app.log, register });
+  registerGameMetrics(register, store, analytics);
+  const beacon = limits.beacon ?? new RateLimiter(60, 60_000);
 
   app.post('/api/rooms', async (req, reply) => {
     if (!limits.create.allow(req.ip)) return reply.code(429).send({ error: 'rate_limited' });
@@ -26,7 +52,42 @@ export async function buildServer(store = new RoomStore(), limits: ServerLimits 
     const body = (req.body ?? {}) as { rules?: Partial<Rules>; pin?: string };
     const pin = typeof body.pin === 'string' && /^\d{4}$/.test(body.pin) ? body.pin : null;
     const room = store.createRoom({ rules: body.rules, pin });
+    analytics.roomCreated(room.code);
     return { code: room.code };
+  });
+
+  app.get('/healthz', async () => ({
+    ok: true,
+    uptimeS: Math.round(process.uptime()),
+    ...store.stats(),
+  }));
+
+  app.get('/metrics', async (_req, reply) => {
+    reply.type(register.contentType);
+    return register.metrics();
+  });
+
+  app.post('/api/analytics/event', async (req, reply) => {
+    if (!beacon.allow(req.ip)) return reply.code(429).send({ error: 'rate_limited' });
+    const body = (req.body ?? {}) as { type?: unknown; vid?: unknown };
+    if (body.type !== 'visit' || typeof body.vid !== 'string' || !/^[\w-]{8,64}$/.test(body.vid)) {
+      return reply.code(400).send({ error: 'bad_event' });
+    }
+    analytics.visit(body.vid);
+    return reply.code(204).send();
+  });
+
+  app.get('/api/admin/stats', async (req, reply) => {
+    const token = process.env.ADMIN_TOKEN;
+    if (!token) return reply.code(404).send({ error: 'not_enabled' });
+    if (req.headers.authorization !== `Bearer ${token}`) {
+      return reply.code(401).send({ error: 'unauthorized' });
+    }
+    return analytics.summary(store.stats());
+  });
+
+  app.get('/admin', async (_req, reply) => {
+    return reply.type('text/html; charset=utf-8').send(ADMIN_HTML);
   });
 
   // import.meta.dirname needs Node 20.11+; derive it portably so Node 18 dev machines work too.
@@ -38,17 +99,34 @@ export async function buildServer(store = new RoomStore(), limits: ServerLimits 
 
   await app.ready();
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(app.server);
-  attachSockets(io, store, limits);
-  return { app, io, store, limits };
+  attachSockets(io, store, limits, analytics);
+  return { app, io, store, limits, analytics };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { app, store, limits } = await buildServer();
+  const prod = process.env.NODE_ENV === 'production';
+  const logger: FastifyServerOptions['logger'] = {
+    level: process.env.LOG_LEVEL ?? 'info',
+    // Room PINs and seat tokens must never reach the log stream.
+    redact: { paths: ['pin', '*.pin', 'token', '*.token', 'req.headers.authorization'], censor: '[redacted]' },
+    ...(prod ? {} : {
+      transport: { target: 'pino-pretty', options: { translateTime: 'SYS:HH:MM:ss', ignore: 'pid,hostname' } },
+    }),
+  };
+  // RATE_LIMITS=off exists for local load testing (bench/ws.mjs spins up more
+  // rooms and joins per minute than any human ever would). Never set it in prod.
+  const limits = process.env.RATE_LIMITS === 'off'
+    ? {
+        create: new RateLimiter(1e9, 60_000), join: new RateLimiter(1e9, 60_000),
+        pin: new RateLimiter(1e9, 60_000), beacon: new RateLimiter(1e9, 60_000),
+      }
+    : defaultLimits();
+  const { app, store } = await buildServer(undefined, limits, { logger });
   setInterval(() => {
     store.sweep();
-    limits.create.sweep(); limits.join.sweep(); limits.pin.sweep();
+    limits.create.sweep(); limits.join.sweep(); limits.pin.sweep(); limits.beacon?.sweep();
   }, 60_000).unref();
   const port = Number(process.env.PORT ?? 3000);
   await app.listen({ port, host: '0.0.0.0' });
-  console.log(`Ochre Eights listening on :${port}`);
+  app.log.info(`Ochre Eights listening on :${port}`);
 }

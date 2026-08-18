@@ -12,3 +12,5 @@ server/public/
 # video assets under client/public/ stay tracked.
 /*.mov
 .gstack/
+# 0x flamegraph capture directories (npm run flame)
+*.0x/

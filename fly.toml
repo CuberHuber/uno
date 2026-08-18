@@ -11,3 +11,9 @@ primary_region = "arn"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "256mb"
+
+# Fly scrapes Prometheus metrics from the app and serves them to the managed
+# Grafana at fly-metrics.net; the endpoint is exposed by server/src/metrics.ts.
+[metrics]
+  port = 3000
+  path = "/metrics"
