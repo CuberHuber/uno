@@ -18,13 +18,13 @@ export const BASICS_CATALOG: readonly BasicInfo[] = [
     id: 'match',
     title: { ru: 'Как ходить', en: 'Making a move' },
     tagline: {
-      ru: 'Кладись по цвету, по числу или по значку.',
+      ru: 'Совпадай по цвету, по числу или по значку.',
       en: 'Match the colour, the number, or the symbol.',
     },
     details: {
-      ru: 'Своя карта ложится на верхнюю, если совпадает хотя бы в одном: цвет, число '
-        + 'или значок действия. Красная 7 ложится на любую красную и на любую семёрку. '
-        + 'Дикие карты подходят всегда.',
+      ru: 'Карта ложится на верхнюю, если совпадает с ней хотя бы в одном: цвет, число '
+        + 'или значок действия. Красная семёрка кроет любую красную карту и любую '
+        + 'семёрку. Дикие подходят всегда.',
       en: 'Your card goes on top if it matches in at least one way: colour, number, or '
         + 'action symbol. A red 7 covers any red card and any seven. Wilds always fit.',
     },
@@ -38,8 +38,8 @@ export const BASICS_CATALOG: readonly BasicInfo[] = [
     },
     details: {
       ru: 'Пропуск лишает следующего игрока хода. Разворот меняет направление игры, '
-        + 'а вдвоём работает как пропуск — ход возвращается тебе. +2 заставляет '
-        + 'следующего взять две карты и пропустить ход.',
+        + 'а вдвоём работает как пропуск: ход тут же возвращается тебе. +2 заставляет '
+        + 'следующего взять две карты и остаться без хода.',
       en: 'Skip takes the next player’s turn away. Reverse flips the direction of play — '
         + 'and with two players it acts as a Skip, handing the turn straight back to you. '
         + 'Draw 2 makes the next player take two cards and lose their turn.',
@@ -53,9 +53,9 @@ export const BASICS_CATALOG: readonly BasicInfo[] = [
       en: 'Always playable, and you call the colour.',
     },
     details: {
-      ru: 'Дикую карту можно положить в любой момент своего хода; сыграв её, ты '
-        + 'называешь цвет, которым игра продолжится. Дикая +4 вдобавок заставляет '
-        + 'следующего взять четыре карты и пропустить ход. Оспорить её нельзя.',
+      ru: 'Дикую можно положить в любой момент своего хода, и, сыграв её, ты называешь '
+        + 'цвет, которым игра продолжится. Дикая +4 вдобавок заставляет следующего взять '
+        + 'четыре карты и пропустить ход. Оспорить её нельзя.',
       en: 'A wild can go down at any point on your turn, and playing it lets you name the '
         + 'colour play continues in. A Wild Draw 4 also makes the next player take four '
         + 'cards and lose their turn. There is no challenge.',
@@ -70,8 +70,8 @@ export const BASICS_CATALOG: readonly BasicInfo[] = [
     },
     details: {
       ru: 'Если подходящей карты нет, возьми одну из колоды. Подошла — можешь сыграть '
-        + 'её сразу же; не подошла или не хочешь — ход переходит дальше. Когда колода '
-        + 'кончается, сброс без верхней карты перемешивается заново.',
+        + 'её сразу же; не подошла или не хочется — ход переходит дальше. Когда колода '
+        + 'кончается, сброс без верхней карты тасуется заново.',
       en: 'With nothing playable, take one card from the pile. If it fits you may play it '
         + 'right away; if it does not, or you would rather keep it, the turn passes. When '
         + 'the pile runs out, the discard minus its top card is shuffled back.',
@@ -81,14 +81,14 @@ export const BASICS_CATALOG: readonly BasicInfo[] = [
     id: 'lastCard',
     title: { ru: 'Последняя карта', en: 'The last card' },
     tagline: {
-      ru: 'Назовись, пока осталась одна — иначе поймают на две.',
+      ru: 'Объяви, пока осталась одна, — иначе поймают на две.',
       en: 'Call it on your last card, or get caught for two.',
     },
     details: {
-      ru: 'Сыграв предпоследнюю карту, нажми «последняя карта» — до или сразу после хода. '
-        + 'Пока следующий игрок не сходил, любой за столом может тебя поймать, и тогда ты '
-        + 'берёшь две карты. Успел назваться — ловить нечего.',
-      en: 'Playing your second-to-last card opens a window: press “last card”, either just '
+      ru: 'Сыграв предпоследнюю карту, нажми UNO! — можно до хода, можно сразу после. '
+        + 'Пока следующий игрок не сходил, любой за столом успеет тебя поймать, и тогда '
+        + 'ты берёшь две карты. Объявил вовремя — ловить нечего.',
+      en: 'Playing your second-to-last card opens a window: press UNO!, either just '
         + 'before or right after the play. Until the next player acts, anyone at the table '
         + 'may catch you, and a catch costs you two cards. Call in time and there is '
         + 'nothing to catch.',
@@ -103,9 +103,9 @@ export const BASICS_CATALOG: readonly BasicInfo[] = [
     },
     details: {
       ru: 'Раздача — отдельный шаг перед раундом: колода тасуется, каждому по семь карт, '
-        + 'а затем карты переворачиваются, пока не выпадет числовая. Всё остальное уходит '
-        + 'под низ колоды и остаётся в игре. Так никого не штрафуют и не пропускают до '
-        + 'первого хода. В официальных правилах UNO это не так — там стартовая карта '
+        + 'а дальше карты переворачиваются, пока не выпадет числовая. Всё остальное уходит '
+        + 'под низ колоды и остаётся в игре. Так никто не получает штраф и не теряет ход, '
+        + 'ещё ничего не сыграв. В официальных правилах UNO иначе: там перевёрнутая карта '
         + 'действия срабатывает на первом игроке.',
       en: 'Dealing is its own step before the round: the deck is shuffled, everyone gets '
         + 'seven, and then cards are turned over until a number appears. Anything else goes '

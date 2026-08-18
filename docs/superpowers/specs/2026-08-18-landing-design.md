@@ -17,6 +17,8 @@ The authored-loop documents stay unmerged on `worktree-beta-core-spec` as a reco
 | Topic | Decision |
 |---|---|
 | Hero | Real gameplay, cut from `gameplay.mov` |
+| Hero treatment | **Full-bleed**, decided 2026-08-18 after building both and seeing them side by side. The framed alternative and the old card fan are removed. |
+| Hero source | The **widened** cut (`hero.*`, 2400×900), never a 16:9 crop of the square — see below |
 | Video format | Short silent looping clips — **not** GIFs, **not** one long video |
 | Page shape | Scrolling page with sections |
 | Call to action | **Fixed to the viewport, not to the page** — always reachable while scrolling |
@@ -133,11 +135,45 @@ All four sit in the first two minutes. That is deliberate: past roughly 150 s th
   dramatic of the two anyway. A `multiDiscard` clip needs a fresh recording with
   that rule switched on — worth doing, not worth blocking on.
 
-Measured output, at 720 px and 30 fps:
+### The hero is widened, not cropped
+
+The hero plays full-bleed, and the source is square. `object-fit: cover` on a
+  landscape screen therefore crops the top away — and the top is where the three
+  player chips sit, the only thing on screen saying four people are at this table.
+Cropping would throw away the argument the landing exists to make.
+
+So the frame is widened instead: `hero.*` is 2400×900 with the whole recording
+  centred at full height and gutters either side.
+
+**What fills the gutters decides whether the widening is visible at all.** The first
+  cut put a blurred, scaled-up copy of the frame there, and it left a hard vertical
+  line right across the hero where the sharp recording met it — the recording's own
+  border, exactly the thing the widening was supposed to hide. What the recording
+  holds at its edge is the table's flat felt, so the gutters now take that colour
+  instead: `fillborders=mode=smear` repeats the outermost column outwards. That is
+  seamless by construction — the first gutter pixel *is* the last recorded pixel —
+  and it tracks the frame, so the +4 colour wash bleeds off the edge rather than
+  stopping dead at a line. Measured across the clip, the colour step at the join is
+  0/255 down most of its length and never above 5.
+The recorder also draws a dark hairline around its own frame; trim a few pixels
+  before smearing, or that hairline is what gets repeated.
+
+The width is 2400 rather than 1600 for the same reason the widening exists at all:
+  at 16:9 a 21:9 monitor goes back to cropping the top chips away. Flat gutters cost
+  almost nothing to encode — 50% more canvas came to 4 KB.
+
+The CSS scrim over it is load-bearing, not decoration.
+A band down the top keeps the header off a player's name chip; the wash across the
+  frame is heaviest at the left under the copy, thinnest over the table, and rises
+  again at the right edge, which calms the empty side. It no longer has a seam to
+  cover.
+
+Measured output, at 720 px and 30 fps (the hero at 2400×900):
 
 | | WebM | MP4 | Poster |
 |---|---|---|---|
 | Total, four clips | 447 KB | 391 KB | 92 KB |
+| Hero, widened | 225 KB | 212 KB | 42 KB |
 
 About 930 KB for the set — above the 600 KB first estimate because the clips run
   longer than five seconds and the crop keeps more of the frame, and still a quarter

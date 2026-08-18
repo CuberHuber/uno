@@ -91,23 +91,189 @@ body {
 }
 .host-token { font-size: 12.5px; color: var(--color-neutral-600); }
 
-/* — landing — */
-.landing { position: relative; min-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-.blob { position: absolute; border-radius: 50%; }
-.blob-a { right: -120px; top: -120px; width: 420px; height: 420px; background: var(--color-accent-2-100); }
-.blob-b { left: -90px; bottom: -160px; width: 360px; height: 360px; background: var(--color-accent-100); }
-.landing-top { position: relative; padding: 26px 44px; display: flex; align-items: center; gap: 11px; }
-.landing-note { margin-left: auto; font-size: 13px; color: var(--color-neutral-600); }
-.landing-main {
-  position: relative; flex: 1; display: flex; align-items: center;
-  padding: 0 44px 60px; gap: 56px; flex-wrap: wrap;
+/* — landing —
+   Port of design/Ochre Eights - Landing Page.dc.html. The rule-card scenes are
+   CSS keyframes over plain markup: no video, no images, sharp at any size, and
+   restylable without re-recording anything. */
+.lp { position: relative; width: 100%; overflow-x: hidden; background: var(--color-bg); }
+.lp-head {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 30;
+  display: flex; align-items: center; gap: 12px; padding: 18px 28px;
 }
-.landing-copy { width: 440px; max-width: 100%; }
-.landing-copy h1 { font-size: 56px; margin: 0 0 16px; line-height: 1.02; }
-.landing-copy p { font-size: 17px; max-width: 380px; color: var(--color-neutral-700); line-height: 1.5; }
-.landing-ctas { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
-.hero { flex: 1; min-width: 380px; position: relative; height: 280px; }
-.hero-card { position: absolute; top: 20px; display: block; }
+.lp-mark {
+  width: 30px; height: 30px; flex: none; border-radius: 50%;
+  border: 2.5px solid var(--color-accent); display: grid; place-items: center;
+  font-family: var(--font-heading); font-size: 17px; color: var(--color-accent);
+  background: rgba(245, 234, 216, .7);
+}
+.lp-name { font-family: var(--font-heading); font-size: 19px; }
+.lp-head-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.lp-hatch { position: absolute; inset: 0; background: repeating-linear-gradient(115deg, rgba(32, 30, 29, .05) 0 3px, transparent 3px 12px); }
+
+/* Hero: full-bleed clip under a two-layer wash. The top band keeps the header off
+   a player's name chip; the right-hand rise calms the empty side and covers the
+   seam where the widened clip's sharp square meets its blurred fill. */
+.lp-hero {
+  position: relative; min-height: min(92vh, 880px);
+  display: flex; align-items: center; overflow: hidden; background: var(--felt);
+}
+.lp-hero > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lp-hero::after {
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(245, 234, 216, .92) 0%, rgba(245, 234, 216, 0) 17%),
+    linear-gradient(100deg, rgba(245, 234, 216, .97) 0 26%, rgba(245, 234, 216, .86) 46%,
+      rgba(245, 234, 216, .42) 68%, rgba(245, 234, 216, .08) 88%);
+}
+.lp-hero-in {
+  position: relative; z-index: 10; width: 100%; max-width: 1240px; margin: 0 auto;
+  padding: 96px 22px 40px; box-sizing: border-box;
+  display: flex; flex-wrap: wrap; gap: 36px 40px; align-items: center;
+}
+.lp-hero-copy { flex: 1 1 420px; min-width: 0; }
+.lp-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .24em; text-transform: uppercase; color: var(--color-accent-700); }
+.lp-hero-copy h1 {
+  margin: 14px 0 0; font-family: var(--font-heading); font-weight: 400;
+  font-size: clamp(36px, 6.4vw, 88px); line-height: .96; letter-spacing: -.02em;
+  max-width: 13ch; text-wrap: balance;
+}
+.lp-hero-copy > p {
+  margin: 18px 0 0; max-width: 44ch; font-size: clamp(16px, 1.4vw, 19px);
+  line-height: 1.55; color: var(--color-neutral-700); text-wrap: pretty;
+}
+.lp-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.lp-note { margin-top: 16px; font-size: 13px; color: var(--color-neutral-600); }
+.lp-hero-side { flex: 1 1 250px; min-width: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.lp-side-label { flex: 1 1 100%; font-size: 11px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--color-neutral-600); }
+.lp-chip {
+  flex: 0 1 auto; max-width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 9px 15px 9px 12px; border-radius: 24px; background: rgba(255, 253, 248, .82);
+  border: 1px solid rgba(32, 30, 29, .16); backdrop-filter: blur(3px);
+}
+.lp-chip-name { font-size: 14px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.lp-chip-state { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; flex: none; }
+.lp-jump { font-size: 13px; margin-top: 4px; padding: 7px 14px; border-radius: 20px; background: rgba(255, 253, 248, .82); border: 1px solid rgba(32, 30, 29, .16); }
+
+/* Sections share a rhythm: a 1240px column, a display heading, a reveal on scroll. */
+.lp-sec { max-width: 1240px; margin: 0 auto; padding: 92px 28px 24px; }
+.lp-sec h2, .lp-band h2 {
+  margin: 0; font-family: var(--font-heading); font-weight: 400;
+  font-size: clamp(30px, 3.4vw, 46px); line-height: 1.05;
+}
+.lp-sub { margin: 12px 0 0; max-width: 52ch; font-size: 16px; line-height: 1.6; color: var(--color-neutral-700); }
+.lp-rev { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+.lp-rev.is-in { opacity: 1; transform: translateY(0); }
+.lp-band { margin-top: 80px; background: var(--felt); border-top: 1px solid rgba(32, 30, 29, .1); border-bottom: 1px solid rgba(32, 30, 29, .1); }
+.lp-band-in { max-width: 1240px; margin: 0 auto; padding: 84px 28px 92px; }
+
+.lp-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 34px; margin-top: 44px; }
+.lp-step { border-top: 2px solid rgba(32, 30, 29, .16); padding-top: 18px; }
+.lp-step-n { font-family: var(--font-heading); font-size: 56px; line-height: .9; color: var(--color-accent); }
+.lp-step h3 { margin: 14px 0 8px; font-family: var(--font-heading); font-weight: 400; font-size: 22px; }
+.lp-step p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--color-neutral-700); max-width: 32ch; text-wrap: pretty; }
+
+.lp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 40px; }
+.lp-rule {
+  display: flex; gap: 16px; align-items: flex-start; background: #fffdf8;
+  border: 1px solid rgba(32, 30, 29, .14); border-radius: 16px; padding: 22px 22px 22px 20px;
+}
+.lp-rule-bar { width: 5px; align-self: stretch; border-radius: 3px; flex: none; }
+.lp-rule h3 { margin: 0; font-family: var(--font-heading); font-weight: 400; font-size: 20px; }
+.lp-rule p { margin: 7px 0 0; font-size: 14.5px; line-height: 1.55; color: var(--color-neutral-700); text-wrap: pretty; }
+.lp-switch { border: 0; cursor: pointer; flex: none; width: 48px; height: 28px; border-radius: 16px; position: relative; transition: background .2s ease; }
+.lp-switch span { position: absolute; top: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fffdf8; box-shadow: 0 1px 3px rgba(32, 30, 29, .3); transition: left .2s ease; }
+
+.lp-clips { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; margin-top: 40px; }
+.lp-clips figure { margin: 0; }
+.lp-clip { position: relative; aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: var(--felt); border: 1px solid rgba(32, 30, 29, .14); }
+.lp-clip video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lp-clips figcaption { margin-top: 14px; font-size: 14.5px; line-height: 1.55; color: var(--color-neutral-700); text-wrap: pretty; }
+
+/* — rules of the game: six cards, each with a drawn scene — */
+.lp-play { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 44px; }
+.lp-card { background: #fffdf8; border: 1px solid rgba(32, 30, 29, .14); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 15px; }
+.lp-stage { position: relative; aspect-ratio: 16 / 10; border-radius: 12px; overflow: hidden; background: var(--felt); border: 1px solid rgba(32, 30, 29, .12); }
+.lp-card h3 { margin: 0; font-family: var(--font-heading); font-weight: 400; font-size: 21px; }
+.lp-card-head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.lp-tag { padding: 3px 9px; border-radius: 11px; background: var(--color-accent); color: #fffdf8; font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.lp-line { margin: 8px 0 0; font-size: 15px; line-height: 1.5; font-weight: 600; color: var(--color-accent-700); }
+.lp-body { margin: 8px 0 0; font-size: 15px; line-height: 1.6; color: var(--color-neutral-700); text-wrap: pretty; }
+
+/* Scene pieces. A card face is a rounded rect with a cream oval and a glyph. */
+.eo-c {
+  position: absolute; left: 50%; top: 50%; width: 34px; height: 48px; margin: -24px 0 0 -17px;
+  border-radius: 6px; display: grid; place-items: center;
+  font-family: var(--font-heading); font-size: 15px;
+  box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, .18), 0 6px 12px rgba(32, 30, 29, .24);
+}
+.eo-back { background: repeating-linear-gradient(120deg, rgba(247, 237, 220, .22) 0 2px, #0000 2px 6px), var(--card-back); }
+.eo-wildface { width: 19px; height: 19px; border-radius: 50%; background: conic-gradient(var(--card-red) 0 25%, var(--card-yellow) 0 50%, var(--card-green) 0 75%, var(--card-blue) 0); }
+.eo-hand { position: absolute; bottom: 8px; width: 30px; height: 42px; border-radius: 5px; display: grid; place-items: center; font-family: var(--font-heading); font-size: 13px; box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, .18); }
+/* Centred by `translate`, not by a hand-measured margin: the labels are localized and
+   change width. `translate` is its own property, so the keyframes' `transform: scale`
+   still composes on top. */
+.eo-badge { position: absolute; top: 24%; translate: -50% 0; padding: 5px 10px; border-radius: 12px; color: #fffdf8; font-size: 10px; font-weight: 700; letter-spacing: .14em; white-space: nowrap; }
+
+@keyframes eo-play { 0% { transform: translate(var(--sx, -40px), 58px) rotate(-10deg); opacity: 0 } 4% { opacity: 1 } 12%, 26% { transform: translate(0, 0) rotate(-2deg); opacity: 1 } 31% { opacity: 0 } 100% { transform: translate(var(--sx, -40px), 58px) rotate(-10deg); opacity: 0 } }
+@keyframes eo-hl { 0%, 10% { opacity: 0 } 16%, 26% { opacity: 1 } 33%, 100% { opacity: 0 } }
+@keyframes eo-dim { 0%, 12% { opacity: 1 } 20%, 30% { opacity: .3 } 38%, 100% { opacity: 1 } }
+@keyframes eo-strike { 0%, 14% { opacity: 0; transform: scaleX(.2) } 22%, 32% { opacity: 1; transform: scaleX(1) } 40%, 100% { opacity: 0 } }
+@keyframes eo-flip { 0%, 40% { transform: scaleX(1) } 48%, 72% { transform: scaleX(-1) } 80%, 100% { transform: scaleX(1) } }
+@keyframes eo-arc { 0%, 70% { transform: translate(0, 0); opacity: 0 } 76% { opacity: 1 } 88% { transform: translate(26px, -28px); opacity: 1 } 95%, 100% { transform: translate(28px, -32px); opacity: 0 } }
+@keyframes eo-fan { 0%, 18% { opacity: 0; transform: translate(0, 0) scale(.5) } 27% { opacity: 1; transform: translate(var(--dx), var(--dy)) scale(1) } 52% { opacity: 1; transform: translate(var(--dx), var(--dy)) scale(1) } 64% { opacity: 0 } 100% { opacity: 0 } }
+@keyframes eo-chosen { 0%, 44% { transform: translate(var(--dx), var(--dy)) scale(1) } 54%, 68% { transform: translate(var(--dx), var(--dy)) scale(1.55) } 78%, 100% { transform: translate(var(--dx), var(--dy)) scale(1) } }
+@keyframes eo-wash { 0%, 46% { opacity: 0 } 60%, 86% { opacity: .5 } 96%, 100% { opacity: 0 } }
+@keyframes eo-shake { 0%, 6% { transform: translateX(0) rotate(var(--rot, 0deg)) } 9% { transform: translateX(-3px) rotate(var(--rot, 0deg)) } 12% { transform: translateX(3px) rotate(var(--rot, 0deg)) } 15% { transform: translateX(-2px) rotate(var(--rot, 0deg)) } 18%, 100% { transform: translateX(0) rotate(var(--rot, 0deg)) } }
+@keyframes eo-slidein { 0%, 20% { transform: translate(48px, 0); opacity: 0 } 26% { opacity: 1 } 34%, 46% { transform: translate(0, 0); opacity: 1 } 53% { opacity: 0 } 100% { opacity: 0; transform: translate(48px, 0) } }
+@keyframes eo-tohand { 0%, 56% { transform: translate(48px, 0); opacity: 0 } 62% { opacity: 1 } 72%, 86% { transform: translate(-10px, 28px) rotate(-7deg); opacity: 1 } 93% { opacity: 0 } 100% { opacity: 0 } }
+@keyframes eo-leave { 0%, 14% { transform: translate(0, 0); opacity: 1 } 26%, 100% { transform: translate(8px, -42px) rotate(9deg); opacity: 0 } }
+@keyframes eo-badge { 0%, 16% { opacity: 0; transform: scale(.85) } 24%, 44% { opacity: 1; transform: scale(1) } 52% { opacity: 0 } 58%, 74% { opacity: 1; transform: scale(1) } 84%, 100% { opacity: 0 } }
+@keyframes eo-close { 0%, 18% { opacity: 0; transform: rotate(0deg) } 26% { opacity: .9 } 44% { opacity: .9; transform: rotate(260deg) } 53% { opacity: 0 } 100% { opacity: 0; transform: rotate(0deg) } }
+@keyframes eo-caught { 0%, 74% { opacity: 0 } 80%, 90% { opacity: 1 } 96%, 100% { opacity: 0 } }
+@keyframes eo-flyback { 0%, 80% { transform: translate(36px, -26px); opacity: 0 } 86% { opacity: 1 } 95% { transform: translate(0, 0); opacity: 1 } 100% { opacity: 0 } }
+@keyframes eo-under { 0% { transform: translate(0, 0); opacity: 0 } 6% { opacity: 1 } 14%, 22% { transform: translate(40px, 0) rotate(4deg); opacity: 1 } 30% { transform: translate(40px, 11px) rotate(4deg); opacity: .2 } 37%, 100% { opacity: 0 } }
+@keyframes eo-stay { 0%, 66% { transform: translate(0, 0); opacity: 0 } 72% { opacity: 1 } 82%, 100% { transform: translate(40px, 0); opacity: 1 } }
+[data-anim] { animation-fill-mode: both !important; }
+
+.lp-close { margin-top: 88px; background: var(--color-accent); color: #fffdf8; }
+.lp-close-in { max-width: 1240px; margin: 0 auto; padding: 96px 28px 148px; text-align: center; }
+.lp-close h2 { margin: 26px 0 0; font-family: var(--font-heading); font-weight: 400; font-size: clamp(32px, 4vw, 54px); line-height: 1.04; }
+.lp-close p { margin: 14px auto 0; max-width: 40ch; font-size: 17px; line-height: 1.55; color: rgba(255, 253, 248, .82); }
+.lp-close-mark { width: 52px; height: 52px; margin: 0 auto; border-radius: 50%; border: 2.5px solid rgba(255, 253, 248, .8); display: grid; place-items: center; font-family: var(--font-heading); font-size: 26px; }
+
+/* The call to action follows the viewport, not the page: decide at the rules and
+   you are one tap from a room. It stays out while the hero's own buttons show. */
+.lp-bar {
+  position: fixed; right: 22px; bottom: 22px; left: 22px; z-index: 40;
+  display: flex; pointer-events: none;
+  transition: opacity .35s ease, transform .35s ease;
+}
+.lp-bar-in {
+  pointer-events: auto; background: #fffdf8; border: 1.5px solid rgba(32, 30, 29, .28);
+  border-radius: 20px; box-shadow: 0 14px 34px rgba(32, 30, 29, .24);
+  padding: 10px; min-width: 280px; max-width: min(520px, calc(100vw - 44px));
+}
+.lp-bar.is-open .lp-bar-in { border-color: var(--color-accent); }
+.lp-bar-row { display: flex; gap: 8px; align-items: center; }
+.lp-bar-head { display: flex; align-items: center; gap: 8px; margin: 2px 4px 9px; }
+.lp-bar-label { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--color-neutral-600); }
+.lp-bar-ghost { margin-left: auto; border: 0; background: none; cursor: pointer; font-size: 12px; color: var(--color-neutral-600); }
+.lp-code-input {
+  flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--color-accent);
+  background: var(--color-bg); font-family: ui-monospace, Menlo, monospace; font-size: 20px;
+  letter-spacing: .34em; text-transform: uppercase; color: var(--color-text);
+  min-height: 46px; box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero > video, .lp-clip video { display: none; }
+  .lp-hero { background: var(--felt) url('/clips/hero.jpg') center / cover no-repeat; }
+  .lp-rev { opacity: 1; transform: none; }
+  /* Freeze each scene on its clearest frame rather than wherever it happened to be. */
+  [data-anim] { animation-delay: var(--freeze, 0s) !important; animation-play-state: paused !important; }
+}
 
 /* — lobby — */
 .lobby-screen { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -352,7 +518,11 @@ body {
   .landing-note { display: none; }
   .landing-main { padding: 0 22px 40px; gap: 24px; }
   .landing-copy h1 { font-size: 40px; }
-  .hero { min-width: 0; height: 200px; width: 100%; }
+  /* Copy stacks centred on a phone, so the wash runs down the frame, not across it. */
+  .landing-bleed::after {
+    background: linear-gradient(180deg,
+      rgba(245, 234, 216, .96) 0%, rgba(245, 234, 216, .86) 48%, rgba(245, 234, 216, .3) 100%);
+  }
   .lobby-top { padding: 16px 18px; }
   .lobby-main { padding: 24px 16px; gap: 14px; }
   .seat-card { width: 140px; height: 180px; }
