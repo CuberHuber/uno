@@ -17,6 +17,8 @@ The authored-loop documents stay unmerged on `worktree-beta-core-spec` as a reco
 | Topic | Decision |
 |---|---|
 | Hero | Real gameplay, cut from `gameplay.mov` |
+| Hero treatment | **Full-bleed**, decided 2026-08-18 after building both and seeing them side by side. The framed alternative and the old card fan are removed. |
+| Hero source | The **widened** cut (`hero.*`, 1600×900), never a 16:9 crop of the square — see below |
 | Video format | Short silent looping clips — **not** GIFs, **not** one long video |
 | Page shape | Scrolling page with sections |
 | Call to action | **Fixed to the viewport, not to the page** — always reachable while scrolling |
@@ -133,11 +135,31 @@ All four sit in the first two minutes. That is deliberate: past roughly 150 s th
   dramatic of the two anyway. A `multiDiscard` clip needs a fresh recording with
   that rule switched on — worth doing, not worth blocking on.
 
-Measured output, at 720 px and 30 fps:
+### The hero is widened, not cropped
+
+The hero plays full-bleed, and the source is square. `object-fit: cover` on a
+  landscape screen therefore crops the top away — and the top is where the three
+  player chips sit, the only thing on screen saying four people are at this table.
+Cropping would throw away the argument the landing exists to make.
+
+So the frame is widened instead: `hero.*` is 1600×900 with the whole square centred
+  at full height and the gutters filled by a blurred, scaled-up copy of the same
+  frame. The felt is nearly flat, so the fill reads as depth rather than as padding.
+
+The CSS scrim over it is load-bearing, not decoration.
+A band down the top keeps the header off a player's name chip; the wash across the
+  frame is heaviest at the left under the copy, thinnest over the table, and rises
+  again at the right edge — which calms the empty side and covers the seam where the
+  sharp square meets its blurred fill.
+A faint seam still shows around 84% of the frame width. Known, and left for
+  art direction; see `design/landing-brief.md`.
+
+Measured output, at 720 px and 30 fps (the hero at 1600×900):
 
 | | WebM | MP4 | Poster |
 |---|---|---|---|
 | Total, four clips | 447 KB | 391 KB | 92 KB |
+| Hero, widened | 221 KB | 242 KB | 40 KB |
 
 About 930 KB for the set — above the 600 KB first estimate because the clips run
   longer than five seconds and the crop keeps more of the frame, and still a quarter

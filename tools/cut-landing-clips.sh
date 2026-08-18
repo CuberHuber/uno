@@ -66,5 +66,27 @@ while read -r name start dur _rest; do
     -frames:v 1 -q:v 4 -y "$OUT/$name.jpg"
 done <<< "$CLIPS"
 
+# --- the hero, widened -------------------------------------------------------
+# The hero plays full-bleed, and the source is square: `object-fit: cover` on a
+# landscape screen would crop away the player chips at the top, which are the only
+# thing saying four people are at this table. So widen the frame instead of
+# cropping it — the square sits centred at full height, and the gutters are filled
+# with a blurred, scaled-up copy of the same frame. The felt is close to flat, so
+# the seam does not read.
+HERO_IN=41.0
+HERO_DUR=7.0
+hero_vf="[0:v]${CROP},${TONEMAP},fps=${FPS},split=2[bg][fg];\
+[bg]scale=1600:-2,crop=1600:900,gblur=sigma=42[bgb];\
+[fg]scale=-2:900[fgs];\
+[bgb][fgs]overlay=(W-w)/2:0"
+
+echo "cutting hero (${HERO_IN}s +${HERO_DUR}s, widened to 16:9)"
+ffmpeg -nostdin -v error -ss "$HERO_IN" -t "$HERO_DUR" -i "$SRC" -filter_complex "$hero_vf" -an \
+  -c:v libvpx-vp9 -crf 34 -b:v 0 -cpu-used 2 -row-mt 1 -y "$OUT/hero.webm"
+ffmpeg -nostdin -v error -ss "$HERO_IN" -t "$HERO_DUR" -i "$SRC" -filter_complex "$hero_vf" -an \
+  -c:v libx264 -crf 26 -preset slow -pix_fmt yuv420p -movflags +faststart -y "$OUT/hero.mp4"
+ffmpeg -nostdin -v error -ss "$HERO_IN" -i "$SRC" -filter_complex "$hero_vf" \
+  -frames:v 1 -q:v 4 -y "$OUT/hero.jpg"
+
 echo
 ls -la "$OUT"

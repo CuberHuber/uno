@@ -106,39 +106,29 @@ body {
 .landing-copy h1 { font-size: 56px; margin: 0 0 16px; line-height: 1.02; }
 .landing-copy p { font-size: 17px; max-width: 380px; color: var(--color-neutral-700); line-height: 1.5; }
 .landing-ctas { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
-.hero { flex: 1; min-width: 380px; position: relative; height: 280px; }
-.hero-card { position: absolute; top: 20px; display: block; }
-
-/* — hero clip, framed beside the copy — */
-.hero-frame { flex: 1; min-width: 380px; display: flex; justify-content: center; }
-.hero-frame video {
-  width: 100%; max-width: 460px; aspect-ratio: 1 / 0.93; object-fit: cover;
-  display: block; border-radius: 26px; box-shadow: var(--shadow-lg);
-  background: var(--color-neutral-100);
-}
-
 /* — hero clip, filling the screen — */
 .landing-bleed { position: absolute; inset: 0; overflow: hidden; }
 .landing-bleed video { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* The clip has no dark patch to hide behind, so the copy gets its own wash:
-   heavy at the left where the text sits, clearing towards the right of the frame. */
+/* The clip has no dark patch to hide behind, so the copy gets its own wash. Two
+   layers: one down the top, so the header never fights a player's name chip, and
+   one across the frame — heavy at the left under the text, thinnest over the
+   table, then rising again at the right edge, which both calms the empty side and
+   covers the seam where the widened clip's sharp square meets its blurred fill. */
 .landing-bleed::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(100deg,
-    var(--color-neutral-100) 0%, rgba(245, 234, 216, .93) 34%,
-    rgba(245, 234, 216, .42) 64%, rgba(245, 234, 216, .1) 100%);
+  background:
+    linear-gradient(180deg, rgba(245, 234, 216, .92) 0%, rgba(245, 234, 216, 0) 17%),
+    linear-gradient(100deg,
+      var(--color-neutral-100) 0%, rgba(245, 234, 216, .93) 34%,
+      rgba(245, 234, 216, .45) 66%, rgba(245, 234, 216, .74) 100%);
 }
 .landing.is-bleed .landing-top,
 .landing.is-bleed .landing-main { position: relative; z-index: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-frame video, .landing-bleed video { display: none; }
-  .hero-frame, .landing-bleed {
-    background: var(--color-neutral-100) url('/clips/slam.jpg') center / cover no-repeat;
-  }
-  .hero-frame {
-    border-radius: 26px; aspect-ratio: 1 / 0.93;
-    max-width: 460px; box-shadow: var(--shadow-lg);
+  .landing-bleed video { display: none; }
+  .landing-bleed {
+    background: var(--color-neutral-100) url('/clips/hero.jpg') center / cover no-repeat;
   }
 }
 
@@ -385,8 +375,6 @@ body {
   .landing-note { display: none; }
   .landing-main { padding: 0 22px 40px; gap: 24px; }
   .landing-copy h1 { font-size: 40px; }
-  .hero { min-width: 0; height: 200px; width: 100%; }
-  .hero-frame { min-width: 0; width: 100%; }
   /* Copy stacks centred on a phone, so the wash runs down the frame, not across it. */
   .landing-bleed::after {
     background: linear-gradient(180deg,

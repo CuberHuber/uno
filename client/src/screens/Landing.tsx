@@ -1,34 +1,22 @@
 import { useState } from 'react';
-import type { Card } from '@uno/shared';
-import CardFace from '../components/CardFace';
 import { LangSwitcher, useT } from '../i18n';
 import HostLink from './HostLink';
 
-// The prototype's hero fan: red 8, blue 4, green +2. Kept as the fallback for
-// `?hero=cards`, the pre-video treatment.
-const HERO: { card: Card; x: number; rot: number }[] = [
-  { card: { id: -1, color: 'red', value: '8' }, x: 10, rot: -13 },
-  { card: { id: -2, color: 'blue', value: '4' }, x: 128, rot: 4 },
-  { card: { id: -3, color: 'green', value: 'draw2' }, x: 246, rot: 17 },
-];
-
-/** Which hero treatment to render. Temporary, while the two are being compared:
- *  `?hero=bleed` fills the screen, `?hero=cards` is the old static fan,
- *  anything else frames the clip beside the copy. */
-type HeroKind = 'frame' | 'bleed' | 'cards';
-const heroKind = (): HeroKind => {
-  const q = new URLSearchParams(window.location.search).get('hero');
-  return q === 'bleed' || q === 'cards' ? q : 'frame';
-};
-
-/** The hero clip. Muted and looping so browsers will autoplay it; the poster is
- *  the clip's own first frame, which makes a stalled load look deliberate. */
-function HeroClip({ className }: { className?: string }) {
+/** The hero clip, playing full-bleed behind the copy.
+ *
+ *  It is the widened cut, not the square one: the recording is 2294x2242, and
+ *  `object-fit: cover` on a landscape screen would crop the player chips off the
+ *  top — the only thing on screen saying four people are at this table. The wide
+ *  cut keeps the whole square and fills the gutters instead.
+ *
+ *  Muted and looping so browsers will autoplay it; the poster is the clip's own
+ *  first frame, which makes a stalled load look deliberate rather than broken. */
+function HeroClip() {
   return (
-    <video className={className} poster="/clips/slam.jpg"
+    <video poster="/clips/hero.jpg"
       autoPlay muted loop playsInline preload="metadata" aria-hidden="true">
-      <source src="/clips/slam.webm" type="video/webm" />
-      <source src="/clips/slam.mp4" type="video/mp4" />
+      <source src="/clips/hero.webm" type="video/webm" />
+      <source src="/clips/hero.mp4" type="video/mp4" />
     </video>
   );
 }
@@ -69,17 +57,9 @@ export default function Landing() {
     );
   }
 
-  const hero = heroKind();
   return (
-    <main className={`landing${hero === 'bleed' ? ' is-bleed' : ''}`}>
-      {hero === 'bleed' ? (
-        <div className="landing-bleed"><HeroClip /></div>
-      ) : (
-        <>
-          <div className="blob blob-a" />
-          <div className="blob blob-b" />
-        </>
-      )}
+    <main className="landing is-bleed">
+      <div className="landing-bleed"><HeroClip /></div>
       <header className="landing-top">
         <div className="brand-mark">8</div>
         <div className="brand-name">Ochre Eights</div>
@@ -99,18 +79,6 @@ export default function Landing() {
             </button>
           </div>
         </div>
-        {hero === 'frame' && (
-          <div className="hero-frame"><HeroClip /></div>
-        )}
-        {hero === 'cards' && (
-          <div className="hero" aria-hidden="true">
-            {HERO.map((h) => (
-              <span key={h.card.id} className="hero-card" style={{ left: h.x, transform: `rotate(${h.rot}deg)` }}>
-                <CardFace card={h.card} size="xl" />
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </main>
   );
