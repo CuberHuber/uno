@@ -1,5 +1,8 @@
 node_modules
 **/node_modules
+# real keys live in env files — never in an image
+.env
+**/.env
 **/dist
 **/*.tsbuildinfo
 server/public

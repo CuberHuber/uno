@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Color, Effect, RoomStateView, Rules } from '@uno/shared';
+import { track } from './analytics';
 import { socket } from './socket';
 
 export interface Store {
@@ -67,6 +68,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { socket.io.off('reconnect', onReconnect); };
   }, [view?.roomCode]);
 
+  // Round lifecycle events for the external analytics; a reconnect mid-round
+  // re-reports round_started, which is close enough for dashboard purposes.
+  const prevPhase = useRef<RoomStateView['phase'] | null>(null);
+  useEffect(() => {
+    const prev = prevPhase.current;
+    if (!view) return;
+    prevPhase.current = view.phase;
+    if (view.phase === 'playing' && prev !== 'playing') track('round_started');
+    if (view.phase === 'roundEnd' && prev === 'playing') {
+      track('round_finished', { won: view.winnerSeat === view.yourSeat });
+    }
+  }, [view?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Failures a new attempt can fix stay on the join screen; the rest are fatal.
   const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started'];
 
@@ -81,6 +95,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
       setJoinError(null);
+      if (!token) track('room_joined'); // a held token means resume, not a fresh seat
       localStorage.setItem(tokenKey(code), ack.token);
     });
   };

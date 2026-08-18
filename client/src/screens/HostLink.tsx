@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { RULES_CATALOG, sanitizeRules, type Rules } from '@uno/shared';
+import { track } from '../analytics';
 import RuleRow from '../components/RuleRow';
 import { useT } from '../i18n';
 
@@ -18,6 +19,7 @@ export default function HostLink() {
       body: JSON.stringify({ rules, pin: pin || undefined }),
     });
     const body = (await res.json()) as { code: string };
+    track('room_created');
     setCode(body.code);
   };
 
