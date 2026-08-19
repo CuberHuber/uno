@@ -37,6 +37,8 @@ Machine endpoints only — nothing here is meant for a browser:
   "Metrics Endpoint" scrape job pointing at
   `https://<app-domain>/metrics`
   (agentless, scrapes every 60 s, free tier holds 10k series).
+  Step-by-step scrape setup and the three alert rules:
+  [ops/grafana-cloud.md](ops/grafana-cloud.md).
 - `GET /config.js` — runtime analytics keys for the client,
   generated from the server's env vars (see below). Not secret.
 
@@ -77,6 +79,8 @@ For local dev without the backend, `client/.env` (see `client/.env.example`)
   Set `UMAMI_WEBSITE_ID` (and `UMAMI_DOMAINS` with the prod hostnames)
   in the panel; the tracking script only loads when the ID is present.
   Free cloud tier: 100K events/month.
+  Self-hosted installs need the yearly data cleanup cron:
+  [ops/umami-cleanup.md](ops/umami-cleanup.md).
 - **GameAnalytics** (free, built for games):
   sessions/retention/playtime automatically once initialized,
   plus the game events as design events (`game:room_created`, …).
@@ -149,6 +153,8 @@ It reports rounds finished, actions/s, rejects,
 Baselines from 2026-08-19 on the dev machine:
   911 rounds/12 s on 5 tables, 4 422 actions/s, p95 lag 0.5 ms;
   `/healthz` at 41 k req/s.
+Re-run procedure and what to record:
+  [ops/bench-baseline.md](ops/bench-baseline.md).
 
 ## Flamegraphs
 
