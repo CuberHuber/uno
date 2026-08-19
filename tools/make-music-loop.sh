@@ -38,6 +38,17 @@ TAIL=151.238      # where the trailing silence starts, from silencedetect
 XFADE=4           # seconds of crossfade wrapping the tail into the loop-in point
 BITRATE=96k       # 3.65 MB of 192 kbps MP3 comes down to about 1.7 MB here
 
+# The master arrives at -10.8 LUFS with peaks touching 0.0 dBFS: mastered to be
+# listened to, not to be sat under a game. At that level the bed came out LOUDER
+# than most of the event cues — the round-end cue measured 3 dB below the music it
+# is supposed to ring out over — and 0 dBFS leaves the AAC encoder no room for
+# intersample overshoot. So the loop is brought down to a bed level by plain gain:
+# no compression, no limiting, nothing that changes the music itself. -1 dBTP is
+# the headroom the spec asks of the composer; the rest of the distance down to the
+# cues is made up by MUSIC_LEVEL in client/src/sound.ts.
+TARGET_I=-20      # LUFS integrated
+TARGET_TP=-1      # dBTP true peak
+
 command -v ffmpeg >/dev/null || { echo "ffmpeg not found" >&2; exit 1; }
 [ -f "$SRC" ] || { echo "no music at $SRC" >&2; exit 1; }
 mkdir -p "$OUT" "$PREVIEW"
@@ -53,8 +64,27 @@ loop_fc="[0:a]atrim=start=${BODY_END}:end=${TAIL},asetpts=PTS-STARTPTS,afade=t=o
 [0:a]atrim=start=${HEAD_END}:end=${BODY_END},asetpts=PTS-STARTPTS[body];\
 [seam][body]concat=n=2:v=0:a=1[out]"
 
+# Measure the assembled loop, then apply one gain to it. Two passes rather than
+# ffmpeg's own loudnorm in one: loudnorm in single-pass mode is a dynamics
+# processor, and a bed that breathes against the cues is worse than a loud one.
+echo "measuring the assembled loop"
+measured=$(ffmpeg -nostdin -v info -i "$SRC" \
+  -filter_complex "${loop_fc};[out]loudnorm=I=${TARGET_I}:TP=${TARGET_TP}:print_format=json[m]" \
+  -map "[m]" -f null - 2>&1)
+read_json () { echo "$measured" | grep "\"$1\"" | sed 's/.*: *"\{0,1\}\([-0-9.]*\)"\{0,1\},\{0,1\}/\1/'; }
+in_i=$(read_json input_i)
+in_tp=$(read_json input_tp)
+[ -n "$in_i" ] && [ -n "$in_tp" ] || { echo "could not measure the loop" >&2; exit 1; }
+
+# Whichever constraint binds first — loudness or true peak — wins.
+gain_i=$(echo "$TARGET_I - ($in_i)" | bc -l)
+gain_tp=$(echo "$TARGET_TP - ($in_tp)" | bc -l)
+GAIN=$(echo "if ($gain_i < $gain_tp) $gain_i else $gain_tp" | bc -l)
+printf "  measured %s LUFS, %s dBTP -> applying %.2f dB\n" "$in_i" "$in_tp" "$GAIN"
+
 echo "building the looped master"
-ffmpeg -nostdin -v error -i "$SRC" -filter_complex "$loop_fc" -map "[out]" \
+ffmpeg -nostdin -v error -i "$SRC" \
+  -filter_complex "${loop_fc};[out]volume=${GAIN}dB[lvl]" -map "[lvl]" \
   -c:a aac -b:a "$BITRATE" -movflags +faststart -y "$OUT/table.m4a"
 
 # --- previews of the join ----------------------------------------------------

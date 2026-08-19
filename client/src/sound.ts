@@ -30,7 +30,18 @@ const LEVEL: Record<Cue, number> = {
   uno: 0.7, caught: 0.7, turn: 0.5, reject: 0.4, win: 0.85, shuffle: 0.5,
   deal: 0.6, seat: 0.5, press: 0.35,
 };
-const MUSIC_LEVEL = 0.34; // under the cues: it is a room, not a soundtrack
+// Under the cues: it is a room, not a soundtrack. The number is measured, not
+// chosen — the loop ships at -20 LUFS (tools/make-music-loop.sh), and 0.2 puts the
+// bed a few decibels below even `press`, the quietest thing in the game. It was
+// 0.34 while the music was still the -10.8 LUFS master, where the bed came out
+// over the top of nearly every cue.
+const MUSIC_LEVEL = 0.2;
+
+/** Cues that fire dozens of times a round get a little pitch and level scatter, so
+ *  the fortieth card does not land on exactly the same sample as the first. Real
+ *  cards never repeat; a buffer always does, and the ear catches it long before it
+ *  can say why. Kept small — this is variation, not an effect. */
+const SCATTER: Partial<Record<Cue, number>> = { play: 0.05, draw: 0.06, action: 0.04 };
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -121,6 +132,11 @@ export function cue(name: Cue): void {
     src.buffer = buf;
     const g = ctx.createGain();
     g.gain.value = LEVEL[name];
+    const scatter = SCATTER[name];
+    if (scatter) {
+      src.playbackRate.value = 1 + (Math.random() * 2 - 1) * scatter;
+      g.gain.value *= 1 + (Math.random() * 2 - 1) * 0.1;
+    }
     src.connect(g).connect(master);
     src.start();
   });
