@@ -50,5 +50,23 @@ test('runs registry-less as a pure log source', () => {
   a.sessionEnded('x');
   a.roundStarted('AAAAA', 2);
   a.roundFinished('AAAAA', 1);
+  a.joinFailed('AAAAA', 'wrong_pin');
+  a.moveRejected('not_your_turn');
+  a.rulesChanged('AAAAA', { stacking: true, forcePlay: false, drawToMatch: false, multiDiscard: false });
+  a.rematchStarted('AAAAA');
+  a.playerKicked('AAAAA', 2);
   expect(a.activeSessions()).toBe(0);
+});
+
+test('failed joins and rejected moves count by reason', async () => {
+  const register = new Registry();
+  const a = new Analytics({ now: () => 0, register });
+  a.joinFailed('AAAAA', 'wrong_pin');
+  a.joinFailed('AAAAA', 'wrong_pin');
+  a.joinFailed('BBBBB', 'table_full');
+  a.moveRejected('not_your_turn');
+  const text = await register.metrics();
+  expect(text).toMatch(/ochre_joins_failed_total\{reason="wrong_pin"\} 2/);
+  expect(text).toMatch(/ochre_joins_failed_total\{reason="table_full"\} 1/);
+  expect(text).toMatch(/ochre_moves_rejected_total\{reason="not_your_turn"\} 1/);
 });

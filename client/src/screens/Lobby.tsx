@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { RULES_CATALOG } from '@uno/shared';
+import { track } from '../analytics';
 import RuleRow from '../components/RuleRow';
 import { LangSwitcher, useT } from '../i18n';
 import { useStore } from '../store';
@@ -42,7 +43,10 @@ export default function Lobby() {
           {RULES_CATALOG.map((r) => (
             <RuleRow key={r.id} name={r.title[locale]} desc={r.tagline[locale]}
               details={r.details[locale]} on={view.rules[r.id]}
-              onToggle={() => actions.setRules({ ...view.rules, [r.id]: !view.rules[r.id] })} />
+              onToggle={() => {
+                track('rules_toggle', { rule: r.id, on: !view.rules[r.id], where: 'lobby' });
+                actions.setRules({ ...view.rules, [r.id]: !view.rules[r.id] });
+              }} />
           ))}
           <div className="pin-row">
             {view.pin !== null ? (

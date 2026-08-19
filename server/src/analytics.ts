@@ -1,5 +1,6 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { Counter, Histogram, type Registry } from 'prom-client';
+import type { Rules } from '@uno/shared';
 
 export interface AnalyticsOptions {
   now?: () => number;
@@ -20,6 +21,7 @@ export class Analytics {
 
   private prom?: {
     rooms: Counter; joins: Counter;
+    joinsFailed: Counter<'reason'>; movesRejected: Counter<'reason'>;
     roundsStarted: Counter; roundsFinished: Counter;
     roundSeconds: Histogram; sessionSeconds: Histogram;
   };
@@ -32,6 +34,14 @@ export class Analytics {
       this.prom = {
         rooms: new Counter({ name: 'ochre_rooms_created_total', help: 'Rooms created over HTTP', registers }),
         joins: new Counter({ name: 'ochre_players_joined_total', help: 'Seats taken (fresh joins, not resumes)', registers }),
+        joinsFailed: new Counter({
+          name: 'ochre_joins_failed_total', help: 'Join attempts the server turned away, by reason',
+          labelNames: ['reason'] as const, registers,
+        }),
+        movesRejected: new Counter({
+          name: 'ochre_moves_rejected_total', help: 'Game actions the engine rejected, by reason',
+          labelNames: ['reason'] as const, registers,
+        }),
         roundsStarted: new Counter({ name: 'ochre_rounds_started_total', help: 'Rounds dealt (first deal and rematches)', registers }),
         roundsFinished: new Counter({ name: 'ochre_rounds_finished_total', help: 'Rounds that reached a winner', registers }),
         roundSeconds: new Histogram({
@@ -86,6 +96,32 @@ export class Analytics {
       durationS = Math.round(ms / 1000);
     }
     this.log?.info({ evt: 'round_finished', code, winnerSeat, durationS }, 'round finished');
+  }
+
+  /** The entry funnel's dark side: wrong codes, PINs, full tables, limits.
+   *  Was previously counted nowhere — not in logs, not in metrics. */
+  joinFailed(code: string, reason: string): void {
+    this.prom?.joinsFailed.inc({ reason });
+    this.log?.info({ evt: 'join_failed', code, reason }, 'join failed');
+  }
+
+  /** Rejected moves are frequent and benign (misclicks), so they count in
+   *  Prometheus but log at debug to keep the info stream readable. */
+  moveRejected(reason: string): void {
+    this.prom?.movesRejected.inc({ reason });
+    this.log?.debug({ evt: 'move_rejected', reason }, 'move rejected');
+  }
+
+  rulesChanged(code: string, rules: Rules): void {
+    this.log?.info({ evt: 'rules_changed', code, rules }, 'rules changed');
+  }
+
+  rematchStarted(code: string): void {
+    this.log?.info({ evt: 'rematch_started', code }, 'rematch started');
+  }
+
+  playerKicked(code: string, seat: number): void {
+    this.log?.info({ evt: 'player_kicked', code, seat }, 'player kicked after grace');
   }
 
   activeSessions(): number {
