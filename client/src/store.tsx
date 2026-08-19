@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Color, Effect, RoomStateView, Rules } from '@uno/shared';
-import { track } from './analytics';
+import { rulesPreset, setAnalyticsDimensions, track, trackProgression } from './analytics';
 import { reportError } from './errors';
 import { socket } from './socket';
+import { roundsPlayed } from './ui';
 
 export interface Store {
   view: RoomStateView | null;
@@ -96,18 +97,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => { socket.io.off('reconnect', onReconnect); };
   }, [view?.roomCode]);
 
-  // Round lifecycle events for the external analytics; a reconnect mid-round
-  // re-reports round_started, which is close enough for dashboard purposes.
+  // Round lifecycle for the external analytics. The party number keys the
+  // dedupe: a reconnect mid-round used to re-report round_started (a 4-player
+  // table over-counted x4 on refreshes); now each browser reports each round
+  // of a room exactly once. Progression events are per-player by design —
+  // that is what the GameAnalytics Progression dashboard expects.
   const prevPhase = useRef<RoomStateView['phase'] | null>(null);
+  const lastRoundKey = useRef<string | null>(null);
   useEffect(() => {
     const prev = prevPhase.current;
     if (!view) return;
     prevPhase.current = view.phase;
-    if (view.phase === 'playing' && prev !== 'playing') track('round_started');
+    const mode = rulesPreset(view.rules) === 'classic' ? 'classic' : 'house';
+    const bucket = view.seats.length <= 2 ? '2p' : '3-4p';
+    if (view.phase === 'playing' && prev !== 'playing') {
+      const roundNo = roundsPlayed(view.winTally) + 1;
+      const key = `${view.roomCode}:${roundNo}`;
+      if (lastRoundKey.current !== key) {
+        lastRoundKey.current = key;
+        if (roundNo === 1) track('game_start', { players: bucket });
+        track('round_started', { round: roundNo, mode });
+        trackProgression('Start', mode, bucket);
+      }
+    }
     if (view.phase === 'roundEnd' && prev === 'playing') {
-      track('round_finished', { won: view.winnerSeat === view.yourSeat });
+      const won = view.winnerSeat === view.yourSeat;
+      track('round_finished', { won, round: roundsPlayed(view.winTally) });
+      trackProgression(won ? 'Complete' : 'Fail', mode, bucket);
     }
   }, [view?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // GA cohort dimensions: whether we host and which house rules the table
+  // runs. Known only once seated; harmless to re-apply on every change.
+  useEffect(() => {
+    if (!view) return;
+    const you = view.seats.find((s) => s.seat === view.yourSeat);
+    setAnalyticsDimensions({ role: you?.isHost ? 'host' : 'guest', rules: view.rules });
+  }, [view && `${view.yourSeat}:${rulesPreset(view.rules)}`]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const join = (code: string, name?: string, pin?: string) => {
     const token = localStorage.getItem(tokenKey(code)) ?? undefined;
@@ -115,6 +141,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     socket.emit('joinRoom', { code, name, token, pin }, (ack) => {
       if (!ack.ok || !ack.token) {
         const reason = ack.error ?? 'table_not_found';
+        track('join_failed', { reason });
         if (TRANSIENT.includes(reason)) setJoinError(reason);
         else setError(reason);
         return;
