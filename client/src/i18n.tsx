@@ -102,6 +102,7 @@ const DICT = {
     'pause.waiting': 'Waiting for {name}…',
     'pause.body': 'Their seat is held — the game resumes the moment they reopen the link.',
     'pause.continue': 'Continue without them',
+    'conn.lost': 'Connection lost — reconnecting…',
     'color.red': 'Red', 'color.yellow': 'Yellow', 'color.green': 'Green', 'color.blue': 'Blue',
     'err.round_over': 'The round is over', 'err.bad_seat': 'Bad seat',
     'err.no_color_pending': 'No colour choice pending', 'err.play_drawn_or_pass': 'Play the drawn card or end your turn',
@@ -122,6 +123,8 @@ const DICT = {
     'err.pin_required': 'This table asks for a PIN', 'err.wrong_pin': 'Wrong PIN — try again',
     'err.bad_pin': 'A PIN is exactly 4 digits', 'err.bad_stack': 'Those cards can’t go down together',
     'err.rate_limited': 'Too many attempts — wait a minute',
+    'err.create_failed': 'Could not create the room — try again',
+    'err.network': 'Network error — check the connection and try again',
   },
   ru: {
     'app.notFoundTitle': 'Стол не найден',
@@ -218,6 +221,7 @@ const DICT = {
     'pause.waiting': 'Ждём {name}…',
     'pause.body': 'Место сохранено — игра продолжится, как только ссылку откроют снова.',
     'pause.continue': 'Продолжить без ожидания',
+    'conn.lost': 'Соединение потеряно — переподключаемся…',
     'color.red': 'Красный', 'color.yellow': 'Жёлтый', 'color.green': 'Зелёный', 'color.blue': 'Синий',
     'err.round_over': 'Раунд окончен', 'err.bad_seat': 'Нет такого места',
     'err.no_color_pending': 'Цвет сейчас не выбирают', 'err.play_drawn_or_pass': 'Сыграй вытянутую карту или заверши ход',
@@ -238,6 +242,8 @@ const DICT = {
     'err.pin_required': 'Стол просит PIN', 'err.wrong_pin': 'Неверный PIN — попробуй ещё',
     'err.bad_pin': 'PIN — это ровно 4 цифры', 'err.bad_stack': 'Эти карты нельзя сбросить вместе',
     'err.rate_limited': 'Слишком много попыток — подожди минуту',
+    'err.create_failed': 'Не получилось создать комнату — попробуй ещё раз',
+    'err.network': 'Ошибка сети — проверь соединение и попробуй снова',
   },
 } as const;
 

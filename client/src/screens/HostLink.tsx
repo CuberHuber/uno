@@ -1,32 +1,57 @@
 import { useState } from 'react';
 import { RULES_CATALOG, sanitizeRules, type Rules } from '@uno/shared';
+import { rulesPreset, track } from '../analytics';
+import { reportError } from '../errors';
 import RuleRow from '../components/RuleRow';
 import { useT } from '../i18n';
 
 // Two phases: configure (rules + optional PIN, no room yet) → share (link).
 export default function HostLink() {
-  const { t, locale } = useT();
+  const { t, terr, locale } = useT();
   const [rules, setRules] = useState<Rules>(sanitizeRules());
   const [pin, setPin] = useState('');
   const [code, setCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const pinOk = pin === '' || /^\d{4}$/.test(pin);
 
+  // The old version ignored res.ok: a 429 or a network hiccup on the main
+  // conversion button left the user staring at the form with no feedback.
   const create = async () => {
-    const res = await fetch('/api/rooms', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ rules, pin: pin || undefined }),
-    });
-    const body = (await res.json()) as { code: string };
-    setCode(body.code);
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ rules, pin: pin || undefined }),
+      });
+      if (!res.ok) {
+        const reason = res.status === 429 ? 'rate_limited' : 'create_failed';
+        setCreateError(reason);
+        track('room_create_failed', { reason });
+        reportError('room_create_failed', `HTTP ${res.status}`, 'warning');
+        return;
+      }
+      const body = (await res.json()) as { code: string };
+      track('room_created', { pin: pin !== '', preset: rulesPreset(rules) });
+      setCode(body.code);
+    } catch (e) {
+      setCreateError('network');
+      track('room_create_failed', { reason: 'network' });
+      reportError('room_create_failed', e, 'warning');
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (code) {
     const link = `${window.location.origin}/r/${code}`;
     const copy = () => {
-      navigator.clipboard.writeText(link);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1400);
+      navigator.clipboard.writeText(link).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1400);
+      }).catch((e) => console.warn('[clipboard] copy failed:', e));
     };
     return (
       <main className="centered">
@@ -63,7 +88,10 @@ export default function HostLink() {
           {RULES_CATALOG.map((r) => (
             <RuleRow key={r.id} name={r.title[locale]} desc={r.tagline[locale]}
               details={r.details[locale]} on={rules[r.id]}
-              onToggle={() => setRules({ ...rules, [r.id]: !rules[r.id] })} />
+              onToggle={() => {
+                track('rules_toggle', { rule: r.id, on: !rules[r.id], where: 'create' });
+                setRules({ ...rules, [r.id]: !rules[r.id] });
+              }} />
           ))}
         </div>
         <div className="host-divider" />
@@ -75,8 +103,8 @@ export default function HostLink() {
           <div className="hint-dot">{t('create.pinHint')}</div>
         </div>
         <div className="host-foot">
-          <span />
-          <button className="btn btn-primary btn-big" disabled={!pinOk} onClick={create}>
+          {createError ? <div className="hint-dot">{terr(createError)}</div> : <span />}
+          <button className="btn btn-primary btn-big" disabled={!pinOk || creating} onClick={create}>
             {t('create.createBtn')}
           </button>
         </div>

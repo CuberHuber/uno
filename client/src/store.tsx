@@ -1,12 +1,16 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Color, Effect, RoomStateView, Rules } from '@uno/shared';
+import { rulesPreset, setAnalyticsDimensions, track, trackProgression } from './analytics';
+import { reportError } from './errors';
 import { socket } from './socket';
+import { roundsPlayed } from './ui';
 
 export interface Store {
   view: RoomStateView | null;
   error: string | null;      // fatal join error → "table not found" screen
   joinError: string | null;  // transient join failure: pin_required / wrong_pin / rate_limited…
   rejection: string | null;  // transient moveRejected, clears itself
+  selfDisconnected: boolean; // OUR socket dropped (not another player's)
   effect: Effect | null;
   join: (code: string, name?: string, pin?: string) => void;
   actions: {
@@ -33,12 +37,30 @@ export const useStore = (): Store => {
 
 const tokenKey = (code: string) => `ochre:${code.toUpperCase()}`;
 
+// Failures a new attempt can fix stay on the join screen; the rest are fatal.
+const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started'];
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<RoomStateView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
+  const [selfDisconnected, setSelfDisconnected] = useState(false);
   const [effect, setEffect] = useState<Effect | null>(null);
+
+  // Our own transport state, for the "connection lost" banner: PauseOverlay
+  // only covers OTHER players dropping; before this, your own drop just froze
+  // the table with no explanation.
+  useEffect(() => {
+    const onDisconnect = () => setSelfDisconnected(true);
+    const onConnect = () => setSelfDisconnected(false);
+    socket.on('disconnect', onDisconnect);
+    socket.on('connect', onConnect);
+    return () => {
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect', onConnect);
+    };
+  }, []);
 
   useEffect(() => {
     const onReject = (p: { reason: string }) => {
@@ -61,14 +83,57 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!code) return;
     const onReconnect = () => {
       const token = localStorage.getItem(tokenKey(code)) ?? undefined;
-      socket.emit('joinRoom', { code, token }, () => {});
+      socket.emit('joinRoom', { code, token }, (ack) => {
+        if (ack.ok) return;
+        // The ack used to be ignored: a room swept while we were offline left
+        // the player staring at a frozen table. Now it's an explicit state.
+        const reason = ack.error ?? 'table_not_found';
+        track('reconnect_failed', { reason });
+        reportError('reconnect_failed', reason, 'warning');
+        if (!TRANSIENT.includes(reason)) setError(reason);
+      });
     };
     socket.io.on('reconnect', onReconnect);
     return () => { socket.io.off('reconnect', onReconnect); };
   }, [view?.roomCode]);
 
-  // Failures a new attempt can fix stay on the join screen; the rest are fatal.
-  const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started'];
+  // Round lifecycle for the external analytics. The party number keys the
+  // dedupe: a reconnect mid-round used to re-report round_started (a 4-player
+  // table over-counted x4 on refreshes); now each browser reports each round
+  // of a room exactly once. Progression events are per-player by design —
+  // that is what the GameAnalytics Progression dashboard expects.
+  const prevPhase = useRef<RoomStateView['phase'] | null>(null);
+  const lastRoundKey = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevPhase.current;
+    if (!view) return;
+    prevPhase.current = view.phase;
+    const mode = rulesPreset(view.rules) === 'classic' ? 'classic' : 'house';
+    const bucket = view.seats.length <= 2 ? '2p' : '3-4p';
+    if (view.phase === 'playing' && prev !== 'playing') {
+      const roundNo = roundsPlayed(view.winTally) + 1;
+      const key = `${view.roomCode}:${roundNo}`;
+      if (lastRoundKey.current !== key) {
+        lastRoundKey.current = key;
+        if (roundNo === 1) track('game_start', { players: bucket });
+        track('round_started', { round: roundNo, mode });
+        trackProgression('Start', mode, bucket);
+      }
+    }
+    if (view.phase === 'roundEnd' && prev === 'playing') {
+      const won = view.winnerSeat === view.yourSeat;
+      track('round_finished', { won, round: roundsPlayed(view.winTally) });
+      trackProgression(won ? 'Complete' : 'Fail', mode, bucket);
+    }
+  }, [view?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // GA cohort dimensions: whether we host and which house rules the table
+  // runs. Known only once seated; harmless to re-apply on every change.
+  useEffect(() => {
+    if (!view) return;
+    const you = view.seats.find((s) => s.seat === view.yourSeat);
+    setAnalyticsDimensions({ role: you?.isHost ? 'host' : 'guest', rules: view.rules });
+  }, [view && `${view.yourSeat}:${rulesPreset(view.rules)}`]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const join = (code: string, name?: string, pin?: string) => {
     const token = localStorage.getItem(tokenKey(code)) ?? undefined;
@@ -76,11 +141,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     socket.emit('joinRoom', { code, name, token, pin }, (ack) => {
       if (!ack.ok || !ack.token) {
         const reason = ack.error ?? 'table_not_found';
+        track('join_failed', { reason });
         if (TRANSIENT.includes(reason)) setJoinError(reason);
         else setError(reason);
         return;
       }
       setJoinError(null);
+      if (!token) track('room_joined'); // a held token means resume, not a fresh seat
       localStorage.setItem(tokenKey(code), ack.token);
     });
   };
@@ -100,7 +167,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }), []);
 
   return (
-    <Ctx.Provider value={{ view, error, joinError, rejection, effect, join, actions }}>
+    <Ctx.Provider value={{ view, error, joinError, rejection, selfDisconnected, effect, join, actions }}>
       {children}
     </Ctx.Provider>
   );

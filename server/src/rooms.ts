@@ -212,11 +212,31 @@ export class RoomStore {
     }, seat);
   }
 
-  sweep(): void {
+  stats() {
+    let lobby = 0, playing = 0, roundEnd = 0, seated = 0, connected = 0;
+    for (const room of this.rooms.values()) {
+      if (room.phase === 'lobby') lobby += 1;
+      else if (room.phase === 'playing') playing += 1;
+      else roundEnd += 1;
+      for (const p of room.players) {
+        if (p.left) continue;
+        seated += 1;
+        if (p.connected) connected += 1;
+      }
+    }
+    return { rooms: this.rooms.size, lobby, playing, roundEnd, seated, connected };
+  }
+
+  /** onRemoved lets callers release per-room state held elsewhere
+   *  (e.g. Analytics drops the deal timestamp of a room swept mid-round). */
+  sweep(onRemoved?: (code: string) => void): void {
     for (const [key, room] of this.rooms) {
       const age = this.now() - room.createdAtMs;
       const emptyFor = room.emptySinceMs === null ? 0 : this.now() - room.emptySinceMs;
-      if (age > MAX_AGE_MS || emptyFor > EMPTY_TTL_MS) this.rooms.delete(key);
+      if (age > MAX_AGE_MS || emptyFor > EMPTY_TTL_MS) {
+        this.rooms.delete(key);
+        onRemoved?.(key);
+      }
     }
   }
 }

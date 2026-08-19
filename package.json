@@ -6,6 +6,9 @@
   "scripts": {
     "build": "npm run build -w shared -w client -w server && rm -rf server/public && cp -r client/dist server/public",
     "test": "npm test -w shared -w server",
-    "typecheck": "tsc -b shared server client"
+    "typecheck": "tsc -b shared server client",
+    "bench:http": "npm run bench:http -w server",
+    "bench:ws": "npm run bench:ws -w server",
+    "flame": "npm run flame -w server"
   }
 }

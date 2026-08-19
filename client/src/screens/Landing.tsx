@@ -8,6 +8,7 @@
 // Rule prose comes from the shared catalogs, never from copy written here.
 import { useEffect, useRef, useState } from 'react';
 import { RULES_CATALOG } from '@uno/shared';
+import { track } from '../analytics';
 import { LangSwitcher, useT } from '../i18n';
 import { cue, isMuted, setMuted, startMusic, stopMusic } from '../sound';
 import HostLink from './HostLink';
@@ -77,7 +78,15 @@ export default function Landing() {
   // the join screen behind /r/CODE, not to this bar.
   const go = () => {
     const c = code.trim().replace(/[\s-]/g, '').toUpperCase();
-    if (c.length === 5) window.location.href = `/r/${c}`;
+    if (c.length === 5) {
+      track('join_code_submitted'); // the code itself never goes to analytics
+      window.location.href = `/r/${c}`;
+    }
+  };
+  // Which of the page's entry points converts: hero pair, closing block, sticky bar.
+  const cta = (variant: string, fn: () => void) => () => {
+    track('landing_cta', { variant });
+    fn();
   };
   // The switch owns both halves of the audio layer. Turning it on is itself the
   // gesture the browser was waiting for, so the music may start on the same click.
@@ -114,10 +123,10 @@ export default function Landing() {
             <h1>{t('landing.h1a')}<br />{t('landing.h1b')}</h1>
             <p>{t('landing.sub')}</p>
             <div className="lp-ctas" ref={ctaRef}>
-              <button className="btn btn-primary btn-big" onClick={() => { cue('press'); setCreating(true); }}>
+              <button className="btn btn-primary btn-big" onClick={cta('hero', () => { cue('press'); setCreating(true); })}>
                 {t('landing.create')}
               </button>
-              <button className="btn btn-secondary btn-solid btn-big" onClick={() => setJoinOpen(true)}>
+              <button className="btn btn-secondary btn-solid btn-big" onClick={cta('join_hero', () => setJoinOpen(true))}>
                 {t('landing.joinCta')}
               </button>
             </div>
@@ -209,7 +218,7 @@ export default function Landing() {
           <h2>{t('close.title')}</h2>
           <p>{t('close.sub')}</p>
           <button className="btn btn-big" style={{ marginTop: 32, background: '#fffdf8', color: 'var(--color-text)' }}
-            onClick={() => { cue('press'); setCreating(true); }}>{t('landing.create')}</button>
+            onClick={cta('close', () => { cue('press'); setCreating(true); })}>{t('landing.create')}</button>
         </div>
       </section>
 
@@ -224,9 +233,9 @@ export default function Landing() {
           {!joinOpen ? (
             <div className="lp-bar-row">
               <button className="btn btn-primary" style={{ flex: 1, minHeight: 46 }}
-                onClick={() => { cue('press'); setCreating(true); }}>{t('landing.create')}</button>
+                onClick={cta('bar', () => { cue('press'); setCreating(true); })}>{t('landing.create')}</button>
               <button className="btn btn-secondary btn-solid" style={{ minHeight: 46 }}
-                onClick={() => setJoinOpen(true)}>{t('bar.join')}</button>
+                onClick={cta('join_bar', () => setJoinOpen(true))}>{t('bar.join')}</button>
             </div>
           ) : (
             <form onSubmit={(e) => { e.preventDefault(); go(); }}>

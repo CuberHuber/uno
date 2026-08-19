@@ -1,12 +1,13 @@
 import type { Server, Socket } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@uno/shared';
+import type { Analytics } from './analytics.js';
 import type { RoomStore } from './rooms.js';
 import type { ServerLimits } from './server.js';
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
 type Sock = Socket<ClientToServerEvents, ServerToClientEvents>;
 
-export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): void {
+export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, analytics?: Analytics): void {
   const broadcast = (code: string) => {
     const room = store.getRoom(code);
     if (!room) return;
@@ -25,11 +26,23 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): v
   };
 
   io.on('connection', (socket: Sock) => {
+    // First x-forwarded-for hop, so server-truth events stitch into the same
+    // Umami session the browser tracker creates behind the reverse proxy.
+    const fwd = socket.handshake.headers['x-forwarded-for'];
+    const visitor = {
+      ip: (Array.isArray(fwd) ? fwd[0] : fwd)?.split(',')[0]?.trim() || socket.handshake.address,
+      userAgent: socket.handshake.headers['user-agent'],
+    };
+    analytics?.sessionStarted(socket.id, visitor);
     const seatOf = () => socket.data as { code: string; seat: number; token: string };
 
     socket.on('joinRoom', (p, ack) => {
       const ip = socket.handshake.address;
-      if (!limits.join.allow(ip)) return ack({ ok: false, error: 'rate_limited' });
+      const refuse = (reason: string) => {
+        analytics?.joinFailed(p.code, reason, visitor);
+        ack({ ok: false, error: reason });
+      };
+      if (!limits.join.allow(ip)) return refuse('rate_limited');
       const existing = p.token ? store.resume(p.code, p.token) : { ok: false as const, error: '' };
       let joined;
       if (existing.ok) {
@@ -37,32 +50,53 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): v
       } else {
         // Wrong PINs burn a per-IP+room budget; a blocked key cools down a minute.
         const pinKey = `${ip}:${p.code.toUpperCase()}`;
-        if (limits.pin.blocked(pinKey)) return ack({ ok: false, error: 'rate_limited' });
+        if (limits.pin.blocked(pinKey)) return refuse('rate_limited');
         joined = store.join(p.code, p.name ?? 'Player', p.pin);
         if (!joined.ok && joined.error === 'wrong_pin') limits.pin.hit(pinKey);
       }
-      if (!joined.ok) return ack({ ok: false, error: joined.error });
+      if (!joined.ok) return refuse(joined.error);
       socket.data = { code: p.code, seat: joined.seat, token: joined.token };
       store.setConnection(p.code, joined.seat, socket.id);
       const room = store.getRoom(p.code)!;
+      if (!existing.ok) analytics?.playerJoined(room.code, joined.seat);
       ack({ ok: true, seat: joined.seat, token: joined.token, roomName: `${room.players[room.hostSeat]!.name}’s table` });
       broadcast(p.code);
     });
 
-    const handle = (fn: () => { ok: boolean; error?: string; effects?: never[] } | { ok: boolean; error?: string }) => {
+    const handle = (
+      fn: () => { ok: boolean; error?: string; effects?: never[] } | { ok: boolean; error?: string },
+      onOk?: () => void,
+    ) => {
       const { code } = seatOf();
       if (!code) return;
+      const room = store.getRoom(code);
+      const phaseBefore = room?.phase;
       const result = fn() as { ok: boolean; error?: string; effects?: never[] };
       if (!result.ok) {
+        analytics?.moveRejected(result.error ?? 'rejected');
         socket.emit('moveRejected', { reason: result.error ?? 'rejected' });
         return;
       }
+      // Rounds start and end only through phase flips, so watching the flip
+      // here covers startGame, rematch, the winning play, and continueWithout.
+      if (analytics && room && room.phase !== phaseBefore) {
+        if (room.phase === 'playing') {
+          if (phaseBefore === 'roundEnd') analytics.rematchStarted(room.code);
+          analytics.roundStarted(room.code, room.players.filter((pl) => !pl.left).length, visitor);
+        } else if (phaseBefore === 'playing' && room.phase === 'roundEnd') {
+          analytics.roundFinished(room.code, room.game?.winner ?? null, visitor);
+        }
+      }
+      onOk?.();
       emitEffects(code, result.effects);
       broadcast(code);
     };
 
     socket.on('startGame', () => handle(() => store.startGame(seatOf().code, seatOf().token)));
-    socket.on('setRules', (p) => handle(() => store.setRules(seatOf().code, seatOf().token, p.rules)));
+    socket.on('setRules', (p) => handle(
+      () => store.setRules(seatOf().code, seatOf().token, p.rules),
+      () => analytics?.rulesChanged(seatOf().code, p.rules),
+    ));
     socket.on('setPin', (p) => handle(() => store.setPin(seatOf().code, seatOf().token, p.pin)));
     socket.on('playCards', (p) => handle(() => store.act(seatOf().code, seatOf().token, { type: 'play', cardIds: p.cardIds, chosenColor: p.chosenColor })));
     socket.on('drawCard', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'draw' })));
@@ -71,10 +105,14 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits): v
     socket.on('callLastCard', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'callLastCard' })));
     socket.on('catchLastCard', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'catchLastCard' })));
     socket.on('rematch', () => handle(() => store.rematch(seatOf().code, seatOf().token)));
-    socket.on('continueWithout', (p) => handle(() => store.continueWithout(seatOf().code, seatOf().token, p.seat)));
+    socket.on('continueWithout', (p) => handle(
+      () => store.continueWithout(seatOf().code, seatOf().token, p.seat),
+      () => analytics?.playerKicked(seatOf().code, p.seat),
+    ));
 
     socket.on('disconnect', () => {
       const { code, seat } = seatOf();
+      analytics?.sessionEnded(socket.id, code ? { code, seat } : undefined);
       if (!code) return;
       store.setConnection(code, seat, null);
       broadcast(code);
