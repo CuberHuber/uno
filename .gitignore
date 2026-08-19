@@ -17,3 +17,10 @@ server/public/
 .gstack/
 # 0x flamegraph capture directories (npm run flame)
 *.0x/
+# Claude Code: agents and commands under .claude/ are versioned deliberately
+# (see docs/superpowers/specs/2026-08-19-devlog-pipeline-design.md), but the
+# personal permission list and the worktree checkouts are not.
+/.claude/settings.local.json
+/.claude/worktrees/
+# Local-only media plan: the repo is public, the content strategy is not.
+/docs/media-pilot*.md
