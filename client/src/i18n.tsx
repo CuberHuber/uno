@@ -123,6 +123,8 @@ const DICT = {
     'err.pin_required': 'This table asks for a PIN', 'err.wrong_pin': 'Wrong PIN — try again',
     'err.bad_pin': 'A PIN is exactly 4 digits', 'err.bad_stack': 'Those cards can’t go down together',
     'err.rate_limited': 'Too many attempts — wait a minute',
+    'err.create_failed': 'Could not create the room — try again',
+    'err.network': 'Network error — check the connection and try again',
   },
   ru: {
     'app.notFoundTitle': 'Стол не найден',
@@ -240,6 +242,8 @@ const DICT = {
     'err.pin_required': 'Стол просит PIN', 'err.wrong_pin': 'Неверный PIN — попробуй ещё',
     'err.bad_pin': 'PIN — это ровно 4 цифры', 'err.bad_stack': 'Эти карты нельзя сбросить вместе',
     'err.rate_limited': 'Слишком много попыток — подожди минуту',
+    'err.create_failed': 'Не получилось создать комнату — попробуй ещё раз',
+    'err.network': 'Ошибка сети — проверь соединение и попробуй снова',
   },
 } as const;
 
