@@ -1,11 +1,13 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { Counter, Histogram, type Registry } from 'prom-client';
 import type { Rules } from '@uno/shared';
+import type { UmamiSender, Visitor } from './umami.js';
 
 export interface AnalyticsOptions {
   now?: () => number;
   log?: FastifyBaseLogger;
   register?: Registry;
+  sendEvent?: UmamiSender;
 }
 
 /** Game telemetry with no in-app dashboard: every lifecycle event becomes a
@@ -15,8 +17,9 @@ export interface AnalyticsOptions {
 export class Analytics {
   private readonly now: () => number;
   private readonly log?: FastifyBaseLogger;
+  private readonly sendEvent?: UmamiSender;
 
-  private sessions = new Map<string, number>(); // socket id -> connect time
+  private sessions = new Map<string, { startedAt: number; visitor?: Visitor }>(); // by socket id
   private roundStartedAtMs = new Map<string, number>(); // room code -> deal time
 
   private prom?: {
@@ -29,6 +32,7 @@ export class Analytics {
   constructor(opts: AnalyticsOptions = {}) {
     this.now = opts.now ?? Date.now;
     this.log = opts.log;
+    this.sendEvent = opts.sendEvent;
     if (opts.register) {
       const registers = [opts.register];
       this.prom = {
@@ -56,17 +60,31 @@ export class Analytics {
     }
   }
 
-  sessionStarted(socketId: string): void {
-    this.sessions.set(socketId, this.now());
+  /** Fan a server-truth event out to Umami. The sender is fail-safe by
+   *  contract, but game paths must survive even a misbehaving one. */
+  private emit(name: string, data?: Record<string, unknown>, visitor?: Visitor): void {
+    try {
+      void Promise.resolve(this.sendEvent?.(name, data, visitor)).catch(() => {});
+    } catch {
+      // Telemetry must never break the game.
+    }
   }
 
-  sessionEnded(socketId: string): void {
-    const startedAt = this.sessions.get(socketId);
-    if (startedAt === undefined) return;
+  sessionStarted(socketId: string, visitor?: Visitor): void {
+    this.sessions.set(socketId, { startedAt: this.now(), visitor });
+  }
+
+  /** `at` binds the session to its table once the socket has joined one;
+   *  pre-join sockets pass nothing and the log line simply has no code/seat. */
+  sessionEnded(socketId: string, at?: { code: string; seat: number }): void {
+    const session = this.sessions.get(socketId);
+    if (session === undefined) return;
     this.sessions.delete(socketId);
-    const ms = this.now() - startedAt;
+    const ms = this.now() - session.startedAt;
+    const durationS = Math.round(ms / 1000);
     this.prom?.sessionSeconds.observe(ms / 1000);
-    this.log?.info({ evt: 'session_ended', durationS: Math.round(ms / 1000) }, 'session ended');
+    this.log?.info({ evt: 'session_ended', durationS, code: at?.code, seat: at?.seat }, 'session ended');
+    this.emit('session_ended', { durationS }, session.visitor);
   }
 
   roomCreated(code: string): void {
@@ -79,13 +97,15 @@ export class Analytics {
     this.log?.info({ evt: 'player_joined', code, seat }, 'player joined');
   }
 
-  roundStarted(code: string, seats: number): void {
+  roundStarted(code: string, seats: number, visitor?: Visitor): void {
     this.roundStartedAtMs.set(code, this.now());
     this.prom?.roundsStarted.inc();
     this.log?.info({ evt: 'round_started', code, seats }, 'round started');
+    // Umami event data carries no room codes — only sizes and durations.
+    this.emit('round_started', { seats }, visitor);
   }
 
-  roundFinished(code: string, winnerSeat: number | null): void {
+  roundFinished(code: string, winnerSeat: number | null, visitor?: Visitor): void {
     const startedAt = this.roundStartedAtMs.get(code);
     this.roundStartedAtMs.delete(code);
     this.prom?.roundsFinished.inc();
@@ -96,13 +116,15 @@ export class Analytics {
       durationS = Math.round(ms / 1000);
     }
     this.log?.info({ evt: 'round_finished', code, winnerSeat, durationS }, 'round finished');
+    this.emit('round_finished', durationS === null ? {} : { durationS }, visitor);
   }
 
   /** The entry funnel's dark side: wrong codes, PINs, full tables, limits.
    *  Was previously counted nowhere — not in logs, not in metrics. */
-  joinFailed(code: string, reason: string): void {
+  joinFailed(code: string, reason: string, visitor?: Visitor): void {
     this.prom?.joinsFailed.inc({ reason });
     this.log?.info({ evt: 'join_failed', code, reason }, 'join failed');
+    this.emit('join_failed', { reason }, visitor);
   }
 
   /** Rejected moves are frequent and benign (misclicks), so they count in

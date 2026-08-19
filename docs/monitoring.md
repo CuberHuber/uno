@@ -64,8 +64,10 @@ Configuration is runtime-first:
 |---|---|
 | `UMAMI_WEBSITE_ID` | Umami website ID from cloud.umami.is |
 | `UMAMI_SRC` | Only for self-hosted Umami; defaults to the cloud script |
+| `UMAMI_HOST` | Origin for server-side `POST /api/send` (e.g. `https://<UMAMI_HOST>`); falls back to the origin of `UMAMI_SRC` |
 | `UMAMI_DOMAINS` | Comma-separated hostnames Umami records (keeps localhost/preview noise out) |
-| `GA_GAME_KEY` / `GA_SECRET_KEY` | GameAnalytics keys (client-side by design) |
+| `GA_GAME_KEY` | GameAnalytics game key, served to the client |
+| `GA_SECRET_KEY` | GameAnalytics secret — server-side only, never served; the browser SDK posts through `POST /api/ga/*` and the relay re-signs |
 
 For local dev without the backend, `client/.env` (see `client/.env.example`)
   provides the same values at build time as a fallback.
@@ -92,9 +94,29 @@ A reconnect mid-round re-reports `round_started`;
 Fastify's built-in pino logger is enabled by the entrypoint,
   with room PINs, seat tokens, and auth headers redacted.
 Game events are structured lines:
-  `evt` is one of `room_created`, `player_joined`,
-  `round_started`, `round_finished`, `session_ended`.
+  `evt` is one of `room_created`, `player_joined`, `join_failed`,
+  `round_started`, `round_finished`, `session_ended`
+  (plus `rules_changed`, `rematch_started`, `player_kicked`, `move_rejected`).
+`session_ended` carries `code` and `seat` once the socket had joined a table.
 Per-request HTTP logging is deliberately off — the game lives on websockets.
+Uncaught route errors are logged with their stack;
+  the HTTP response is an opaque `{"error":"internal_error"}`.
+
+Server-truth events (`join_failed`, `round_started`, `round_finished`,
+  `session_ended`) are also sent to Umami via `POST /api/send`
+  with the player's ip/userAgent overrides (requires Umami ≥ 2.17),
+  so they land in the same Umami session as the player's pageviews.
+This needs `UMAMI_HOST` (or `UMAMI_SRC`) alongside `UMAMI_WEBSITE_ID`;
+  without them the sender is a silent no-op.
+Event data never contains room codes, nicknames, or IPs.
+
+The GameAnalytics relay (`server/src/ga-relay.ts`) accepts the browser SDK's
+  batches on `POST /api/ga/v2/<key>/events` and
+  `POST /api/ga/remote_configs/v1/init`,
+  re-signs the body with HMAC-SHA256(`GA_SECRET_KEY`),
+  and forwards to the GameAnalytics Collection API.
+It answers 202 and drops the batch when the collector is unreachable —
+  analytics never blocks or retries into the game.
 Read them in the Timeweb panel (app → Логи);
   they are also the durable history,
   since Prometheus counters reset on every deploy.

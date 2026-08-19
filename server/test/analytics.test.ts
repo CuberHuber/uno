@@ -1,6 +1,8 @@
 import { expect, test } from 'vitest';
+import type { FastifyBaseLogger } from 'fastify';
 import { Registry } from 'prom-client';
 import { Analytics } from '../src/analytics.js';
+import type { Visitor } from '../src/umami.js';
 
 async function metric(register: Registry, name: string): Promise<number | null> {
   const text = await register.metrics();
@@ -56,6 +58,59 @@ test('runs registry-less as a pure log source', () => {
   a.rematchStarted('AAAAA');
   a.playerKicked('AAAAA', 2);
   expect(a.activeSessions()).toBe(0);
+});
+
+test('session_ended binds to room and seat once the socket had joined', () => {
+  const lines: Record<string, unknown>[] = [];
+  const log = {
+    info: (o: object) => lines.push(o as Record<string, unknown>),
+    debug: () => {}, warn: () => {}, error: () => {},
+  } as unknown as FastifyBaseLogger;
+  const a = new Analytics({ now: () => 0, log });
+
+  a.sessionStarted('joined');
+  a.sessionEnded('joined', { code: 'AAAAA', seat: 2 });
+  expect(lines.find((l) => l.evt === 'session_ended')).toMatchObject({ code: 'AAAAA', seat: 2 });
+
+  // Pre-join sockets still end cleanly with no seat reference.
+  lines.length = 0;
+  a.sessionStarted('drive-by');
+  a.sessionEnded('drive-by');
+  expect(lines.find((l) => l.evt === 'session_ended')).toMatchObject({ durationS: 0 });
+});
+
+test('server-truth events fan out to the Umami sender with the visitor', () => {
+  const sent: [string, Record<string, unknown> | undefined, Visitor | undefined][] = [];
+  const a = new Analytics({
+    now: () => 0,
+    sendEvent: async (name, data, visitor) => { sent.push([name, data, visitor]); },
+  });
+  const visitor = { ip: '203.0.113.7', userAgent: 'UA' }; // RFC 5737 doc address
+
+  a.sessionStarted('s1', visitor);
+  a.joinFailed('AAAAA', 'wrong_pin', visitor);
+  a.roundStarted('AAAAA', 2, visitor);
+  a.roundFinished('AAAAA', 0, visitor);
+  a.sessionEnded('s1', { code: 'AAAAA', seat: 0 });
+
+  expect(sent.map(([name]) => name)).toEqual(['join_failed', 'round_started', 'round_finished', 'session_ended']);
+  expect(sent[0]![1]).toEqual({ reason: 'wrong_pin' });
+  expect(sent[1]![1]).toEqual({ seats: 2 });
+  expect(sent[2]![1]).toEqual({ durationS: 0 });
+  for (const [, , v] of sent) expect(v).toBe(visitor); // session_ended reuses the stored visitor
+  for (const [, data] of sent) expect(JSON.stringify(data ?? {})).not.toContain('AAAAA'); // no room codes leak
+});
+
+test('a rejecting sender never breaks a game path', () => {
+  const a = new Analytics({
+    now: () => 0,
+    sendEvent: () => Promise.reject(new Error('umami down')),
+  });
+  expect(() => {
+    a.joinFailed('AAAAA', 'no_such_room');
+    a.roundStarted('AAAAA', 2);
+    a.roundFinished('AAAAA', null);
+  }).not.toThrow();
 });
 
 test('failed joins and rejected moves count by reason', async () => {

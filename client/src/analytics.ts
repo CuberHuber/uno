@@ -5,7 +5,6 @@ interface RuntimeConf {
   umamiSrc?: string | null;
   umamiDomains?: string | null;
   gaGameKey?: string | null;
-  gaSecretKey?: string | null;
   appVersion?: string | null;
 }
 
@@ -30,7 +29,10 @@ const UMAMI_SRC = conf.umamiSrc || env.VITE_UMAMI_SRC || 'https://cloud.umami.is
 // keeps localhost and preview hosts out of the stats.
 const UMAMI_DOMAINS = conf.umamiDomains || env.VITE_UMAMI_DOMAINS;
 const GA_KEY = conf.gaGameKey || env.VITE_GA_GAME_KEY;
-const GA_SECRET = conf.gaSecretKey || env.VITE_GA_SECRET_KEY;
+// The GameAnalytics secret never travels through /config.js anymore: without
+// a local VITE_GA_SECRET_KEY (dev-only escape hatch for talking to the
+// collector directly) the SDK runs in relay mode via POST /api/ga/*.
+const GA_SECRET = env.VITE_GA_SECRET_KEY;
 const APP_VERSION = conf.appVersion || env.VITE_APP_VERSION || 'dev';
 
 // Custom-dimension vocabularies must be declared before initialize; GA drops
@@ -107,7 +109,7 @@ export function initAnalytics(): void {
       s.dataset.beforeSend = '__oeBeforeSend';
       document.head.appendChild(s);
     }
-    if (GA_KEY && GA_SECRET) {
+    if (GA_KEY) {
       void import('gameanalytics')
         .then((m) => {
           // Typings put the API on the default export, but at runtime the
@@ -119,15 +121,26 @@ export function initAnalytics(): void {
               GameAnalytics: GASdk;
               EGAErrorSeverity: Record<string, GaErrorSeverity>;
               EGAProgressionStatus: Record<string, GaProgression>;
+              http: { GAHTTPApi: { instance: { baseUrl: string; remoteConfigsBaseUrl: string } } };
             };
           }).gameanalytics;
           const sdk = ns.GameAnalytics;
+          if (!GA_SECRET) {
+            // Relay mode: point the SDK's transport at our own origin, where
+            // server/src/ga-relay.ts re-signs with the real GA_SECRET_KEY and
+            // forwards — adblock-proof, and no secret in any browser. The SDK
+            // insists on a 40-char secret at initialize, so it gets a
+            // placeholder; the signature it produces is ignored by the relay.
+            const api = ns.http.GAHTTPApi.instance;
+            api.baseUrl = '/api/ga/v2';
+            api.remoteConfigsBaseUrl = '/api/ga/remote_configs/v1';
+          }
           // Build + dimension vocabularies must precede initialize.
           sdk.configureBuild(APP_VERSION);
           sdk.configureAvailableCustomDimensions01(['host', 'guest']);
           sdk.configureAvailableCustomDimensions02(['mobile-web', 'desktop-web']);
           sdk.configureAvailableCustomDimensions03(RULE_PRESETS);
-          sdk.initialize(GA_KEY, GA_SECRET);
+          sdk.initialize(GA_KEY, GA_SECRET || '0'.repeat(40));
           ga = sdk;
           gaSeverities = ns.EGAErrorSeverity;
           gaProgressions = ns.EGAProgressionStatus;
