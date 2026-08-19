@@ -15,6 +15,8 @@ server/public/
 # off GitHub. Entries are mirrored to issues only after explicit approval.
 /docs/backlog*.md
 .gstack/
+# Seam previews from tools/make-music-loop.sh — for listening, never for shipping.
+.audio-preview/
 # 0x flamegraph capture directories (npm run flame)
 *.0x/
 # Claude Code: agents and commands under .claude/ are versioned deliberately

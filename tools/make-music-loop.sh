@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Turn the background track into something that can actually loop.
+#
+#   bash tools/make-music-loop.sh [path/to/sound.mp3]
+#
+# The delivered master is a piece of music, not a loop, and measuring it says so:
+#
+#   * it ends with 0.98 s of digital silence (151.238 s -> 152.216 s);
+#   * the first 8 s average -20.1 dB, the last 12 s average -10.7 dB and peak -0.1;
+#
+# so playing it on repeat gives a loud finish, a full second of nothing, then a quiet
+# intro. That is not a seam, it is an audible restart every two and a half minutes.
+#
+# Until a properly written loop arrives (see design/audio-spec.md), this makes the best
+# loop available from what we have: trim the dead air, then wrap the tail into the head
+# with a crossfade. The join becomes continuous by construction — the output starts on
+# the very sample the output ends on — and the level change is spread over four seconds
+# instead of happening between two samples.
+#
+# It also writes two 8-second previews of just the join, before and after, so the seam
+# can be judged by ear without sitting through the track.
+set -euo pipefail
+
+SRC="${1:-sound.mp3}"
+OUT="client/public/audio"
+# Deliberately NOT under client/public: the previews are for judging the seam by ear,
+# and anything under public/ ships to production.
+PREVIEW="${PREVIEW_DIR:-.audio-preview}"
+
+# Where the loop starts. NOT the top of the track: the first 14 s are an intro at
+# about -19 dB, while everything from 14 s to the end sits at -10 dB. Looping from the
+# top would slide 9 dB down and back up every couple of minutes. Starting at 14 s makes
+# both sides of the join the same loudness, at the cost of an intro that would have
+# played once. A quiet 14-second intro is not worth a seam heard every two minutes —
+# if a real intro is wanted, it is a separate file and a code change (design/audio-spec.md).
+LOOP_IN=14.0
+TAIL=151.238      # where the trailing silence starts, from silencedetect
+XFADE=4           # seconds of crossfade wrapping the tail into the loop-in point
+BITRATE=96k       # 3.65 MB of 192 kbps MP3 comes down to about 1.7 MB here
+
+# The master arrives at -10.8 LUFS with peaks touching 0.0 dBFS: mastered to be
+# listened to, not to be sat under a game. At that level the bed came out LOUDER
+# than most of the event cues — the round-end cue measured 3 dB below the music it
+# is supposed to ring out over — and 0 dBFS leaves the AAC encoder no room for
+# intersample overshoot. So the loop is brought down to a bed level by plain gain:
+# no compression, no limiting, nothing that changes the music itself. -1 dBTP is
+# the headroom the spec asks of the composer; the rest of the distance down to the
+# cues is made up by MUSIC_LEVEL in client/src/sound.ts.
+TARGET_I=-20      # LUFS integrated
+TARGET_TP=-1      # dBTP true peak
+
+command -v ffmpeg >/dev/null || { echo "ffmpeg not found" >&2; exit 1; }
+[ -f "$SRC" ] || { echo "no music at $SRC" >&2; exit 1; }
+mkdir -p "$OUT" "$PREVIEW"
+
+BODY_END=$(echo "$TAIL - $XFADE" | bc)
+HEAD_END=$(echo "$LOOP_IN + $XFADE" | bc)
+
+# seam = last XFADE seconds fading out over the first XFADE seconds fading in;
+# body  = everything between. Output length is (TAIL - HEAD) - XFADE.
+loop_fc="[0:a]atrim=start=${BODY_END}:end=${TAIL},asetpts=PTS-STARTPTS,afade=t=out:st=0:d=${XFADE}[tail];\
+[0:a]atrim=start=${LOOP_IN}:end=${HEAD_END},asetpts=PTS-STARTPTS,afade=t=in:st=0:d=${XFADE}[head];\
+[tail][head]amix=inputs=2:normalize=0[seam];\
+[0:a]atrim=start=${HEAD_END}:end=${BODY_END},asetpts=PTS-STARTPTS[body];\
+[seam][body]concat=n=2:v=0:a=1[out]"
+
+# Measure the assembled loop, then apply one gain to it. Two passes rather than
+# ffmpeg's own loudnorm in one: loudnorm in single-pass mode is a dynamics
+# processor, and a bed that breathes against the cues is worse than a loud one.
+echo "measuring the assembled loop"
+measured=$(ffmpeg -nostdin -v info -i "$SRC" \
+  -filter_complex "${loop_fc};[out]loudnorm=I=${TARGET_I}:TP=${TARGET_TP}:print_format=json[m]" \
+  -map "[m]" -f null - 2>&1)
+read_json () { echo "$measured" | grep "\"$1\"" | sed 's/.*: *"\{0,1\}\([-0-9.]*\)"\{0,1\},\{0,1\}/\1/'; }
+in_i=$(read_json input_i)
+in_tp=$(read_json input_tp)
+[ -n "$in_i" ] && [ -n "$in_tp" ] || { echo "could not measure the loop" >&2; exit 1; }
+
+# Whichever constraint binds first — loudness or true peak — wins.
+gain_i=$(echo "$TARGET_I - ($in_i)" | bc -l)
+gain_tp=$(echo "$TARGET_TP - ($in_tp)" | bc -l)
+GAIN=$(echo "if ($gain_i < $gain_tp) $gain_i else $gain_tp" | bc -l)
+printf "  measured %s LUFS, %s dBTP -> applying %.2f dB\n" "$in_i" "$in_tp" "$GAIN"
+
+echo "building the looped master"
+ffmpeg -nostdin -v error -i "$SRC" \
+  -filter_complex "${loop_fc};[out]volume=${GAIN}dB[lvl]" -map "[lvl]" \
+  -c:a aac -b:a "$BITRATE" -movflags +faststart -y "$OUT/table.m4a"
+
+# --- previews of the join ----------------------------------------------------
+# Four seconds either side of the wrap, so the ear hears only what matters.
+seam_of () {  # seam_of <file> <out> — end of the file followed by its beginning
+  local f="$1" o="$2" dur from
+  dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$f")
+  from=$(echo "$dur - 4" | bc)
+  ffmpeg -nostdin -v error -ss "$from" -i "$f" -t 4 -c:a aac -b:a "$BITRATE" -y "$PREVIEW/.a.m4a"
+  ffmpeg -nostdin -v error -t 4 -i "$f" -c:a aac -b:a "$BITRATE" -y "$PREVIEW/.b.m4a"
+  ffmpeg -nostdin -v error -i "$PREVIEW/.a.m4a" -i "$PREVIEW/.b.m4a" \
+    -filter_complex "[0:a][1:a]concat=n=2:v=0:a=1[o]" -map "[o]" \
+    -c:a aac -b:a "$BITRATE" -y "$o"
+  rm -f "$PREVIEW/.a.m4a" "$PREVIEW/.b.m4a"
+}
+
+echo "rendering seam previews"
+ffmpeg -nostdin -v error -i "$SRC" -c:a aac -b:a "$BITRATE" -y "$PREVIEW/.src.m4a"
+seam_of "$PREVIEW/.src.m4a" "$PREVIEW/seam-before.m4a"
+seam_of "$OUT/table.m4a" "$PREVIEW/seam-after.m4a"
+rm -f "$PREVIEW/.src.m4a"
+
+echo
+ls -la "$OUT" "$PREVIEW"

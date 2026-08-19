@@ -6,6 +6,7 @@ import { isPlayable, type Card, type Color, type Effect, type RoomStateView } fr
 import { track } from '../analytics';
 import HelpSheet from '../components/HelpSheet';
 import PauseOverlay from '../components/PauseOverlay';
+import { cue } from '../sound';
 import RulesSlide, { hasSeenSlide, markSlideSeen } from './RulesSlide';
 import { useT, type MsgKey } from '../i18n';
 import { useStore } from '../store';
@@ -139,6 +140,12 @@ export default function Table() {
 
     if (effect.type === 'played') {
       const last = effect.cards.at(-1)!;
+      // One voice per kind of card. A number is the everyday sound and must never
+      // tire; an action is sharper; a wild announces itself. The +4 keeps quiet here
+      // and slams below, on the beat where the card actually lands.
+      if (last.value !== 'wild4') {
+        cue(last.value === 'wild' ? 'wild' : isNumberCard(last) ? 'play' : 'action');
+      }
       if (effect.seat !== v.yourSeat) {
         for (const c of effect.cards.slice(0, 3)) enqueue({ kind: 'fly', slot: slotOfSeat(effect.seat), card: c });
       } else if (!effect.cards.some((c) => leavingRef.current.has(c.id))) {
@@ -152,7 +159,7 @@ export default function Table() {
       if (last.value === 'wild4') {
         // the +4 slam, timed to the card's landing: table quake + shadow scatter
         setTimeout(() => {
-          quake(); buzz([70, 40, 90]);
+          quake(); buzz([70, 40, 90]); cue('slam');
           setScatter(true);
           setTimeout(() => setScatter(false), 2200);
         }, 550);
@@ -175,8 +182,10 @@ export default function Table() {
         const heavy = effect.count >= 8;
         setBig({ text: `+${effect.count}` });
         if (heavy) quake();
-        buzz(heavy ? [80, 50, 120] : 80);
+        buzz(heavy ? [80, 50, 120] : 80); cue('penalty');
         setTimeout(() => setBig(null), 900);
+      } else {
+        cue('draw');
       }
       if (effect.seat !== v.yourSeat) {
         const slot = slotOfSeat(effect.seat);
@@ -192,9 +201,12 @@ export default function Table() {
       }
     } else if (effect.type === 'called') {
       showToast(t('t.called', { name: nameOf(effect.seat) }));
+      cue('uno');
     } else if (effect.type === 'caught') {
       showToast(t('t.caught', { name: nameOf(effect.seat) }));
-      buzz(100);
+      buzz(100); cue('caught');
+    } else if (effect.type === 'win') {
+      cue('win');
     }
   }, [effect]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -206,7 +218,7 @@ export default function Table() {
       setShakeId(lastTry.current[0] ?? null);
       setTimeout(() => setShakeId(null), 550);
     }
-    buzz(40);
+    buzz(40); cue('reject');
     showToast(terr(rejection));
   }, [rejection]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -278,7 +290,7 @@ export default function Table() {
   const prevTurn = useRef<number | null>(null);
   useEffect(() => {
     const t = view?.turnSeat ?? null;
-    if (t !== prevTurn.current && t === view?.yourSeat) buzz(30);
+    if (t !== prevTurn.current && t === view?.yourSeat) { buzz(30); cue('turn'); }
     prevTurn.current = t;
   }, [view?.turnSeat]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -350,7 +362,7 @@ export default function Table() {
 
   const shake = (id: number) => {
     setShakeId(id);
-    buzz(40);
+    buzz(40); cue('reject');
     setTimeout(() => setShakeId(null), 550);
   };
 
@@ -615,7 +627,7 @@ export default function Table() {
             anim="ob-flip .8s ease-in-out both"
             onDone={() => {
               setReFly(null);
-              setShuffling(true);
+              setShuffling(true); cue('shuffle');
               setTimeout(() => setShuffling(false), 1000);
             }}>
             <div style={{
