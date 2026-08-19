@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RULES_CATALOG, sanitizeRules, type Rules } from '@uno/shared';
-import { track } from '../analytics';
+import { rulesPreset, track } from '../analytics';
 import { reportError } from '../errors';
 import RuleRow from '../components/RuleRow';
 import { useT } from '../i18n';
@@ -34,7 +34,7 @@ export default function HostLink() {
         return;
       }
       const body = (await res.json()) as { code: string };
-      track('room_created');
+      track('room_created', { pin: pin !== '', preset: rulesPreset(rules) });
       setCode(body.code);
     } catch (e) {
       setCreateError('network');
@@ -88,7 +88,10 @@ export default function HostLink() {
           {RULES_CATALOG.map((r) => (
             <RuleRow key={r.id} name={r.title[locale]} desc={r.tagline[locale]}
               details={r.details[locale]} on={rules[r.id]}
-              onToggle={() => setRules({ ...rules, [r.id]: !rules[r.id] })} />
+              onToggle={() => {
+                track('rules_toggle', { rule: r.id, on: !rules[r.id], where: 'create' });
+                setRules({ ...rules, [r.id]: !rules[r.id] });
+              }} />
           ))}
         </div>
         <div className="host-divider" />

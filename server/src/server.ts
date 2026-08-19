@@ -73,6 +73,8 @@ export async function buildServer(
       umamiDomains: process.env.UMAMI_DOMAINS ?? null,
       gaGameKey: process.env.GA_GAME_KEY ?? null,
       gaSecretKey: process.env.GA_SECRET_KEY ?? null,
+      // Feeds GameAnalytics configureBuild, so dashboards can compare deploys.
+      appVersion: process.env.APP_VERSION ?? null,
     };
     reply.type('application/javascript').header('cache-control', 'no-store');
     return `window.__OE_CONF=${JSON.stringify(conf)};`;

@@ -31,7 +31,11 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, an
 
     socket.on('joinRoom', (p, ack) => {
       const ip = socket.handshake.address;
-      if (!limits.join.allow(ip)) return ack({ ok: false, error: 'rate_limited' });
+      const refuse = (reason: string) => {
+        analytics?.joinFailed(p.code, reason);
+        ack({ ok: false, error: reason });
+      };
+      if (!limits.join.allow(ip)) return refuse('rate_limited');
       const existing = p.token ? store.resume(p.code, p.token) : { ok: false as const, error: '' };
       let joined;
       if (existing.ok) {
@@ -39,11 +43,11 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, an
       } else {
         // Wrong PINs burn a per-IP+room budget; a blocked key cools down a minute.
         const pinKey = `${ip}:${p.code.toUpperCase()}`;
-        if (limits.pin.blocked(pinKey)) return ack({ ok: false, error: 'rate_limited' });
+        if (limits.pin.blocked(pinKey)) return refuse('rate_limited');
         joined = store.join(p.code, p.name ?? 'Player', p.pin);
         if (!joined.ok && joined.error === 'wrong_pin') limits.pin.hit(pinKey);
       }
-      if (!joined.ok) return ack({ ok: false, error: joined.error });
+      if (!joined.ok) return refuse(joined.error);
       socket.data = { code: p.code, seat: joined.seat, token: joined.token };
       store.setConnection(p.code, joined.seat, socket.id);
       const room = store.getRoom(p.code)!;
@@ -52,13 +56,17 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, an
       broadcast(p.code);
     });
 
-    const handle = (fn: () => { ok: boolean; error?: string; effects?: never[] } | { ok: boolean; error?: string }) => {
+    const handle = (
+      fn: () => { ok: boolean; error?: string; effects?: never[] } | { ok: boolean; error?: string },
+      onOk?: () => void,
+    ) => {
       const { code } = seatOf();
       if (!code) return;
       const room = store.getRoom(code);
       const phaseBefore = room?.phase;
       const result = fn() as { ok: boolean; error?: string; effects?: never[] };
       if (!result.ok) {
+        analytics?.moveRejected(result.error ?? 'rejected');
         socket.emit('moveRejected', { reason: result.error ?? 'rejected' });
         return;
       }
@@ -66,17 +74,22 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, an
       // here covers startGame, rematch, the winning play, and continueWithout.
       if (analytics && room && room.phase !== phaseBefore) {
         if (room.phase === 'playing') {
+          if (phaseBefore === 'roundEnd') analytics.rematchStarted(room.code);
           analytics.roundStarted(room.code, room.players.filter((pl) => !pl.left).length);
         } else if (phaseBefore === 'playing' && room.phase === 'roundEnd') {
           analytics.roundFinished(room.code, room.game?.winner ?? null);
         }
       }
+      onOk?.();
       emitEffects(code, result.effects);
       broadcast(code);
     };
 
     socket.on('startGame', () => handle(() => store.startGame(seatOf().code, seatOf().token)));
-    socket.on('setRules', (p) => handle(() => store.setRules(seatOf().code, seatOf().token, p.rules)));
+    socket.on('setRules', (p) => handle(
+      () => store.setRules(seatOf().code, seatOf().token, p.rules),
+      () => analytics?.rulesChanged(seatOf().code, p.rules),
+    ));
     socket.on('setPin', (p) => handle(() => store.setPin(seatOf().code, seatOf().token, p.pin)));
     socket.on('playCards', (p) => handle(() => store.act(seatOf().code, seatOf().token, { type: 'play', cardIds: p.cardIds, chosenColor: p.chosenColor })));
     socket.on('drawCard', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'draw' })));
@@ -85,7 +98,10 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, an
     socket.on('callLastCard', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'callLastCard' })));
     socket.on('catchLastCard', () => handle(() => store.act(seatOf().code, seatOf().token, { type: 'catchLastCard' })));
     socket.on('rematch', () => handle(() => store.rematch(seatOf().code, seatOf().token)));
-    socket.on('continueWithout', (p) => handle(() => store.continueWithout(seatOf().code, seatOf().token, p.seat)));
+    socket.on('continueWithout', (p) => handle(
+      () => store.continueWithout(seatOf().code, seatOf().token, p.seat),
+      () => analytics?.playerKicked(seatOf().code, p.seat),
+    ));
 
     socket.on('disconnect', () => {
       analytics?.sessionEnded(socket.id);

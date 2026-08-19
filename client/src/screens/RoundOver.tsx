@@ -1,3 +1,4 @@
+import { track } from '../analytics';
 import { useT } from '../i18n';
 import { useStore } from '../store';
 import { initialOf, roundsPlayed, seatColor } from '../ui';
@@ -37,7 +38,11 @@ export default function RoundOver() {
       </div>
       <div className="hand-actions">
         <a className="btn btn-secondary btn-solid btn-big" href="/">{t('over.leave')}</a>
-        <button className="btn btn-primary btn-big" onClick={actions.rematch}>{t('over.again')}</button>
+        <button className="btn btn-primary btn-big" onClick={() => {
+          // The B-002 KPI ("rooms with more than one game") hangs off this event.
+          track('rematch', { game: roundsPlayed(view.winTally) + 1 });
+          actions.rematch();
+        }}>{t('over.again')}</button>
       </div>
     </main>
   );
