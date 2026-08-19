@@ -80,21 +80,29 @@
 
 ### Task 0.2: Аккаунты и env в панели (руками пользователя, чеклист)
 
-- [ ] **Step 1:** создать сайт в self-hosted Umami → получить website ID.
-- [ ] **Step 2:** создать игру в GameAnalytics → получить game key и secret key.
-- [ ] **Step 3:** прописать в панели Timeweb:
+> **Выполнено:** env применены в панели (вторая попытка сохранения —
+>   панель требует правку Deploy Configuration; сохранение = полный редеплой).
+
+- [x] **Step 1:** создать сайт в self-hosted Umami → получить website ID.
+- [x] **Step 2:** создать игру в GameAnalytics → получить game key и secret key.
+- [x] **Step 3:** прописать в панели Timeweb:
   `UMAMI_WEBSITE_ID`, `UMAMI_SRC`, `UMAMI_DOMAINS` (только прод-домен),
   `GA_GAME_KEY`, `GA_SECRET_KEY`, `LOG_LEVEL=info`.
-- [ ] **Step 4:** проверить версию инсталляции Umami:
+- [x] **Step 4:** проверить версию инсталляции Umami:
   минимум 2.17 (для серверной отправки), рекомендуется 2.19/2.20.x.
 
 ### Task 0.3: Проверка прода после деплоя
 
-- [ ] **Step 1:** `curl https://<домен>/config.js` — отдаёт значения, не пустоту.
-- [ ] **Step 2:** `curl https://<домен>/healthz` — JSON со счётчиками комнат.
-- [ ] **Step 3:** открыть сайт — в Umami Realtime появился визит;
+> **Выполнено, проверено браузерным пробом на проде:** Umami script 200
+>   и `/api/send` 200 (pageview записан), GameAnalytics init 201 / events 200,
+>   `/healthz` JSON, `/metrics` — 28 серий `ochre_*`.
+> Перенесено в этап 6: health-check path в панели и Grafana-scrape.
+
+- [x] **Step 1:** `curl https://<домен>/config.js` — отдаёт значения, не пустоту.
+- [x] **Step 2:** `curl https://<домен>/healthz` — JSON со счётчиками комнат.
+- [x] **Step 3:** открыть сайт — в Umami Realtime появился визит;
   в GameAnalytics (Live feed) появилась сессия.
-- [ ] **Step 4:** убедиться, что `fly.toml` удалён из main (ветка это делает).
+- [x] **Step 4:** убедиться, что `fly.toml` удалён из main (ветка это делает).
 
 **Критерий приёмки этапа:** прод шлёт pageview и сессии; `/healthz` и `/metrics` живые.
 
