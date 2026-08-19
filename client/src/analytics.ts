@@ -1,14 +1,18 @@
+import type { Rules } from '@uno/shared';
+
 interface RuntimeConf {
   umamiWebsiteId?: string | null;
   umamiSrc?: string | null;
   umamiDomains?: string | null;
   gaGameKey?: string | null;
   gaSecretKey?: string | null;
+  appVersion?: string | null;
 }
 
 declare global {
   interface Window {
     __OE_CONF?: RuntimeConf;
+    __oeBeforeSend?: (type: string, payload: Record<string, unknown>) => Record<string, unknown>;
     umami?: { track: (name: string, data?: Record<string, unknown>) => void };
   }
 }
@@ -27,15 +31,56 @@ const UMAMI_SRC = conf.umamiSrc || env.VITE_UMAMI_SRC || 'https://cloud.umami.is
 const UMAMI_DOMAINS = conf.umamiDomains || env.VITE_UMAMI_DOMAINS;
 const GA_KEY = conf.gaGameKey || env.VITE_GA_GAME_KEY;
 const GA_SECRET = conf.gaSecretKey || env.VITE_GA_SECRET_KEY;
+const APP_VERSION = conf.appVersion || env.VITE_APP_VERSION || 'dev';
+
+// Custom-dimension vocabularies must be declared before initialize; GA drops
+// values that are not on the declared list. Rule presets are encoded as a
+// 4-bit mask over RULE_ORDER ('classic' for all-off): 16 values, under GA's
+// 20-per-dimension cap and immune to rule renaming.
+const RULE_ORDER = ['stacking', 'forcePlay', 'drawToMatch', 'multiDiscard'] as const;
+const RULE_PRESETS = Array.from({ length: 16 }, (_, i) => {
+  const bits = i.toString(2).padStart(4, '0');
+  return bits === '0000' ? 'classic' : `r${bits}`;
+});
+
+/** Low-cardinality encoding of a house-rules combination (see RULE_ORDER). */
+export function rulesPreset(rules: Rules): string {
+  const bits = RULE_ORDER.map((k) => (rules[k] ? '1' : '0')).join('');
+  return bits === '0000' ? 'classic' : `r${bits}`;
+}
 
 // Set once the SDK chunk loads; the dynamic import keeps ~50 KB of
 // GameAnalytics out of the game bundle when no keys are configured.
 type GASdk = (typeof import('gameanalytics'))['default'];
 type GaErrorSeverity = Parameters<GASdk['addErrorEvent']>[0];
+type GaProgression = Parameters<GASdk['addProgressionEvent']>[0];
 let ga: GASdk | null = null;
 let gaSeverities: Record<string, GaErrorSeverity> | null = null;
+let gaProgressions: Record<string, GaProgression> | null = null;
 
 export type GaSeverity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
+
+// Dimensions may become known (role: after seating; rules: at deal) before
+// the lazy GA chunk finishes loading — buffer them and flush after init.
+const dims: { role?: string; form?: string; rules?: string } = {};
+function applyDims(): void {
+  if (!ga) return;
+  if (dims.role) ga.setCustomDimension01(dims.role);
+  if (dims.form) ga.setCustomDimension02(dims.form);
+  if (dims.rules) ga.setCustomDimension03(dims.rules);
+}
+
+/** Segment the session for GA cohorts: host/guest and the rules preset.
+ *  Form factor is set automatically at init. Safe to call repeatedly. */
+export function setAnalyticsDimensions(d: { role?: 'host' | 'guest'; rules?: Rules }): void {
+  try {
+    if (d.role) dims.role = d.role;
+    if (d.rules) dims.rules = rulesPreset(d.rules);
+    applyDims();
+  } catch {
+    // Analytics must never break the game.
+  }
+}
 
 /** Boot whichever external analytics are configured at build time.
  *  Umami (open-source, cookie-less) counts visits/uniques/pageviews on its
@@ -44,11 +89,22 @@ export type GaSeverity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 export function initAnalytics(): void {
   try {
     if (UMAMI_ID) {
+      // Room codes must not become distinct "pages": normalize /r/CODE before
+      // any payload leaves the tracker (Umami 2.18+ data-before-send).
+      const roomPath = /\/r\/[A-Za-z0-9-]+/g;
+      window.__oeBeforeSend = (_type, payload) => {
+        for (const k of ['url', 'referrer'] as const) {
+          const v = payload[k];
+          if (typeof v === 'string') payload[k] = v.replace(roomPath, '/r/:code');
+        }
+        return payload;
+      };
       const s = document.createElement('script');
       s.defer = true;
       s.src = UMAMI_SRC;
       s.dataset.websiteId = UMAMI_ID;
       if (UMAMI_DOMAINS) s.dataset.domains = UMAMI_DOMAINS;
+      s.dataset.beforeSend = '__oeBeforeSend';
       document.head.appendChild(s);
     }
     if (GA_KEY && GA_SECRET) {
@@ -59,11 +115,24 @@ export function initAnalytics(): void {
           // class sits on m.gameanalytics.GameAnalytics (verified in-browser).
           // The cast bridges that typings/runtime mismatch.
           const ns = (m as unknown as {
-            gameanalytics: { GameAnalytics: GASdk; EGAErrorSeverity: Record<string, GaErrorSeverity> };
+            gameanalytics: {
+              GameAnalytics: GASdk;
+              EGAErrorSeverity: Record<string, GaErrorSeverity>;
+              EGAProgressionStatus: Record<string, GaProgression>;
+            };
           }).gameanalytics;
-          ns.GameAnalytics.initialize(GA_KEY, GA_SECRET);
-          ga = ns.GameAnalytics;
+          const sdk = ns.GameAnalytics;
+          // Build + dimension vocabularies must precede initialize.
+          sdk.configureBuild(APP_VERSION);
+          sdk.configureAvailableCustomDimensions01(['host', 'guest']);
+          sdk.configureAvailableCustomDimensions02(['mobile-web', 'desktop-web']);
+          sdk.configureAvailableCustomDimensions03(RULE_PRESETS);
+          sdk.initialize(GA_KEY, GA_SECRET);
+          ga = sdk;
           gaSeverities = ns.EGAErrorSeverity;
+          gaProgressions = ns.EGAProgressionStatus;
+          dims.form = window.matchMedia('(pointer: coarse)').matches ? 'mobile-web' : 'desktop-web';
+          applyDims();
         })
         .catch((e) => console.warn('[analytics] GameAnalytics SDK failed to load', e));
     }
@@ -72,11 +141,35 @@ export function initAnalytics(): void {
   }
 }
 
-/** Fan one game event out to every configured service. */
+/** Fan one game event out to every configured service. A numeric `value`
+ *  in data also becomes the GameAnalytics design-event value (count/sum/mean
+ *  in their dashboards); everything else is Umami-only event data. */
 export function track(name: string, data?: Record<string, string | number | boolean>): void {
   try {
     window.umami?.track(name, data);
-    ga?.addDesignEvent(`game:${name}`);
+    if (typeof data?.value === 'number') ga?.addDesignEvent(`game:${name}`, data.value);
+    else ga?.addDesignEvent(`game:${name}`);
+  } catch {
+    // Analytics must never break the game.
+  }
+}
+
+/** Round progression for the GameAnalytics Progression dashboard: one
+ *  progression type only (rounds), per the taxonomy — Start at deal,
+ *  Complete for the winner (score = points when known), Fail for the rest.
+ *  mode: classic|house, bucket: 2p|3-4p — never codes or exact counts. */
+export function trackProgression(
+  status: 'Start' | 'Complete' | 'Fail',
+  mode: string,
+  bucket: string,
+  score?: number,
+): void {
+  try {
+    if (!ga || !gaProgressions) return;
+    const st = gaProgressions[status];
+    if (st === undefined) return;
+    if (score === undefined) ga.addProgressionEvent(st, 'round', mode, bucket);
+    else ga.addProgressionEvent(st, 'round', mode, bucket, score);
   } catch {
     // Analytics must never break the game.
   }

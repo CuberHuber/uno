@@ -3,6 +3,7 @@
 // The server stays authoritative; effects and view diffs drive the choreography.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isPlayable, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
+import { track } from '../analytics';
 import HelpSheet from '../components/HelpSheet';
 import PauseOverlay from '../components/PauseOverlay';
 import RulesSlide, { hasSeenSlide, markSlideSeen } from './RulesSlide';
@@ -291,6 +292,7 @@ export default function Table() {
   }, [roomCode]);
   useEffect(() => {
     if (!slideOpen || !view || view.turnSeat !== view.yourSeat) return;
+    track('slide_viewed', { closedBy: 'turn' }); // auto-closed: reader may not have finished
     markSlideSeen(roomCode);
     setSlideOpen(false);
   }, [slideOpen, roomCode, view?.turnSeat, view?.yourSeat]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -852,7 +854,7 @@ export default function Table() {
               it opens nothing until it is asked to. */}
           <button type="button" className="btn btn-ghost ghost-pill"
             aria-label={t('rules.helpOpen')} title={t('rules.helpOpen')}
-            onClick={() => setHelpOpen(true)}>?</button>
+            onClick={() => { track('help_open'); setHelpOpen(true); }}>?</button>
         </div>
         <a className="btn btn-ghost ghost-pill" href="/"
           style={{ position: 'absolute', right: L.ngR, top: L.ngT, zIndex: 45 }}>
@@ -866,7 +868,11 @@ export default function Table() {
           screen, but nobody has yet been shown how the base game runs. */}
       {slideOpen && (
         <RulesSlide rules={view.rules}
-          onDismiss={() => { markSlideSeen(roomCode); setSlideOpen(false); }} />
+          onDismiss={() => {
+            track('slide_viewed', { closedBy: 'button' });
+            markSlideSeen(roomCode);
+            setSlideOpen(false);
+          }} />
       )}
       <PauseOverlay />
     </main>
