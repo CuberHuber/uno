@@ -124,6 +124,19 @@ export class Analytics {
     this.log?.info({ evt: 'player_kicked', code, seat }, 'player kicked after grace');
   }
 
+  /** Rooms die silently in the sweep; a room swept mid-round would otherwise
+   *  leave its deal timestamp in the Map forever. Routine housekeeping, so it
+   *  logs at debug like moveRejected. */
+  roomClosed(code: string): void {
+    const droppedOpenRound = this.roundStartedAtMs.delete(code);
+    this.log?.debug({ evt: 'room_closed', code, droppedOpenRound }, 'room closed');
+  }
+
+  /** Read-only seam (like activeSessions) so tests can prove swept rooms leak nothing. */
+  hasOpenRound(code: string): boolean {
+    return this.roundStartedAtMs.has(code);
+  }
+
   activeSessions(): number {
     return this.sessions.size;
   }

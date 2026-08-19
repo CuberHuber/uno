@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { Registry } from 'prom-client';
 import { Analytics } from '../src/analytics.js';
+import { RoomStore } from '../src/rooms.js';
 
 async function metric(register: Registry, name: string): Promise<number | null> {
   const text = await register.metrics();
@@ -55,7 +56,37 @@ test('runs registry-less as a pure log source', () => {
   a.rulesChanged('AAAAA', { stacking: true, forcePlay: false, drawToMatch: false, multiDiscard: false });
   a.rematchStarted('AAAAA');
   a.playerKicked('AAAAA', 2);
+  a.roomClosed('AAAAA');
   expect(a.activeSessions()).toBe(0);
+});
+
+test('a room swept mid-round leaves no deal timestamp behind', () => {
+  let clock = 0;
+  const store = new RoomStore(() => clock);
+  const a = new Analytics({ now: () => clock });
+  const doomed = store.createRoom();
+  const kept = store.createRoom();
+  store.join(kept.code, 'Mira');
+  store.setConnection(kept.code, 0, 'sock-1'); // connected player → survives the sweep
+
+  a.roundStarted(doomed.code, 2);
+  a.roundStarted(kept.code, 2);
+  expect(a.hasOpenRound(doomed.code)).toBe(true);
+
+  clock = 11 * 60_000; // past the empty-room TTL
+  store.sweep((code) => a.roomClosed(code));
+
+  expect(store.getRoom(doomed.code)).toBeUndefined();
+  expect(a.hasOpenRound(doomed.code)).toBe(false); // entry must not outlive its room
+  expect(a.hasOpenRound(kept.code)).toBe(true); // live rooms keep their deal timer
+});
+
+test('roomClosed on a room without an open round is a safe no-op', () => {
+  const a = new Analytics({ now: () => 0 });
+  a.roundStarted('AAAAA', 2);
+  a.roomClosed('CCCCC'); // never dealt — nothing to drop
+  expect(a.hasOpenRound('AAAAA')).toBe(true);
+  expect(a.hasOpenRound('CCCCC')).toBe(false);
 });
 
 test('failed joins and rejected moves count by reason', async () => {

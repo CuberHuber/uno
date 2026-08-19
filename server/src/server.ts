@@ -1,4 +1,4 @@
-import Fastify, { LogController, type FastifyServerOptions } from 'fastify';
+import Fastify, { LogController, type FastifyBaseLogger, type FastifyServerOptions } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { Server } from 'socket.io';
 import { existsSync } from 'node:fs';
@@ -93,6 +93,41 @@ export async function buildServer(
   return { app, io, store, limits, analytics };
 }
 
+export interface ShutdownOptions {
+  /** Hard-exit guard: how long a hung close may stall before process death. */
+  timeoutMs?: number;
+  /** Test seam; defaults to process.exit. */
+  exit?: (code: number) => void;
+}
+
+/** Deploys send SIGTERM; without this the container is killed mid-round with
+ *  sockets dangling. The handler drains socket.io first (open websockets keep
+ *  the HTTP server from ever closing), then Fastify, then exits 0 — and a
+ *  watchdog timer hard-exits 1 so a hung close can't block the platform's
+ *  stop sequence. Repeat signals while draining are ignored. */
+export function createShutdownHandler(
+  app: { log: FastifyBaseLogger; close: () => PromiseLike<unknown> },
+  io: { close: (cb?: (err?: Error) => void) => unknown },
+  opts: ShutdownOptions = {},
+): (sig: NodeJS.Signals) => void {
+  const exit = opts.exit ?? ((code: number) => process.exit(code));
+  const timeoutMs = opts.timeoutMs ?? 5_000;
+  let shuttingDown = false;
+  return (sig) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    app.log.info({ sig }, 'shutdown');
+    const watchdog = setTimeout(() => exit(1), timeoutMs);
+    watchdog.unref();
+    io.close(() => {
+      Promise.resolve(app.close()).then(
+        () => exit(0),
+        (err: unknown) => { app.log.error({ err }, 'shutdown close failed'); exit(1); },
+      );
+    });
+  };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const prod = process.env.NODE_ENV === 'production';
   const logger: FastifyServerOptions['logger'] = {
@@ -111,11 +146,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         pin: new RateLimiter(1e9, 60_000),
       }
     : defaultLimits();
-  const { app, store } = await buildServer(undefined, limits, { logger });
+  const { app, io, store, analytics } = await buildServer(undefined, limits, { logger });
   setInterval(() => {
-    store.sweep();
+    store.sweep((code) => analytics.roomClosed(code));
     limits.create.sweep(); limits.join.sweep(); limits.pin.sweep();
   }, 60_000).unref();
+  const shutdown = createShutdownHandler(app, io);
+  for (const sig of ['SIGTERM', 'SIGINT'] as const) process.on(sig, () => shutdown(sig));
   const port = Number(process.env.PORT ?? 3000);
   await app.listen({ port, host: '0.0.0.0' });
   app.log.info(`Ochre Eights listening on :${port}`);
