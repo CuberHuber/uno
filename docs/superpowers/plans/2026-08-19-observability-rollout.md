@@ -120,12 +120,14 @@
 - Consumes: `track(name, data)` и GA-хендл из `client/src/analytics.ts`.
 - Produces: `initErrorReporting(): void`; `reportError(kind: string, err: unknown, severity?: 'warning'|'error'|'critical'): void`.
 
-- [ ] **Step 1:** написать чистую функцию `shouldReport(key: string): boolean` —
+> **Выполнено — PR #24 (влит 19.08.2026)**
+
+- [x] **Step 1:** написать чистую функцию `shouldReport(key: string): boolean` —
   дедуп по ключу `kind:message` и лимит 10 ошибок за сессию —
   и unit-тест на неё (та же схема раннера, что в `server/test`; если в client
   раннера нет — вынести функцию в shared-утилиту и покрыть тестом сервера).
 Тест: первый вызов true, повтор того же ключа false, 11-я уникальная ошибка false.
-- [ ] **Step 2:** реализовать модуль:
+- [x] **Step 2:** реализовать модуль:
 
 ```ts
 // client/src/errors.ts
@@ -158,22 +160,24 @@ export function initErrorReporting() {
 }
 ```
 
-- [ ] **Step 3:** экспортировать из `analytics.ts` обёртку `gaAddError(severity, message)`
+- [x] **Step 3:** экспортировать из `analytics.ts` обёртку `gaAddError(severity, message)`
   (внутри — маппинг на `EGAErrorSeverity`; no-op, пока GA не инициализирован).
-- [ ] **Step 4:** `npm run typecheck && npm run build`; commit.
+- [x] **Step 4:** `npm run typecheck && npm run build`; commit.
 
 ### Task 1.2: Слушатели WebSocket
 
 **Files:**
 - Modify: `client/src/socket.ts:5` (после создания `io(...)`)
 
-- [ ] **Step 1:** повесить слушатели:
+> **Выполнено — PR #24 (влит 19.08.2026)**
+
+- [x] **Step 1:** повесить слушатели:
   `socket.io.on('reconnect_attempt', ...)`, `socket.on('connect_error', ...)`,
   `socket.on('disconnect', reason => ...)` →
   `console.warn` + `reportError('ws_'+вид, ..., 'warning')`, не чаще одного в минуту.
-- [ ] **Step 2:** вручную проверить: остановить сервер на 5 секунд при открытом столе —
+- [x] **Step 2:** вручную проверить: остановить сервер на 5 секунд при открытом столе —
   в консоли warning, событие ушло один раз.
-- [ ] **Step 3:** commit.
+- [x] **Step 3:** commit.
 
 ### Task 1.3: Ack повторного входа и баннер своего дисконнекта
 
@@ -181,25 +185,29 @@ export function initErrorReporting() {
 - Modify: `client/src/store.tsx:59–68` (обработчик `reconnect`, ack сейчас игнорируется)
 - Modify: `client/src/components/PauseOverlay.tsx` или новый баннер в `Table.tsx`
 
-- [ ] **Step 1:** в ack пере-join обработать ошибку:
+> **Выполнено — PR #24 (влит 19.08.2026)**
+
+- [x] **Step 1:** в ack пере-join обработать ошибку:
   показать состояние «стол недоступен» + событие `reconnect_failed` с `reason`.
-- [ ] **Step 2:** добавить в store флаг `selfDisconnected`
+- [x] **Step 2:** добавить в store флаг `selfDisconnected`
   (из `socket.on('disconnect')` / `connect`), в Table — баннер
   «соединение потеряно, переподключаемся…» по этому флагу.
-- [ ] **Step 3:** ручная проверка обоих состояний (остановить сервер / вернуть сервер).
-- [ ] **Step 4:** commit.
+- [x] **Step 3:** ручная проверка обоих состояний (остановить сервер / вернуть сервер).
+- [x] **Step 4:** commit.
 
 ### Task 1.4: `HostLink.create` перестаёт глотать ошибки
 
 **Files:**
 - Modify: `client/src/screens/HostLink.tsx:15–27`
 
-- [ ] **Step 1:** обернуть fetch: проверять `res.ok`;
+> **Выполнено — PR #24 (влит 19.08.2026)**
+
+- [x] **Step 1:** обернуть fetch: проверять `res.ok`;
   при 429 показать локализованную ошибку `rate_limited`, при сетевой — общую;
   событие `room_create_failed` с `reason`; `catch` на `clipboard.writeText`.
-- [ ] **Step 2:** ручная проверка: временно дёрнуть создание комнат в цикле до 429 —
+- [x] **Step 2:** ручная проверка: временно дёрнуть создание комнат в цикле до 429 —
   ошибка видна, консоль чистая.
-- [ ] **Step 3:** commit.
+- [x] **Step 3:** commit.
 
 **Критерий приёмки этапа:** искусственный `throw` на лендинге виден
   в GameAnalytics Health и в Umami как `client_error`;
@@ -220,16 +228,18 @@ export function initErrorReporting() {
   `setDimensions(d: {role?: string; form?: string; rules?: string})`,
   вызов `configureBuild(APP_VERSION)` до `initialize`.
 
-- [ ] **Step 1:** передавать в design-события числовое value из `data.value`, если есть.
-- [ ] **Step 2:** добавить `trackProgression` поверх `addProgressionEvent`
+> **Выполнено — PR #25 (открыт 19.08.2026)**
+
+- [x] **Step 1:** передавать в design-события числовое value из `data.value`, если есть.
+- [x] **Step 2:** добавить `trackProgression` поверх `addProgressionEvent`
   (`round:<mode>:<bucket>`, score только у Complete).
-- [ ] **Step 3:** `configureAvailableCustomDimensions01..03` до init:
+- [x] **Step 3:** `configureAvailableCustomDimensions01..03` до init:
   dim01 `['host','guest']`, dim02 `['mobile-web','desktop-web']`,
   dim03 — пресеты правил; `configureBuild` из `window.__CONFIG__.APP_VERSION`
   (прокинуть в `/config.js` из env либо из версии пакета при сборке).
-- [ ] **Step 4:** `data-before-send`-нормализация URL комнат `/r/:code`
+- [x] **Step 4:** `data-before-send`-нормализация URL комнат `/r/:code`
   (или переопределение url в `track`-payload).
-- [ ] **Step 5:** typecheck + build; commit.
+- [x] **Step 5:** typecheck + build; commit.
 
 ### Task 2.2: Клиентские события по карте аудита
 
@@ -241,18 +251,20 @@ export function initErrorReporting() {
 - Modify: `client/src/screens/RoundOver.tsx:40`
 - Modify: `client/src/store.tsx:71–86`
 
-- [ ] **Step 1:** события `landing_cta {variant}`, `room_join {role, resume}`,
+> **Выполнено — PR #25 (открыт 19.08.2026)**
+
+- [x] **Step 1:** события `landing_cta {variant}`, `room_join {role, resume}`,
   `rules_toggle {rule, on}`, `help_open`, `slide_viewed {closedBy}`, `rematch`.
-- [ ] **Step 2:** дедуп `round_started` при reconnect:
+- [x] **Step 2:** дедуп `round_started` при reconnect:
   слать только на первом флипе фазы в данной партии
   (сравнивать номер партии `roundsPlayed(winTally)`).
-- [ ] **Step 3:** progression: `Start` на старте раунда,
+- [x] **Step 3:** progression: `Start` на старте раунда,
   `Complete` (score = очки) у победителя, `Fail` у остальных, mode = пресет правил,
   bucket = `2p`/`3-4p`.
-- [ ] **Step 4:** ручная проверка через Umami Realtime на dev-инсталляции
+- [x] **Step 4:** ручная проверка через Umami Realtime на dev-инсталляции
   (или логом `track`-вызовов): пройти путь лендинг → комната → раунд → rematch,
   увидеть все события ровно по одному разу.
-- [ ] **Step 5:** commit.
+- [x] **Step 5:** commit.
 
 ### Task 2.3: Серверные события и счётчики
 
@@ -261,12 +273,14 @@ export function initErrorReporting() {
 - Modify: `server/src/analytics.ts`, `server/src/metrics.ts`
 - Test: `server/test/analytics.test.ts`
 
-- [ ] **Step 1:** тест: неуспешный join с `wrong_pin` инкрементит
+> **Выполнено — PR #25 (открыт 19.08.2026)**
+
+- [x] **Step 1:** тест: неуспешный join с `wrong_pin` инкрементит
   `ochre_joins_failed_total{reason="wrong_pin"}` и пишет pino-строку `join_failed`.
-- [ ] **Step 2:** реализовать `joinFailed(reason)` в классе `Analytics` + counter в metrics.
-- [ ] **Step 3:** события `rules_changed`, `rematch` (номер партии), `player_kicked`
+- [x] **Step 2:** реализовать `joinFailed(reason)` в классе `Analytics` + counter в metrics.
+- [x] **Step 3:** события `rules_changed`, `rematch` (номер партии), `player_kicked`
   (`continueWithout`), причины `moveRejected` — лог + counter.
-- [ ] **Step 4:** `npm test -w server`; commit.
+- [x] **Step 4:** `npm test -w server`; commit.
 
 **Критерий приёмки этапа:** в Umami строится Funnel
   лендинг → room_create/room_join → game_start → round_end → rematch;
