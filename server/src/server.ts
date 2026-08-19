@@ -1,4 +1,7 @@
-import Fastify, { LogController, type FastifyServerOptions } from 'fastify';
+import Fastify, {
+  LogController,
+  type FastifyError, type FastifyReply, type FastifyRequest, type FastifyServerOptions,
+} from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { Server } from 'socket.io';
 import { existsSync } from 'node:fs';
@@ -11,6 +14,8 @@ import { RoomStore } from './rooms.js';
 import { attachSockets } from './sockets.js';
 import { Analytics } from './analytics.js';
 import { registerGameMetrics } from './metrics.js';
+import { registerGaRelay } from './ga-relay.js';
+import { createUmamiSender } from './umami.js';
 
 export interface ServerLimits { create: RateLimiter; join: RateLimiter; pin: RateLimiter }
 export const defaultLimits = (): ServerLimits => ({
@@ -24,6 +29,21 @@ export interface BuildOptions {
   analytics?: Analytics;
 }
 
+/** Uncaught route errors: full detail (message and stack) goes to pino, an
+ *  opaque JSON goes to the wire — internals never leak to a client. Errors
+ *  that already carry a 4xx status (body parser, bodyLimit, rate caps) keep
+ *  it, reduced to their machine-readable code. */
+export function routeErrorHandler(err: FastifyError, req: FastifyRequest, reply: FastifyReply): void {
+  const status = err.statusCode && err.statusCode >= 400 && err.statusCode < 600 ? err.statusCode : 500;
+  if (status >= 500) {
+    req.log.error({ err, method: req.method, url: req.url }, 'unhandled route error');
+    void reply.code(500).send({ error: 'internal_error' });
+  } else {
+    req.log.warn({ code: err.code, method: req.method, url: req.url, status }, 'request refused');
+    void reply.code(status).send({ error: err.code ?? 'request_refused' });
+  }
+}
+
 export async function buildServer(
   store = new RoomStore(),
   limits: ServerLimits = defaultLimits(),
@@ -35,9 +55,12 @@ export async function buildServer(
     logger: opts.logger ?? false,
     logController: new LogController({ disableRequestLogging: true }),
   });
+  app.setErrorHandler(routeErrorHandler);
   const register = new Registry();
-  const analytics = opts.analytics ?? new Analytics({ log: app.log, register });
+  const analytics = opts.analytics
+    ?? new Analytics({ log: app.log, register, sendEvent: createUmamiSender({ log: app.log }) });
   registerGameMetrics(register, store, analytics);
+  registerGaRelay(app);
 
   app.post('/api/rooms', async (req, reply) => {
     if (!limits.create.allow(req.ip)) return reply.code(429).send({ error: 'rate_limited' });
@@ -72,7 +95,8 @@ export async function buildServer(
       umamiSrc: process.env.UMAMI_SRC ?? null,
       umamiDomains: process.env.UMAMI_DOMAINS ?? null,
       gaGameKey: process.env.GA_GAME_KEY ?? null,
-      gaSecretKey: process.env.GA_SECRET_KEY ?? null,
+      // GA_SECRET_KEY stays server-side by design: the browser SDK talks to
+      // POST /api/ga/*, where the relay signs with the real secret.
       // Feeds GameAnalytics configureBuild, so dashboards can compare deploys.
       appVersion: process.env.APP_VERSION ?? null,
     };

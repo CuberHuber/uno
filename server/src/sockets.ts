@@ -26,13 +26,20 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, an
   };
 
   io.on('connection', (socket: Sock) => {
-    analytics?.sessionStarted(socket.id);
+    // First x-forwarded-for hop, so server-truth events stitch into the same
+    // Umami session the browser tracker creates behind the reverse proxy.
+    const fwd = socket.handshake.headers['x-forwarded-for'];
+    const visitor = {
+      ip: (Array.isArray(fwd) ? fwd[0] : fwd)?.split(',')[0]?.trim() || socket.handshake.address,
+      userAgent: socket.handshake.headers['user-agent'],
+    };
+    analytics?.sessionStarted(socket.id, visitor);
     const seatOf = () => socket.data as { code: string; seat: number; token: string };
 
     socket.on('joinRoom', (p, ack) => {
       const ip = socket.handshake.address;
       const refuse = (reason: string) => {
-        analytics?.joinFailed(p.code, reason);
+        analytics?.joinFailed(p.code, reason, visitor);
         ack({ ok: false, error: reason });
       };
       if (!limits.join.allow(ip)) return refuse('rate_limited');
@@ -75,9 +82,9 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, an
       if (analytics && room && room.phase !== phaseBefore) {
         if (room.phase === 'playing') {
           if (phaseBefore === 'roundEnd') analytics.rematchStarted(room.code);
-          analytics.roundStarted(room.code, room.players.filter((pl) => !pl.left).length);
+          analytics.roundStarted(room.code, room.players.filter((pl) => !pl.left).length, visitor);
         } else if (phaseBefore === 'playing' && room.phase === 'roundEnd') {
-          analytics.roundFinished(room.code, room.game?.winner ?? null);
+          analytics.roundFinished(room.code, room.game?.winner ?? null, visitor);
         }
       }
       onOk?.();
@@ -104,8 +111,8 @@ export function attachSockets(io: IO, store: RoomStore, limits: ServerLimits, an
     ));
 
     socket.on('disconnect', () => {
-      analytics?.sessionEnded(socket.id);
       const { code, seat } = seatOf();
+      analytics?.sessionEnded(socket.id, code ? { code, seat } : undefined);
       if (!code) return;
       store.setConnection(code, seat, null);
       broadcast(code);
