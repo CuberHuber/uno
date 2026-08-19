@@ -1,3 +1,4 @@
+import ConnectionBanner from './components/ConnectionBanner';
 import { useT } from './i18n';
 import Landing from './screens/Landing';
 import Join from './screens/Join';
@@ -23,9 +24,10 @@ export default function App() {
       </main>
     );
   }
-  if (!match) return <Landing />;
-  if (!view) return <Join code={match[1]!} />;
-  if (view.phase === 'lobby') return <Lobby />;
-  if (view.phase === 'playing') return <Table />;
-  return <RoundOver />;
+  const screen = !match ? <Landing />
+    : !view ? <Join code={match[1]!} />
+    : view.phase === 'lobby' ? <Lobby />
+    : view.phase === 'playing' ? <Table />
+    : <RoundOver />;
+  return <><ConnectionBanner />{screen}</>;
 }

@@ -31,7 +31,11 @@ const GA_SECRET = conf.gaSecretKey || env.VITE_GA_SECRET_KEY;
 // Set once the SDK chunk loads; the dynamic import keeps ~50 KB of
 // GameAnalytics out of the game bundle when no keys are configured.
 type GASdk = (typeof import('gameanalytics'))['default'];
+type GaErrorSeverity = Parameters<GASdk['addErrorEvent']>[0];
 let ga: GASdk | null = null;
+let gaSeverities: Record<string, GaErrorSeverity> | null = null;
+
+export type GaSeverity = 'debug' | 'info' | 'warning' | 'error' | 'critical';
 
 /** Boot whichever external analytics are configured at build time.
  *  Umami (open-source, cookie-less) counts visits/uniques/pageviews on its
@@ -54,12 +58,14 @@ export function initAnalytics(): void {
           // ESM bundle's default is a bare stub with no statics — the working
           // class sits on m.gameanalytics.GameAnalytics (verified in-browser).
           // The cast bridges that typings/runtime mismatch.
-          const sdk = (m as unknown as { gameanalytics: { GameAnalytics: GASdk } })
-            .gameanalytics.GameAnalytics;
-          sdk.initialize(GA_KEY, GA_SECRET);
-          ga = sdk;
+          const ns = (m as unknown as {
+            gameanalytics: { GameAnalytics: GASdk; EGAErrorSeverity: Record<string, GaErrorSeverity> };
+          }).gameanalytics;
+          ns.GameAnalytics.initialize(GA_KEY, GA_SECRET);
+          ga = ns.GameAnalytics;
+          gaSeverities = ns.EGAErrorSeverity;
         })
-        .catch(() => undefined);
+        .catch((e) => console.warn('[analytics] GameAnalytics SDK failed to load', e));
     }
   } catch {
     // Analytics must never break the game.
@@ -71,6 +77,21 @@ export function track(name: string, data?: Record<string, string | number | bool
   try {
     window.umami?.track(name, data);
     ga?.addDesignEvent(`game:${name}`);
+  } catch {
+    // Analytics must never break the game.
+  }
+}
+
+/** Report an error to the GameAnalytics Health dashboard (no-op until the
+ *  SDK chunk is initialized). Callers go through reportError() in errors.ts,
+ *  which dedupes and rate-limits — never call this in a loop directly. */
+export function gaAddError(severity: GaSeverity, message: string): void {
+  try {
+    if (!ga || !gaSeverities) return;
+    const name = severity.charAt(0).toUpperCase() + severity.slice(1);
+    const value = gaSeverities[name];
+    if (value === undefined) return;
+    ga.addErrorEvent(value, message);
   } catch {
     // Analytics must never break the game.
   }
