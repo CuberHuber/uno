@@ -37,17 +37,17 @@
 
 ## Гейты согласования
 
-Задачи помечены гейтами из отчёта.
-Не начинать помеченную задачу, пока пользователь не подтвердил соответствующее решение.
+Все шесть решений согласованы пользователем 19.08.2026 —
+  ни одна задача плана больше не заблокирована.
 
-| Гейт | Решение из отчёта | Блокирует |
-|---|---|---|
-| G1 | Вливать ветку observability | Этап 0 целиком |
-| G2 | Таксономия событий | Этап 2 |
-| G3 | GameAnalytics relay через Fastify | T3.2 |
-| G4 | Переименование трекера Umami на VPS | T5.1 |
-| G5 | Первый A/B-тест | T4.3 |
-| G6 | Остаться на Umami 2.x | ничего не блокирует (справочно) |
+| Гейт | Решение из отчёта | Блокирует | Статус |
+|---|---|---|---|
+| G1 | Вливать ветку observability | Этап 0 целиком | ✅ согласовано; влито PR #22 |
+| G2 | Таксономия событий | Этап 2 | ✅ согласовано |
+| G3 | GameAnalytics relay через Fastify | T3.2 | ✅ согласовано |
+| G4 | Переименование трекера Umami на VPS | T5.1 | ✅ согласовано (rename) |
+| G5 | Первый A/B-тест | T4.3 | ✅ согласовано (после 2–3 недель данных) |
+| G6 | Остаться на Umami 2.x | ничего не блокирует (справочно) | ✅ согласовано |
 
 ---
 
@@ -64,14 +64,19 @@
   `server/src/analytics.ts` (класс `Analytics`), `server/src/metrics.ts`,
   маршруты `GET /config.js`, `GET /healthz`, `GET /metrics`.
 
-- [ ] **Step 1:** обновить ветку: `git fetch origin && git checkout worktree-observability && git merge origin/main`.
-- [ ] **Step 2:** разрешить конфликты в `sockets.ts` / `store.tsx`,
+> **Выполнено 19.08.2026:** ветка влита в main через PR #22
+>   (`0b98c20`, коммиты ebfe6a4…6a6fcc9);
+>   в main проверено наличие `client/src/analytics.ts`, `server/src/analytics.ts`,
+>   `server/src/metrics.ts`, `docs/monitoring.md`.
+
+- [x] **Step 1:** обновить ветку: `git fetch origin && git checkout worktree-observability && git merge origin/main`.
+- [x] **Step 2:** разрешить конфликты в `sockets.ts` / `store.tsx`,
   сохранив обе стороны: хуки телеметрии ветки и rules-onboarding из main.
-- [ ] **Step 3:** прогнать проверку: `npm run typecheck && npm test -w server && npm run build`.
+- [x] **Step 3:** прогнать проверку: `npm run typecheck && npm test -w server && npm run build`.
 Ожидание: все тесты зелёные, включая `server/test/observability.test.ts` и `analytics.test.ts`.
-- [ ] **Step 4:** прогнать design-смоук из прошлых сессий или `qa_smoke`-скрипт
+- [x] **Step 4:** прогнать design-смоук из прошлых сессий или `qa_smoke`-скрипт
   на собранном сервере (создание комнаты, полный раунд).
-- [ ] **Step 5:** открыть PR `worktree-observability → main`, влить после ревью.
+- [x] **Step 5:** открыть PR `worktree-observability → main`, влить после ревью.
 
 ### Task 0.2: Аккаунты и env в панели (руками пользователя, чеклист)
 
