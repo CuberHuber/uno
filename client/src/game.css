@@ -572,3 +572,19 @@ body {
   .rp-foot { margin-top: 22px; }
   .rp-foot .btn { flex: 1; }
 }
+
+/* ---- own-connection banner: OUR socket dropped (above pause backdrop, 70) */
+.conn-banner {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 80; display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 999px; white-space: nowrap;
+  background: var(--color-neutral-900); color: var(--color-neutral-100);
+  font-size: 14px; box-shadow: 0 4px 14px rgba(32, 30, 29, 0.3);
+}
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--color-accent-400);
+  animation: conn-breathe 1.2s ease-in-out infinite;
+}
+@keyframes conn-breathe { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .conn-dot { animation: none; } }

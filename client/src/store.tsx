@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Color, Effect, RoomStateView, Rules } from '@uno/shared';
 import { track } from './analytics';
+import { reportError } from './errors';
 import { socket } from './socket';
 
 export interface Store {
@@ -8,6 +9,7 @@ export interface Store {
   error: string | null;      // fatal join error → "table not found" screen
   joinError: string | null;  // transient join failure: pin_required / wrong_pin / rate_limited…
   rejection: string | null;  // transient moveRejected, clears itself
+  selfDisconnected: boolean; // OUR socket dropped (not another player's)
   effect: Effect | null;
   join: (code: string, name?: string, pin?: string) => void;
   actions: {
@@ -34,12 +36,30 @@ export const useStore = (): Store => {
 
 const tokenKey = (code: string) => `ochre:${code.toUpperCase()}`;
 
+// Failures a new attempt can fix stay on the join screen; the rest are fatal.
+const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started'];
+
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<RoomStateView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
+  const [selfDisconnected, setSelfDisconnected] = useState(false);
   const [effect, setEffect] = useState<Effect | null>(null);
+
+  // Our own transport state, for the "connection lost" banner: PauseOverlay
+  // only covers OTHER players dropping; before this, your own drop just froze
+  // the table with no explanation.
+  useEffect(() => {
+    const onDisconnect = () => setSelfDisconnected(true);
+    const onConnect = () => setSelfDisconnected(false);
+    socket.on('disconnect', onDisconnect);
+    socket.on('connect', onConnect);
+    return () => {
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect', onConnect);
+    };
+  }, []);
 
   useEffect(() => {
     const onReject = (p: { reason: string }) => {
@@ -62,7 +82,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!code) return;
     const onReconnect = () => {
       const token = localStorage.getItem(tokenKey(code)) ?? undefined;
-      socket.emit('joinRoom', { code, token }, () => {});
+      socket.emit('joinRoom', { code, token }, (ack) => {
+        if (ack.ok) return;
+        // The ack used to be ignored: a room swept while we were offline left
+        // the player staring at a frozen table. Now it's an explicit state.
+        const reason = ack.error ?? 'table_not_found';
+        track('reconnect_failed', { reason });
+        reportError('reconnect_failed', reason, 'warning');
+        if (!TRANSIENT.includes(reason)) setError(reason);
+      });
     };
     socket.io.on('reconnect', onReconnect);
     return () => { socket.io.off('reconnect', onReconnect); };
@@ -80,9 +108,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       track('round_finished', { won: view.winnerSeat === view.yourSeat });
     }
   }, [view?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Failures a new attempt can fix stay on the join screen; the rest are fatal.
-  const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started'];
 
   const join = (code: string, name?: string, pin?: string) => {
     const token = localStorage.getItem(tokenKey(code)) ?? undefined;
@@ -115,7 +140,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }), []);
 
   return (
-    <Ctx.Provider value={{ view, error, joinError, rejection, effect, join, actions }}>
+    <Ctx.Provider value={{ view, error, joinError, rejection, selfDisconnected, effect, join, actions }}>
       {children}
     </Ctx.Provider>
   );
