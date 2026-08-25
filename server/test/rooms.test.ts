@@ -307,6 +307,23 @@ describe('rematch: validate first, then mutate', () => {
     expect(after.game!.players.length).toBe(after.players.length); // round still matches the seat list
   });
 
+  test('a refused rematch does not move the journal either', () => {
+    let clock = 1_000_000;
+    const store = new RoomStore(() => clock);
+    const { room, tokens } = seatRoom(store, ['Mira', 'Jonas', 'Ada']);
+    store.getRoom(room.code)!.phase = 'roundEnd';
+    const before = store.historyHead(room.code);
+    expect(store.rematch(room.code, tokens[2]!)).toEqual({ ok: false, error: 'host_only_deal' });
+    // Nothing happened, so nothing is written down — and the seat numbering has
+    // not silently moved on under the pointers players are still holding.
+    expect(store.historyHead(room.code)).toEqual(before);
+    expect(clock).toBe(1_000_000);
+    expect(store.rematch(room.code, tokens[0]!).ok).toBe(true);
+    const after = store.historyHead(room.code);
+    expect(after.ok && before.ok && after.seq > before.seq).toBe(true);
+    expect(after.ok && after.seatEpoch).toBe(1);
+  });
+
   test('only the host deals the next hand; a removed host passes the deal down', () => {
     let clock = 1_000_000;
     const store = new RoomStore(() => clock);
