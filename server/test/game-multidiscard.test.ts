@@ -19,6 +19,17 @@ describe('house rule: stack discard (same-value numbers)', () => {
     expect(r.state.turn).toBe(1);
     expect(r.effects).toContainEqual({ type: 'played', seat: 0, cards: [b5, r5, g5] });
   });
+  test('a stack removes exactly the played cards, never the last card in hand', () => {
+    const b5 = card('blue', '5'); const r5 = card('red', '5');
+    const keep = card('yellow', '1'); const alsoKeep = card('green', '9');
+    const s = fixedState(
+      [[b5, r5, keep, alsoKeep], [card('green', '2')]],
+      card('blue', '7'), { rules: MULTI });
+    const r = applyAction(s, { type: 'play', seat: 0, cardIds: [b5.id, r5.id] });
+    if (!r.ok) throw new Error(r.error);
+    expect(r.state.players[0]!.hand.map((c) => c.id)).toEqual([keep.id, alsoKeep.id]);
+  });
+
   test('first card must be playable', () => {
     const r5 = card('red', '5'); const g5 = card('green', '5');
     const s = fixedState(

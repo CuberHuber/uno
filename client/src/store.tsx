@@ -38,7 +38,7 @@ export const useStore = (): Store => {
 const tokenKey = (code: string) => `ochre:${code.toUpperCase()}`;
 
 // Failures a new attempt can fix stay on the join screen; the rest are fatal.
-const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started'];
+const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started', 'already_seated'];
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<RoomStateView | null>(null);

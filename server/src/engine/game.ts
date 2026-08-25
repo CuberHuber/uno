@@ -1,5 +1,5 @@
 import type { Card, Color, Rules } from '@uno/shared';
-import { buildDeck, shuffle } from './deck.js';
+import { buildDeck, isColor, shuffle } from './deck.js';
 import { CLASSIC_RULES, isPlayable, type Effect } from '@uno/shared';
 import { rng } from './deck.js';
 
@@ -28,11 +28,16 @@ const isNumberCard = (c: Card) => /^\d$/.test(c.value);
 
 export function nextSeat(state: GameState, from: number, steps = 1): number {
   const n = state.players.length;
+  if (n === 0) return from;
   let seat = from;
   for (let remaining = steps; remaining > 0; remaining--) {
+    // One lap is the whole table: if it ends on a removed seat there is no active
+    // seat to hand the turn to, and the walk stops rather than spinning forever.
+    let lap = n;
     do {
       seat = (((seat + state.direction) % n) + n) % n;
-    } while (state.players[seat]!.removed);
+    } while (state.players[seat]?.removed && --lap > 0);
+    if (state.players[seat]?.removed) return from;
   }
   return seat;
 }
@@ -143,14 +148,24 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (s.pendingDraw > 0 && !stackAnswer) return err('answer_pot');
       if (!stackAnswer && !isPlayable(card, top, s.currentColor)) return err('card_no_match');
       const isWild = card.value === 'wild' || card.value === 'wild4';
-      if (isWild && !action.chosenColor) return err('wild_needs_color');
+      // The colour is a caller's word, not the engine's: only one of the four real
+      // colours may become the round's colour.
+      let wildColor: Color | null = null;
+      if (isWild) {
+        if (!isColor(action.chosenColor)) return err('wild_needs_color');
+        wildColor = action.chosenColor;
+      }
 
       s.catchWindow = null; // the next act closes any open window (may re-arm below)
       s.pendingDrawn = null;
-      for (const c of stack) player.hand.splice(player.hand.findIndex((h) => h.id === c.id), 1);
+      for (const c of stack) {
+        const at = player.hand.findIndex((h) => h.id === c.id);
+        if (at === -1) return err('card_not_in_hand'); // never guess: splice(-1) eats the wrong card
+        player.hand.splice(at, 1);
+      }
       s.discard.push(...stack);
       const last = stack.at(-1)!;
-      s.currentColor = isWild ? action.chosenColor! : last.color;
+      s.currentColor = wildColor ?? last.color;
       effects.push({ type: 'played', seat: action.seat, cards: stack });
 
       if (player.hand.length === 0) {
@@ -253,7 +268,8 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (s.rules.forcePlay && !isWildDraw && !hasRankMates) {
         // Force play: the drawn card goes straight down (wilds wait for a colour).
         const played = applyAction(s, { type: 'play', seat: action.seat, cardIds: [drawnCard.id] });
-        if (played.ok) return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
+        if (!played.ok) return played; // the rule says this play is legal; if it is not, say so
+        return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
       }
       s.pendingDrawn = { seat: action.seat, cardId: drawnCard.id };
       return { ok: true, state: s, effects };
@@ -262,6 +278,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     case 'pass': {
       if (s.pendingDrawn?.seat !== action.seat) return err('nothing_to_pass');
       if (s.rules.forcePlay) return err('force_play');
+      s.catchWindow = null; // like every other act, passing closes an open window
       s.pendingDrawn = null;
       s.turn = nextSeat(s, action.seat);
       return { ok: true, state: s, effects };
@@ -294,7 +311,8 @@ export function applyAction(state: GameState, action: Action): ActionResult {
  *  draw pile, fix the turn, and end the round if only one player remains. */
 export function removeFromRound(state: GameState, seat: number): GameState {
   const s = structuredClone(state);
-  const p = s.players[seat]!;
+  const p = Number.isInteger(seat) ? s.players[seat] : undefined;
+  if (!p) return s; // no such seat: nothing to remove, and nothing to corrupt
   p.removed = true;
   s.drawPile.unshift(...p.hand);
   p.hand = [];

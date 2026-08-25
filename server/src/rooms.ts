@@ -32,6 +32,16 @@ export interface Room {
 
 const norm = (code: string) => code.toUpperCase().replace(/[\s-]/g, '');
 
+/** A seat is an array index, never a string key: `'__proto__'` would reach
+ *  `Array.prototype`, `'length'` a number, and `'1'` the right player under a
+ *  key the engine's `s.turn === seat` comparison can never match again. */
+const isSeatIndex = (seat: number, len: number): boolean =>
+  typeof seat === 'number' && Number.isSafeInteger(seat) && seat >= 0 && seat < len;
+
+/** `RegExp.test` coerces, so the typeof comes first: a numeric 1234 would
+ *  otherwise be stored and never match the string a client sends back. */
+const isPin = (pin: unknown): pin is string => typeof pin === 'string' && /^\d{4}$/.test(pin);
+
 /** Omit that distributes over a discriminated union, so each Action variant
  *  keeps its own payload fields (plain Omit collapses them to just `type`). */
 type SeatlessAction = Action extends infer A ? (A extends Action ? Omit<A, 'seat'> : never) : never;
@@ -52,7 +62,7 @@ export class RoomStore {
       game: null, winTally: [],
       seed: opts.seed ?? randomInt(2 ** 31),
       rules: sanitizeRules(opts.rules),
-      pin: opts.pin ?? null,
+      pin: isPin(opts.pin) ? opts.pin : null,
     };
     this.rooms.set(key, room);
     return room;
@@ -87,10 +97,14 @@ export class RoomStore {
     return { ok: true as const, seat };
   }
 
-  setConnection(code: string, seat: number, socketId: string | null): void {
+  /** `expectedSocketId`, when passed, pins the update to one socket. A phone
+   *  moving Wi-Fi→LTE reconnects in a second while the dead socket's disconnect
+   *  lands up to a minute later; without the pin it would darken a live seat. */
+  setConnection(code: string, seat: number, socketId: string | null, expectedSocketId?: string | null): void {
     const room = this.getRoom(code);
-    const player = room?.players[seat];
-    if (!room || !player) return;
+    if (!room || !isSeatIndex(seat, room.players.length)) return;
+    const player = room.players[seat]!;
+    if (expectedSocketId !== undefined && player.socketId !== expectedSocketId) return;
     player.socketId = socketId;
     player.connected = socketId !== null;
     player.disconnectedAtMs = socketId === null ? this.now() : null;
@@ -99,6 +113,13 @@ export class RoomStore {
 
   private seatFor(room: Room, token: string): number {
     return room.players.findIndex((p) => p.token === token && !p.left);
+  }
+
+  /** `hostSeat` can point at a player removed mid-round; until the rematch
+   *  compaction reseats everyone, the first remaining player holds the deal. */
+  private hostSeatOf(room: Room): number {
+    const host = room.players[room.hostSeat];
+    return host && !host.left ? room.hostSeat : room.players.findIndex((p) => !p.left);
   }
 
   setRules(code: string, token: string, rules: Rules) {
@@ -119,7 +140,7 @@ export class RoomStore {
       return { ok: false as const, error: 'host_only_rules' };
     }
     if (room.phase !== 'lobby') return { ok: false as const, error: 'rules_locked' };
-    if (pin !== null && !/^\d{4}$/.test(pin)) return { ok: false as const, error: 'bad_pin' };
+    if (pin !== null && !isPin(pin)) return { ok: false as const, error: 'bad_pin' };
     room.pin = pin;
     return { ok: true as const };
   }
@@ -156,13 +177,17 @@ export class RoomStore {
     const room = this.getRoom(code);
     if (!room) return { ok: false as const, error: 'table_not_found' };
     if (room.phase !== 'roundEnd') return { ok: false as const, error: 'round_running' };
-    if (this.seatFor(room, token) === -1) return { ok: false as const, error: 'seat_not_found' };
+    const seat = this.seatFor(room, token);
+    if (seat === -1) return { ok: false as const, error: 'seat_not_found' };
+    if (seat !== this.hostSeatOf(room)) return { ok: false as const, error: 'host_only_deal' };
     // Compact away players who left; keep everyone else's seat order and tally.
+    // Every check runs first: a rejected rematch must leave the room untouched,
+    // or the seats shift under clients nobody broadcasts to.
     const stayingIdx = room.players.flatMap((p, i) => (p.left ? [] : [i]));
+    if (stayingIdx.length < 2) return { ok: false as const, error: 'not_enough_players' };
     room.players = stayingIdx.map((i) => room.players[i]!);
     room.winTally = stayingIdx.map((i) => room.winTally[i]!);
     room.hostSeat = 0;
-    if (room.players.length < 2) return { ok: false as const, error: 'not_enough_players' };
     room.seed = randomInt(2 ** 31);
     room.game = createGame(room.players.length, rng(room.seed), room.rules);
     room.phase = 'playing';
@@ -171,10 +196,14 @@ export class RoomStore {
 
   continueWithout(code: string, token: string, targetSeat: number) {
     const room = this.getRoom(code);
-    if (!room || !room.game) return { ok: false as const, error: 'table_not_found' };
+    if (!room) return { ok: false as const, error: 'table_not_found' };
+    // `room.game` outlives the round, so without the phase check a removal
+    // after the last card would score the finished round a second time.
+    if (room.phase !== 'playing' || !room.game) return { ok: false as const, error: 'no_round' };
     if (this.seatFor(room, token) === -1) return { ok: false as const, error: 'seat_not_found' };
-    const target = room.players[targetSeat];
-    if (!target || target.left) return { ok: false as const, error: 'no_such_seat' };
+    if (!isSeatIndex(targetSeat, room.players.length)) return { ok: false as const, error: 'no_such_seat' };
+    const target = room.players[targetSeat]!;
+    if (target.left) return { ok: false as const, error: 'no_such_seat' };
     if (target.connected) return { ok: false as const, error: 'player_connected' };
     if (target.disconnectedAtMs === null || this.now() - target.disconnectedAtMs < CONTINUE_GRACE_MS) {
       return { ok: false as const, error: 'grace_running' };
@@ -194,8 +223,19 @@ export class RoomStore {
     return seat === -1 ? null : seat;
   }
 
+  /** Absence-expressing form for callers that hold only a code. */
+  tryViewFor(code: string, seat: number): RoomStateView | null {
+    const room = this.getRoom(code);
+    return room === undefined ? null : this.viewOf(room, seat);
+  }
+
   viewFor(code: string, seat: number): RoomStateView {
-    const room = this.getRoom(code)!;
+    const room = this.getRoom(code);
+    if (room === undefined) throw new Error(`viewFor: no room ${norm(code)}`);
+    return this.viewOf(room, seat);
+  }
+
+  private viewOf(room: Room, seat: number): RoomStateView {
     const pausedSeat = this.pausedForSeat(room);
     return projectView({
       roomCode: room.code, phase: room.phase,

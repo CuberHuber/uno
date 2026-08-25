@@ -125,6 +125,9 @@ const DICT = {
     'err.rate_limited': 'Too many attempts — wait a minute',
     'err.create_failed': 'Could not create the room — try again',
     'err.network': 'Network error — check the connection and try again',
+    'err.bad_request': 'The app sent something the table did not understand',
+    'err.already_seated': 'This tab already sits at a table — reload to join another',
+    'err.server_error': 'Something went wrong on the table — try that again',
   },
   ru: {
     'app.notFoundTitle': 'Стол не найден',
@@ -244,6 +247,9 @@ const DICT = {
     'err.rate_limited': 'Слишком много попыток — подожди минуту',
     'err.create_failed': 'Не получилось создать комнату — попробуй ещё раз',
     'err.network': 'Ошибка сети — проверь соединение и попробуй снова',
+    'err.bad_request': 'Приложение отправило то, чего стол не понял',
+    'err.already_seated': 'Эта вкладка уже за столом — перезагрузи, чтобы сесть за другой',
+    'err.server_error': 'На столе что-то пошло не так — попробуй ещё раз',
   },
 } as const;
 

@@ -17,11 +17,16 @@ import { registerGameMetrics } from './metrics.js';
 import { registerGaRelay } from './ga-relay.js';
 import { createUmamiSender } from './umami.js';
 
-export interface ServerLimits { create: RateLimiter; join: RateLimiter; pin: RateLimiter }
+export interface ServerLimits { create: RateLimiter; join: RateLimiter; pin: RateLimiter; action: RateLimiter }
 export const defaultLimits = (): ServerLimits => ({
   create: new RateLimiter(10, 60_000),
   join: new RateLimiter(20, 60_000),
   pin: new RateLimiter(5, 60_000),
+  // Per socket, not per IP: every in-game action clones the whole game state
+  // before it is judged, so a seated client looping drawCard would stall the
+  // single thread the server has. A full local round costs about twenty frames
+  // a seat, so this window is six times the busiest legal play.
+  action: new RateLimiter(120, 10_000),
 });
 
 export interface BuildOptions {
@@ -54,6 +59,11 @@ export async function buildServer(
   const app = Fastify({
     logger: opts.logger ?? false,
     logController: new LogController({ disableRequestLogging: true }),
+    // Deployed behind the platform's reverse proxy, so req.ip is the proxy
+    // unless x-forwarded-for is read. Without this every per-IP limiter is one
+    // shared budget: the eleventh room anyone on the internet creates in a
+    // minute gets refused.
+    trustProxy: true,
   });
   app.setErrorHandler(routeErrorHandler);
   const register = new Registry();
@@ -113,8 +123,21 @@ export async function buildServer(
 
   await app.ready();
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(app.server);
-  attachSockets(io, store, limits, analytics);
+  attachSockets(io, store, limits, analytics, app.log);
   return { app, io, store, limits, analytics };
+}
+
+/** Last-resort net. Socket.IO invokes listeners inside process.nextTick with no
+ *  try/catch, and Node's default action for an escaping throw is exit(1) — one
+ *  malformed frame from one socket would end every round on the instance. The
+ *  handlers below log and keep serving; the socket layer has already refused
+ *  the frame that got here. `target` is a test seam. */
+export function installProcessGuards(
+  log: { error: (obj: object, msg: string) => void },
+  target: NodeJS.EventEmitter = process,
+): void {
+  target.on('uncaughtException', (err: unknown) => log.error({ err }, 'uncaught exception — still serving'));
+  target.on('unhandledRejection', (err: unknown) => log.error({ err }, 'unhandled rejection — still serving'));
 }
 
 export interface ShutdownOptions {
@@ -167,13 +190,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const limits = process.env.RATE_LIMITS === 'off'
     ? {
         create: new RateLimiter(1e9, 60_000), join: new RateLimiter(1e9, 60_000),
-        pin: new RateLimiter(1e9, 60_000),
+        pin: new RateLimiter(1e9, 60_000), action: new RateLimiter(1e9, 10_000),
       }
     : defaultLimits();
   const { app, io, store, analytics } = await buildServer(undefined, limits, { logger });
+  installProcessGuards(app.log);
   setInterval(() => {
     store.sweep((code) => analytics.roomClosed(code));
-    limits.create.sweep(); limits.join.sweep(); limits.pin.sweep();
+    limits.create.sweep(); limits.join.sweep(); limits.pin.sweep(); limits.action.sweep();
   }, 60_000).unref();
   const shutdown = createShutdownHandler(app, io);
   for (const sig of ['SIGTERM', 'SIGINT'] as const) process.on(sig, () => shutdown(sig));
