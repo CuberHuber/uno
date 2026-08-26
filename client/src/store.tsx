@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Color, Effect, RoomStateView, Rules } from '@uno/shared';
+import type { CatchUpView, Color, Effect, RoomStateView, Rules } from '@uno/shared';
 import { rulesPreset, setAnalyticsDimensions, track, trackProgression } from './analytics';
 import { reportError } from './errors';
 import { socket } from './socket';
@@ -12,6 +12,8 @@ export interface Store {
   rejection: string | null;  // transient moveRejected, clears itself
   selfDisconnected: boolean; // OUR socket dropped (not another player's)
   effect: Effect | null;
+  catchUp: CatchUpView | null; // what happened while we were away; null when nothing did
+  dismissCatchUp: () => void;
   join: (code: string, name?: string, pin?: string) => void;
   actions: {
     start: () => void;
@@ -37,8 +39,15 @@ export const useStore = (): Store => {
 
 const tokenKey = (code: string) => `ochre:${code.toUpperCase()}`;
 
+/** A burst of accepted moves lands as a burst of snapshots, each carrying the
+ *  journal head. The pointer is a high-water mark, so acknowledging only the
+ *  last of a burst loses nothing and spends one frame instead of a dozen —
+ *  which matters, because acknowledgements share the per-socket action budget
+ *  with the moves themselves. */
+const ACK_COALESCE_MS = 250;
+
 // Failures a new attempt can fix stay on the join screen; the rest are fatal.
-const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started'];
+const TRANSIENT = ['pin_required', 'wrong_pin', 'rate_limited', 'table_full', 'game_started', 'already_seated'];
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<RoomStateView | null>(null);
@@ -47,6 +56,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [rejection, setRejection] = useState<string | null>(null);
   const [selfDisconnected, setSelfDisconnected] = useState(false);
   const [effect, setEffect] = useState<Effect | null>(null);
+  const [catchUp, setCatchUp] = useState<CatchUpView | null>(null);
 
   // Our own transport state, for the "connection lost" banner: PauseOverlay
   // only covers OTHER players dropping; before this, your own drop just froze
@@ -74,6 +84,53 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       socket.off('roomState', setView);
       socket.off('moveRejected', onReject);
       socket.off('effect', setEffect);
+    };
+  }, []);
+
+  // The journal pointer. The server moves it only on our word, and only
+  // forward, so this is the one thing standing between a reconnect that replays
+  // exactly what was missed and one that is told the gap is too old to answer.
+  //
+  // Every snapshot arrives with the head it is true as of; applying the
+  // snapshot is what makes acknowledging that head honest. Compared with `!==`
+  // rather than `>`: heads only rise inside one room, and a tab that somehow
+  // lands in a second room must not carry the first room's number as a floor
+  // and go silent. Re-acknowledging an older number is harmless — the server
+  // keeps the larger of the two.
+  const acked = useRef(0);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let pending: number | null = null;
+    const flush = () => {
+      timer = null;
+      const seq = pending;
+      pending = null;
+      if (seq === null) return;
+      acked.current = seq;
+      socket.emit('ackHistory', { seq });
+    };
+    const onHead = (p: { seq: number }) => {
+      if (p.seq === acked.current || p.seq === pending) return;
+      pending = p.seq;
+      if (timer === null) timer = setTimeout(flush, ACK_COALESCE_MS);
+    };
+    // A socket that dies can take an unsent acknowledgement with it. Forgetting
+    // what we acknowledged costs one frame on the way back in and closes the
+    // gap where the server's pointer would otherwise sit behind where we are.
+    const onDrop = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      pending = null;
+      acked.current = 0;
+    };
+    socket.on('historyHead', onHead);
+    socket.on('catchUp', setCatchUp);
+    socket.on('disconnect', onDrop);
+    return () => {
+      socket.off('historyHead', onHead);
+      socket.off('catchUp', setCatchUp);
+      socket.off('disconnect', onDrop);
+      if (timer !== null) clearTimeout(timer);
     };
   }, []);
 
@@ -167,7 +224,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }), []);
 
   return (
-    <Ctx.Provider value={{ view, error, joinError, rejection, selfDisconnected, effect, join, actions }}>
+    <Ctx.Provider value={{
+      view, error, joinError, rejection, selfDisconnected, effect,
+      catchUp, dismissCatchUp: () => setCatchUp(null), join, actions,
+    }}>
       {children}
     </Ctx.Provider>
   );

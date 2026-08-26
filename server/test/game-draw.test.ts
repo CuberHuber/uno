@@ -49,6 +49,17 @@ describe('draw', () => {
     expect(r.state.pendingDrawn).toBeNull();
   });
 
+  test('pass closes an open catch window, like every other act', () => {
+    const drawn = card('red', '9');
+    const s = fixedState([[card('blue', '1'), drawn], [card('green', '2')]], card('red', '7'), {
+      pendingDrawn: { seat: 0, cardId: drawn.id }, catchWindow: { seat: 1 },
+    });
+    const r = applyAction(s, { type: 'pass', seat: 0 });
+    if (!r.ok) throw new Error(r.error);
+    expect(r.state.catchWindow).toBeNull();
+    expect(r.state.turn).toBe(1);
+  });
+
   test('pass without a pending drawn card is rejected', () => {
     const s = fixedState([[card('red', '1')], [card('green', '2')]], card('red', '7'));
     expect(applyAction(s, { type: 'pass', seat: 0 }).ok).toBe(false);

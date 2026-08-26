@@ -10,6 +10,24 @@ export interface AnalyticsOptions {
   sendEvent?: UmamiSender;
 }
 
+/** How a return to a table was answered: the gap was closed by a delta, there
+ *  was no gap, the gap reached further back than the journal keeps, or the
+ *  journal could not answer at all. Four words, and never a fifth — a label is
+ *  only ever drawn from a dictionary this small. */
+export type CatchUpOutcome = 'delta' | 'empty' | 'truncated' | 'failed';
+
+/** What a turn queue must never be found doing. Not a statistic: this series
+ *  exists in order to read zero, and any other reading is an incident. */
+export type TurnAnomaly = 'turn_out_of_range' | 'turn_on_removed' | 'no_seats_left';
+
+/** The codes `wire.ts` can refuse a frame with. Written down here because a
+ *  parser answers with `error: string`, and a label taken from a `string` is one
+ *  careless call site away from unbounded cardinality: anything not on this list
+ *  counts as `other` instead of opening a series of its own. */
+const WIRE_REASONS: ReadonlySet<string> = new Set([
+  'bad_request', 'table_not_found', 'bad_pin', 'bad_stack', 'wild_needs_color', 'no_such_seat',
+]);
+
 /** Game telemetry with no in-app dashboard: every lifecycle event becomes a
  *  structured log line and, when a registry is attached, a Prometheus series
  *  at /metrics. Humans watch external dashboards only — the hosting panel and
@@ -25,8 +43,11 @@ export class Analytics {
   private prom?: {
     rooms: Counter; joins: Counter;
     joinsFailed: Counter<'reason'>; movesRejected: Counter<'reason'>;
+    wireRejected: Counter<'reason'>; actionBudget: Counter;
     roundsStarted: Counter; roundsFinished: Counter;
     roundSeconds: Histogram; sessionSeconds: Histogram;
+    catchUps: Counter<'outcome'>; catchUpGap: Histogram;
+    turnAnomalies: Counter<'kind'>;
   };
 
   constructor(opts: AnalyticsOptions = {}) {
@@ -43,8 +64,17 @@ export class Analytics {
           labelNames: ['reason'] as const, registers,
         }),
         movesRejected: new Counter({
-          name: 'ochre_moves_rejected_total', help: 'Game actions the engine rejected, by reason',
+          name: 'ochre_moves_rejected_total', help: 'Game actions the rules turned down, by reason',
           labelNames: ['reason'] as const, registers,
+        }),
+        wireRejected: new Counter({
+          name: 'ochre_wire_frames_rejected_total',
+          help: 'Frames refused at the protocol boundary before any game rule was read, by reason',
+          labelNames: ['reason'] as const, registers,
+        }),
+        actionBudget: new Counter({
+          name: 'ochre_action_budget_exceeded_total',
+          help: 'Actions turned away by the per-socket action budget', registers,
         }),
         roundsStarted: new Counter({ name: 'ochre_rounds_started_total', help: 'Rounds dealt (first deal and rematches)', registers }),
         roundsFinished: new Counter({ name: 'ochre_rounds_finished_total', help: 'Rounds that reached a winner', registers }),
@@ -55,6 +85,24 @@ export class Analytics {
         sessionSeconds: new Histogram({
           name: 'ochre_session_duration_seconds', help: 'Socket connect to disconnect',
           buckets: [60, 300, 900, 1800, 3600, 7200], registers,
+        }),
+        catchUps: new Counter({
+          name: 'ochre_catchups_served_total',
+          help: 'Returns to a table, by what the journal could do about the gap',
+          labelNames: ['outcome'] as const, registers,
+        }),
+        // Transactions, not seconds: this measures a distance in the journal.
+        // The buckets straddle MAX_TRANSACTIONS on purpose — the share above
+        // le=200 is how often the cap is what turned a return into a reset.
+        catchUpGap: new Histogram({
+          name: 'ochre_catchup_gap_transactions',
+          help: 'How far behind a returning player was, in journal transactions',
+          buckets: [0, 1, 2, 5, 10, 25, 50, 100, 200, 400, 800], registers,
+        }),
+        turnAnomalies: new Counter({
+          name: 'ochre_turn_queue_anomalies_total',
+          help: 'Turn-queue invariants found broken after an accepted action — always zero on a healthy server',
+          labelNames: ['kind'] as const, registers,
         }),
       };
     }
@@ -128,10 +176,50 @@ export class Analytics {
   }
 
   /** Rejected moves are frequent and benign (misclicks), so they count in
-   *  Prometheus but log at debug to keep the info stream readable. */
+   *  Prometheus but log at debug to keep the info stream readable.
+   *
+   *  Rules only. "You cannot play that" and "that is not a protocol frame" are
+   *  different failures read by different people — see `wireRejected`. */
   moveRejected(reason: string): void {
     this.prom?.movesRejected.inc({ reason });
     this.log?.debug({ evt: 'move_rejected', reason }, 'move rejected');
+  }
+
+  /** A frame that never reached a rule: `wire.ts` refused its shape. A real
+   *  client cannot produce one — its own UI can only send well-formed frames —
+   *  so a rate here is either a client bug or somebody prodding the socket, and
+   *  it is worth reading apart from the misclicks in `moveRejected`. */
+  wireRejected(reason: string): void {
+    this.prom?.wireRejected.inc({ reason: WIRE_REASONS.has(reason) ? reason : 'other' });
+    this.log?.debug({ evt: 'wire_rejected', reason }, 'frame refused at the wire');
+  }
+
+  /** The per-socket action budget saying no. A human at a table never reaches
+   *  it — twenty frames a seat a round against a hundred and twenty in ten
+   *  seconds — so anything but a flat zero means the ceiling is too low or the
+   *  socket is not a human. Counted apart from the moves for that reason. */
+  actionBudgetExceeded(): void {
+    this.prom?.actionBudget.inc();
+    this.log?.debug({ evt: 'action_budget_exceeded' }, 'action budget exceeded');
+  }
+
+  /** A player came back and the journal answered. `gap` is a count of
+   *  transactions — how much had happened while they were away — and `null`
+   *  when the journal could not say. Nothing here identifies anybody: the
+   *  outcome is one of four words and the gap is a distance. */
+  catchUpServed(outcome: CatchUpOutcome, gap: number | null, visitor?: Visitor): void {
+    this.prom?.catchUps.inc({ outcome });
+    if (gap !== null && Number.isFinite(gap) && gap >= 0) this.prom?.catchUpGap.observe(gap);
+    this.log?.debug({ evt: 'catch_up', outcome, gap }, 'catch-up served');
+    this.emit('catch_up', { outcome }, visitor);
+  }
+
+  /** The turn queue caught in a state it promises never to be in. An incident,
+   *  not a rate: it logs at error with the room code so the table can be found,
+   *  and the label carries only which invariant broke. */
+  turnAnomaly(kind: TurnAnomaly, code?: string): void {
+    this.prom?.turnAnomalies.inc({ kind });
+    this.log?.error({ evt: 'turn_queue_anomaly', kind, code }, 'turn queue anomaly');
   }
 
   rulesChanged(code: string, rules: Rules): void {

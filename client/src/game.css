@@ -399,6 +399,37 @@ body {
   background: rgb(32 30 29 / 0.42);
 }
 
+/* — what you missed: shown once on the way back in —
+   One above the pause backdrop (71). Both can be up at the same moment — you
+   come back, someone else is still away — and the account of what you missed is
+   the one the returning player came looking for. */
+.catchup-backdrop { z-index: 71; }
+.catchup-list {
+  margin: 0; padding: 0; list-style: none;
+  max-height: min(46vh, 340px); overflow-y: auto;
+  border-top: 1px solid var(--color-neutral-200);
+}
+.catchup-row {
+  padding: 9px 2px; font-size: 14px; line-height: 1.35;
+  color: var(--color-neutral-700);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.catchup-row:last-child { border-bottom: none; }
+/* Yours reads darker and carries a rule down the left, so even a long list
+   answers "and what happened to me" at a glance. */
+.catchup-mine {
+  color: var(--color-text); font-weight: 600;
+  padding-left: 10px; border-left: 3px solid var(--color-accent);
+}
+/* The rematch boundary is a divider, not an event. */
+.catchup-boundary {
+  margin: 4px 0; padding: 8px 2px; text-align: center;
+  font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--color-neutral-500); background: var(--color-neutral-100);
+  border-radius: 10px; border-bottom: none;
+}
+.catchup-crossed { color: var(--color-neutral-600); }
+
 /* — round over — */
 .roundover { position: relative; overflow: hidden; }
 .roundover::before {

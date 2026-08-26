@@ -1,7 +1,10 @@
 import type { Card, Color, Rules } from '@uno/shared';
-import { buildDeck, shuffle } from './deck.js';
+import { buildDeck, isColor, shuffle } from './deck.js';
 import { CLASSIC_RULES, isPlayable, type Effect } from '@uno/shared';
 import { rng } from './deck.js';
+import {
+  openingSeating, passTurn, reverseTurn, seatAfter, seatsInRound, withdrawSeat,
+} from './seating.js';
 
 export interface PlayerState { hand: Card[]; calledLastCard: boolean; removed: boolean }
 
@@ -26,15 +29,11 @@ export interface GameState {
  *  allowed to open a round. */
 const isNumberCard = (c: Card) => /^\d$/.test(c.value);
 
+/** Where the turn lands `steps` places on from `from`. A reading of the turn queue
+ *  that moves nothing — kept under its old name because callers and tests ask this
+ *  question. The order itself lives in `seating.ts`. */
 export function nextSeat(state: GameState, from: number, steps = 1): number {
-  const n = state.players.length;
-  let seat = from;
-  for (let remaining = steps; remaining > 0; remaining--) {
-    do {
-      seat = (((seat + state.direction) % n) + n) % n;
-    } while (state.players[seat]!.removed);
-  }
-  return seat;
+  return seatAfter(state, from, steps);
 }
 
 export function createGame(numPlayers: number, random: () => number, rules: Rules = CLASSIC_RULES): GameState {
@@ -58,7 +57,7 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
 
   return {
     players, drawPile, discard: [first],
-    turn: 0, direction: 1,
+    ...openingSeating(players.length),
     currentColor: first.color,
     mustChooseColor: false,
     pendingDrawn: null, catchWindow: null, winner: null,
@@ -143,14 +142,24 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (s.pendingDraw > 0 && !stackAnswer) return err('answer_pot');
       if (!stackAnswer && !isPlayable(card, top, s.currentColor)) return err('card_no_match');
       const isWild = card.value === 'wild' || card.value === 'wild4';
-      if (isWild && !action.chosenColor) return err('wild_needs_color');
+      // The colour is a caller's word, not the engine's: only one of the four real
+      // colours may become the round's colour.
+      let wildColor: Color | null = null;
+      if (isWild) {
+        if (!isColor(action.chosenColor)) return err('wild_needs_color');
+        wildColor = action.chosenColor;
+      }
 
       s.catchWindow = null; // the next act closes any open window (may re-arm below)
       s.pendingDrawn = null;
-      for (const c of stack) player.hand.splice(player.hand.findIndex((h) => h.id === c.id), 1);
+      for (const c of stack) {
+        const at = player.hand.findIndex((h) => h.id === c.id);
+        if (at === -1) return err('card_not_in_hand'); // never guess: splice(-1) eats the wrong card
+        player.hand.splice(at, 1);
+      }
       s.discard.push(...stack);
       const last = stack.at(-1)!;
-      s.currentColor = isWild ? action.chosenColor! : last.color;
+      s.currentColor = wildColor ?? last.color;
       effects.push({ type: 'played', seat: action.seat, cards: stack });
 
       if (player.hand.length === 0) {
@@ -164,51 +173,47 @@ export function applyAction(state: GameState, action: Action): ActionResult {
 
       if (stack.length > 1) {
         // Stacks are always number cards: no action effects, the turn just moves on.
-        s.turn = nextSeat(s, action.seat);
+        passTurn(s);
         return { ok: true, state: s, effects };
       }
 
-      const active = s.players.filter((p) => !p.removed).length;
       switch (card.value) {
         case 'skip':
-          s.turn = nextSeat(s, action.seat, 2);
+          passTurn(s, 2);
           break;
         case 'reverse':
-          if (active === 2) {
-            s.turn = action.seat; // acts as skip: same player again
-          } else {
-            s.direction = s.direction === 1 ? -1 : 1;
-            s.turn = nextSeat(s, action.seat);
-          }
+          // Two players left is not a special case here: the queue knows a ring of
+          // two is its own reverse, and hands the turn back to this seat itself.
+          reverseTurn(s);
           break;
         case 'draw2': {
           if (s.rules.stacking) {
             s.pendingDraw += 2;
             s.pendingDrawKind = 'draw2';
-            s.turn = nextSeat(s, action.seat); // victim answers: stack or take
+            passTurn(s); // victim answers: stack or take
             break;
           }
           const victim = nextSeat(s, action.seat);
           const n = drawFromPile(s, victim, 2);
           effects.push({ type: 'drew', seat: victim, count: n });
-          s.turn = nextSeat(s, action.seat, 2);
+          passTurn(s, 2);
           break;
         }
         case 'wild4': {
           if (s.rules.stacking) {
             s.pendingDraw += 4;
             s.pendingDrawKind = 'wild4';
-            s.turn = nextSeat(s, action.seat);
+            passTurn(s);
             break;
           }
           const victim = nextSeat(s, action.seat);
           const n = drawFromPile(s, victim, 4);
           effects.push({ type: 'drew', seat: victim, count: n });
-          s.turn = nextSeat(s, action.seat, 2);
+          passTurn(s, 2);
           break;
         }
         default:
-          s.turn = nextSeat(s, action.seat);
+          passTurn(s);
       }
       return { ok: true, state: s, effects };
     }
@@ -225,7 +230,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
         s.pendingDrawKind = null;
         const n = drawFromPile(s, action.seat, owed);
         effects.push({ type: 'drew', seat: action.seat, count: n });
-        s.turn = nextSeat(s, action.seat);
+        passTurn(s);
         return { ok: true, state: s, effects };
       }
       // Draw one card — or, under drawToMatch, keep drawing to the first playable.
@@ -241,7 +246,7 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       }
       effects.push({ type: 'drew', seat: action.seat, count: total });
       if (!drawnCard || !isPlayable(drawnCard, s.discard.at(-1)!, s.currentColor)) {
-        s.turn = nextSeat(s, action.seat);
+        passTurn(s);
         return { ok: true, state: s, effects };
       }
       const isWildDraw = drawnCard.value === 'wild' || drawnCard.value === 'wild4';
@@ -253,7 +258,8 @@ export function applyAction(state: GameState, action: Action): ActionResult {
       if (s.rules.forcePlay && !isWildDraw && !hasRankMates) {
         // Force play: the drawn card goes straight down (wilds wait for a colour).
         const played = applyAction(s, { type: 'play', seat: action.seat, cardIds: [drawnCard.id] });
-        if (played.ok) return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
+        if (!played.ok) return played; // the rule says this play is legal; if it is not, say so
+        return { ok: true, state: played.state, effects: [...effects, ...played.effects] };
       }
       s.pendingDrawn = { seat: action.seat, cardId: drawnCard.id };
       return { ok: true, state: s, effects };
@@ -262,8 +268,9 @@ export function applyAction(state: GameState, action: Action): ActionResult {
     case 'pass': {
       if (s.pendingDrawn?.seat !== action.seat) return err('nothing_to_pass');
       if (s.rules.forcePlay) return err('force_play');
+      s.catchWindow = null; // like every other act, passing closes an open window
       s.pendingDrawn = null;
-      s.turn = nextSeat(s, action.seat);
+      passTurn(s);
       return { ok: true, state: s, effects };
     }
 
@@ -290,29 +297,33 @@ export function applyAction(state: GameState, action: Action): ActionResult {
   }
 }
 
-/** Remove a seat from the current round: bury their cards at the bottom of the
- *  draw pile, fix the turn, and end the round if only one player remains. */
+/** Remove a seat from the current round: take them out of the turn queue, bury
+ *  their cards at the bottom of the draw pile, and end the round if only one
+ *  player remains. The queue moves the turn off the leaver by itself. */
 export function removeFromRound(state: GameState, seat: number): GameState {
   const s = structuredClone(state);
-  const p = s.players[seat]!;
-  p.removed = true;
+  const p = Number.isInteger(seat) ? s.players[seat] : undefined;
+  if (!p) return s; // no such seat: nothing to remove, and nothing to corrupt
+  const wasTheirTurn = s.turn === seat;
+  // Out of the queue, and the turn steps off them in the same breath: no caller
+  // has to remember that a leaver may have been holding it.
+  withdrawSeat(s, seat);
   s.drawPile.unshift(...p.hand);
   p.hand = [];
   if (s.pendingDrawn?.seat === seat) s.pendingDrawn = null;
   if (s.catchWindow?.seat === seat) s.catchWindow = null;
-  const active = s.players.flatMap((pl, i) => (pl.removed ? [] : [i]));
+  const active = seatsInRound(s);
   if (active.length === 1) {
-    s.winner = active[0]!;
+    s.winner = active[0] ?? null;
     return s;
   }
-  if (s.turn === seat) {
+  if (wasTheirTurn) {
     if (s.mustChooseColor) {
       s.mustChooseColor = false;
-      s.currentColor = s.discard.at(-1)!.color ?? 'red';
+      s.currentColor = s.discard.at(-1)?.color ?? 'red';
     }
     s.pendingDraw = 0; // an owed pot dies with the leaver
     s.pendingDrawKind = null;
-    s.turn = nextSeat(s, seat);
   }
   return s;
 }

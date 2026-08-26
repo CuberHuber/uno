@@ -223,3 +223,163 @@ describe('5-char codes and room PIN', () => {
     expect(store.viewFor(room.code, 1).hasPin).toBe(true);
   });
 });
+
+
+function seatRoom(store: RoomStore, names: string[], seed = 42) {
+  const room = store.createRoom({ seed });
+  const tokens = names.map((n) => {
+    const j = store.join(room.code, n);
+    if (!j.ok) throw new Error(j.error);
+    return j.token;
+  });
+  const started = store.startGame(room.code, tokens[0]!);
+  if (!started.ok) throw new Error(started.error);
+  return { room, tokens };
+}
+
+/** Hand the player to move one card that matches the discard, so the next act
+ *  ends the round. Returns the winning seat. */
+function forceWin(store: RoomStore, code: string): number {
+  const g = store.getRoom(code)!.game!;
+  g.pendingDraw = 0; g.pendingDrawKind = null; g.pendingDrawn = null; g.catchWindow = null;
+  g.mustChooseColor = false; g.currentColor = 'red';
+  g.players[g.turn]!.hand = [{ id: 9999, color: 'red', value: '5' }];
+  const seat = g.turn;
+  const r = store.act(code, store.getRoom(code)!.players[seat]!.token, { type: 'play', cardIds: [9999] } as never);
+  if (!r.ok) throw new Error('forced win failed');
+  return seat;
+}
+
+describe('continueWithout: the target seat must be a real array index', () => {
+  test('string keys, negatives, fractions and out-of-range are all refused', () => {
+    let clock = 1_000_000;
+    const store = new RoomStore(() => clock);
+    const { room, tokens } = seatRoom(store, ['Mira', 'Jonas']);
+    store.setConnection(room.code, 1, null);
+    clock += CONTINUE_GRACE_MS + 1; // grace is over: only the index check can stop these
+    const hostile: unknown[] = ['__proto__', 'length', 'constructor', '1', -1, 1.5, 2, 99, NaN, Infinity, null, undefined];
+    for (const seat of hostile) {
+      expect(store.continueWithout(room.code, tokens[0]!, seat as number))
+        .toEqual({ ok: false, error: 'no_such_seat' });
+    }
+    // nothing was written through the prototype, and the table still plays
+    expect(Object.prototype.hasOwnProperty.call(Array.prototype, 'left')).toBe(false);
+    expect(([] as unknown as { left?: boolean }).left).toBeUndefined();
+    const after = store.getRoom(room.code)!;
+    expect(after.phase).toBe('playing');
+    expect(after.players[1]!.left).toBe(false);
+    expect(after.game!.players[1]!.removed).toBe(false);
+    expect(store.continueWithout(room.code, tokens[0]!, 1).ok).toBe(true); // the real index still works
+  });
+
+  test('a removal after the round has ended does not score the win twice', () => {
+    let clock = 1_000_000;
+    const store = new RoomStore(() => clock);
+    const { room, tokens } = seatRoom(store, ['Mira', 'Jonas']);
+    const winner = forceWin(store, room.code);
+    const loser = winner === 0 ? 1 : 0;
+    expect(store.getRoom(room.code)!.phase).toBe('roundEnd');
+    expect(store.getRoom(room.code)!.winTally[winner]).toBe(1);
+    store.setConnection(room.code, loser, null);
+    clock += CONTINUE_GRACE_MS + 1;
+    const caller = store.getRoom(room.code)!.players[winner]!.token;
+    expect(store.continueWithout(room.code, caller, loser)).toEqual({ ok: false, error: 'no_round' });
+    const after = store.getRoom(room.code)!;
+    expect(after.winTally[winner]).toBe(1);
+    expect(after.players[loser]!.left).toBe(false);
+    expect(tokens.length).toBe(2);
+  });
+});
+
+describe('rematch: validate first, then mutate', () => {
+  test('a rematch that cannot deal leaves the room exactly as it was', () => {
+    let clock = 1_000_000;
+    const store = new RoomStore(() => clock);
+    const { room, tokens } = seatRoom(store, ['Mira', 'Jonas']);
+    store.setConnection(room.code, 1, null);
+    clock += CONTINUE_GRACE_MS + 1;
+    expect(store.continueWithout(room.code, tokens[0]!, 1).ok).toBe(true); // 2 seats: the round ends
+    const live = store.getRoom(room.code)!;
+    const before = JSON.stringify([live.players, live.winTally, live.hostSeat, live.seed, live.phase]);
+    expect(store.rematch(room.code, tokens[0]!)).toEqual({ ok: false, error: 'not_enough_players' });
+    const after = store.getRoom(room.code)!;
+    expect(JSON.stringify([after.players, after.winTally, after.hostSeat, after.seed, after.phase])).toBe(before);
+    expect(after.game!.players.length).toBe(after.players.length); // round still matches the seat list
+  });
+
+  test('a refused rematch does not move the journal either', () => {
+    let clock = 1_000_000;
+    const store = new RoomStore(() => clock);
+    const { room, tokens } = seatRoom(store, ['Mira', 'Jonas', 'Ada']);
+    store.getRoom(room.code)!.phase = 'roundEnd';
+    const before = store.historyHead(room.code);
+    expect(store.rematch(room.code, tokens[2]!)).toEqual({ ok: false, error: 'host_only_deal' });
+    // Nothing happened, so nothing is written down — and the seat numbering has
+    // not silently moved on under the pointers players are still holding.
+    expect(store.historyHead(room.code)).toEqual(before);
+    expect(clock).toBe(1_000_000);
+    expect(store.rematch(room.code, tokens[0]!).ok).toBe(true);
+    const after = store.historyHead(room.code);
+    expect(after.ok && before.ok && after.seq > before.seq).toBe(true);
+    expect(after.ok && after.seatEpoch).toBe(1);
+  });
+
+  test('only the host deals the next hand; a removed host passes the deal down', () => {
+    let clock = 1_000_000;
+    const store = new RoomStore(() => clock);
+    const { room, tokens } = seatRoom(store, ['Mira', 'Jonas', 'Ada']);
+    store.getRoom(room.code)!.phase = 'roundEnd';
+    const live = store.getRoom(room.code)!;
+    const before = JSON.stringify([live.players, live.winTally, live.hostSeat]);
+    expect(store.rematch(room.code, tokens[2]!)).toEqual({ ok: false, error: 'host_only_deal' });
+    expect(JSON.stringify([live.players, live.winTally, live.hostSeat])).toBe(before);
+    expect(store.rematch(room.code, tokens[0]!).ok).toBe(true);
+    // now drop the host out of the round: the first player still seated deals
+    store.setConnection(room.code, 0, null);
+    clock += CONTINUE_GRACE_MS + 1;
+    expect(store.continueWithout(room.code, tokens[1]!, 0).ok).toBe(true);
+    store.getRoom(room.code)!.phase = 'roundEnd';
+    expect(store.rematch(room.code, tokens[2]!)).toEqual({ ok: false, error: 'host_only_deal' });
+    expect(store.rematch(room.code, tokens[1]!).ok).toBe(true);
+    const after = store.getRoom(room.code)!;
+    expect(after.players.map((p) => p.name)).toEqual(['Jonas', 'Ada']);
+    expect(after.hostSeat).toBe(0);
+  });
+});
+
+describe('setConnection and the pin type', () => {
+  test('a late disconnect from a replaced socket is ignored', () => {
+    const store = new RoomStore();
+    const { room } = seatRoom(store, ['Mira', 'Jonas']);
+    store.setConnection(room.code, 0, 'sock-old');
+    store.setConnection(room.code, 0, 'sock-new'); // Wi-Fi to LTE: same seat, new socket
+    store.setConnection(room.code, 0, null, 'sock-old'); // the dead socket finally times out
+    expect(store.getRoom(room.code)!.players[0]!.connected).toBe(true);
+    expect(store.getRoom(room.code)!.players[0]!.socketId).toBe('sock-new');
+    store.setConnection(room.code, 0, null, 'sock-new'); // the live socket really drops
+    expect(store.getRoom(room.code)!.players[0]!.connected).toBe(false);
+    // three-argument calls keep their old, unconditional meaning
+    store.setConnection(room.code, 0, 'sock-3');
+    store.setConnection(room.code, 0, null);
+    expect(store.getRoom(room.code)!.players[0]!.connected).toBe(false);
+    expect(store.getRoom(room.code)!.players[0]!.socketId).toBeNull();
+  });
+
+  test('a numeric pin is refused instead of locking the host out', () => {
+    const store = new RoomStore();
+    const room = store.createRoom();
+    const host = store.join(room.code, 'Host');
+    if (!host.ok) throw new Error(host.error);
+    expect(store.setPin(room.code, host.token, 1234 as unknown as string)).toEqual({ ok: false, error: 'bad_pin' });
+    expect(room.pin).toBeNull();
+    expect(store.join(room.code, 'Guest').ok).toBe(true); // the table never got locked
+    expect(store.createRoom({ pin: 1234 as unknown as string }).pin).toBeNull();
+  });
+
+  test('tryViewFor reports a missing room instead of throwing', () => {
+    const store = new RoomStore();
+    const { room } = seatRoom(store, ['Mira', 'Jonas']);
+    expect(store.tryViewFor('AAAAA', 0)).toBeNull();
+    expect(store.tryViewFor(room.code, 0)).toEqual(store.viewFor(room.code, 0));
+  });
+});

@@ -1,6 +1,10 @@
 import type { Card, Color, Value } from '@uno/shared';
 
-const COLORS: Color[] = ['red', 'yellow', 'green', 'blue'];
+export const COLORS: readonly Color[] = ['red', 'yellow', 'green', 'blue'];
+
+/** Colours reach the engine from callers it does not control: never assume one
+ *  of the four, check it. */
+export const isColor = (v: unknown): v is Color => COLORS.includes(v as Color);
 
 export function buildDeck(): Card[] {
   const cards: Card[] = [];

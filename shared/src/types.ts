@@ -67,6 +67,94 @@ export type Effect =
   | { type: 'caught'; seat: number }
   | { type: 'win'; seat: number };
 
+// ── The room's journal, as it crosses the wire ───────────────────────────────
+//
+// The server keeps an ordered log of accepted changes (`server/src/history.ts`)
+// and one pointer per player into it. The types below are the shape that log
+// takes when it leaves the server; the server's own types satisfy them
+// structurally, and the assignment at the emit site is what checks that.
+//
+// Nothing here is narrower than "the whole table may see it", with one
+// exception that is named as such: `yourCards`, the cards the single player
+// this copy was built for is allowed to see.
+
+/** A player's public, stable name — never the token. Seats are renumbered by
+ *  the rematch compaction; this is what a transaction written before it still
+ *  points at afterwards. */
+export type PlayerId = string;
+
+export interface SeatRecord { seat: number; playerId: PlayerId; name: string }
+
+/** Who caused the change. `seat` is the seat *as of this transaction's
+ *  `seatEpoch`*; `playerId` is the part that keeps its meaning across a
+ *  reseating. `system` is the room drawing a consequence — a round ending is
+ *  nobody's move. */
+export type TxActor =
+  | { kind: 'player'; playerId: PlayerId; seat: number }
+  | { kind: 'system' };
+
+export type MoveKind = 'play' | 'draw' | 'pass' | 'chooseColor' | 'callLastCard' | 'catchLastCard';
+
+export interface TxPayloads {
+  roundStarted: { handCounts: number[]; topCard: Card | null; turnSeat: number | null };
+  move: {
+    move: MoveKind;
+    handCounts: number[];
+    turnSeat: number | null;
+    currentColor: Color | null;
+    topCard: Card | null;
+  };
+  roundEnded: { winnerSeat: number | null; winnerPlayerId: PlayerId | null; winTally: number[] };
+  playerRemoved: { seat: number; playerId: PlayerId; name: string; buriedCount: number };
+  rulesChanged: { rules: Rules };
+  /** The rematch compaction: from here on the seat numbers mean new people. */
+  seatsRebuilt: { seats: SeatRecord[] };
+}
+
+export type TxKind = keyof TxPayloads;
+
+export type PublicTransaction = {
+  [K in TxKind]: {
+    seq: number;
+    atMs: number;
+    /** Which seating the `seat` numbers in this transaction belong to. */
+    seatEpoch: number;
+    actor: TxActor;
+    effects: Effect[];
+    /** The room's phase once this change had been applied. */
+    phase: Phase;
+    kind: K;
+    payload: TxPayloads[K];
+  };
+}[TxKind];
+
+/** A transaction as one seat may read it: the public part verbatim, plus the
+ *  cards that seat — and only that seat — was allowed to see. */
+export type SeatTransaction = PublicTransaction & { yourCards: Card[] | null };
+
+/** The answer to "what happened while I was gone". It never replaces the
+ *  snapshot — `roomState` arrives either way — it only says what the gap was
+ *  made of. */
+export interface CatchUpView {
+  /** The journal head this answer was built at. */
+  seq: number;
+  /** What was missed, oldest first. Empty when the journal could not answer. */
+  entries: SeatTransaction[];
+  /** The gap ran deeper than the journal keeps. `entries` is empty on purpose:
+   *  a list with a hole in it is a worse answer than no list. The pointer has
+   *  been moved up to the head and the snapshot is the whole truth. */
+  truncated: boolean;
+  /** A rematch sits inside the window, so seat numbers before it name other
+   *  people than the same numbers name now. */
+  crossedRebuild: boolean;
+  /** Who is who at the table right now: the only way to put a name to the
+   *  `playerId` a transaction carries. Players who have left are absent — the
+   *  transaction that removed them carries their name itself. */
+  seats: SeatRecord[];
+  /** Your own public id, so the list can say "you" where it means you. */
+  you: PlayerId;
+}
+
 export interface JoinAck {
   ok: boolean;
   error?: string;
@@ -91,10 +179,22 @@ export interface ClientToServerEvents {
   catchLastCard: () => void;
   rematch: () => void;
   continueWithout: (p: { seat: number }) => void;
+  /** "I have applied everything up to this number." The pointer it moves only
+   *  ever goes forward, so a late acknowledgement from a socket that has since
+   *  been replaced cannot re-open a gap that is already closed. */
+  ackHistory: (p: { seq: number }) => void;
 }
 
 export interface ServerToClientEvents {
   roomState: (view: RoomStateView) => void;
   moveRejected: (p: { reason: string }) => void;
   effect: (e: Effect) => void;
+  /** Where the journal stands, sent alongside every snapshot. A snapshot holds
+   *  everything up to this number by construction, so applying one is grounds
+   *  to acknowledge it — and that, not the reconnect, is what keeps the pointer
+   *  level during a live round. */
+  historyHead: (p: { seq: number }) => void;
+  /** What one player missed while they were away. Sent after the snapshot, and
+   *  only when there is something to say. */
+  catchUp: (p: CatchUpView) => void;
 }

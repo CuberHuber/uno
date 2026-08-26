@@ -50,6 +50,25 @@ Custom series:
   (counters — use `increase()`);
   `ochre_round_duration_seconds`, `ochre_session_duration_seconds`
   (histograms — use `histogram_quantile()`).
+
+The journal and the turn queue, added so those two are watchable:
+
+| Series | The question it answers |
+|---|---|
+| `ochre_catchups_served_total{outcome}` | Of the players who came back, how many got a delta (`delta`), had missed nothing (`empty`), fell off the back of the journal (`truncated`), or could not be placed at all (`failed`). A fresh arrival is not a return and is not counted. |
+| `ochre_catchup_gap_transactions` | How far behind returning players were, in transactions. The share above `le="200"` is how often `MAX_TRANSACTIONS` is what turned a return into a reset — the reading that says whether 200 is the right number. |
+| `ochre_history_lag_transactions_max` | Are acknowledgements arriving at all? Near zero while they are; it climbs and stays up when they stop. Connected seats only — a player who is away is supposed to be behind. |
+| `ochre_history_transactions_stored`, `…_deepest` | What the journals cost in memory, and how close a single room comes to the cap. |
+| `ochre_turn_queue_anomalies_total{kind}` | An alarm, not a statistic: `turn_out_of_range`, `turn_on_removed`, `no_seats_left`. Each must read zero forever; any increase is an incident, and the matching `turn_queue_anomaly` log line carries the room code. |
+| `ochre_wire_frames_rejected_total{reason}` | Frames refused by `wire.ts` before any rule was read. A real client cannot produce one, so a rate here is a client bug or somebody prodding the socket. |
+| `ochre_action_budget_exceeded_total` | The per-socket action budget biting. A human never reaches it: anything but zero means the ceiling is too low or the socket is not a human. |
+
+`ochre_moves_rejected_total{reason}` is now *rules only* —
+  misclicks, read by whoever tunes the game.
+Malformed frames and budget refusals used to land in it as well,
+  which made one number out of three unrelated questions.
+Labels are only ever drawn from a fixed dictionary of reasons, kinds and
+  outcomes: no room code, nickname, token, player id or card ever becomes one.
 Watch `nodejs_eventloop_lag_seconds` and `process_resident_memory_bytes` —
   the earliest trouble signals on a 1 CPU / 1 GB app.
 
@@ -100,19 +119,27 @@ Fastify's built-in pino logger is enabled by the entrypoint,
 Game events are structured lines:
   `evt` is one of `room_created`, `player_joined`, `join_failed`,
   `round_started`, `round_finished`, `session_ended`
-  (plus `rules_changed`, `rematch_started`, `player_kicked`, `move_rejected`).
-`session_ended` carries `code` and `seat` once the socket had joined a table.
+  (plus `rules_changed`, `rematch_started`, `player_kicked`, `move_rejected`,
+  `wire_rejected`, `action_budget_exceeded`, `catch_up`,
+  and `turn_queue_anomaly`, the only one that logs at `error`).
+`session_ended` carries `code` and `seat` once the socket had joined a table;
+  the seat is re-derived from the seat token at disconnect time,
+  because the rematch compaction renumbers seats
+  and the number written down at sitting time goes stale.
 Per-request HTTP logging is deliberately off — the game lives on websockets.
 Uncaught route errors are logged with their stack;
   the HTTP response is an opaque `{"error":"internal_error"}`.
 
 Server-truth events (`join_failed`, `round_started`, `round_finished`,
-  `session_ended`) are also sent to Umami via `POST /api/send`
+  `session_ended`, `catch_up`) are also sent to Umami via `POST /api/send`
   with the player's ip/userAgent overrides (requires Umami ≥ 2.17),
   so they land in the same Umami session as the player's pageviews.
 This needs `UMAMI_HOST` (or `UMAMI_SRC`) alongside `UMAMI_WEBSITE_ID`;
   without them the sender is a silent no-op.
-Event data never contains room codes, nicknames, or IPs.
+Event data never contains room codes, nicknames, or IPs —
+  only aggregates and categories:
+  `catch_up` carries its outcome word and nothing else,
+  and the gap it measured stays in Prometheus.
 
 The GameAnalytics relay (`server/src/ga-relay.ts`) accepts the browser SDK's
   batches on `POST /api/ga/v2/<key>/events` and

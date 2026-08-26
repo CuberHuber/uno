@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { Card } from '@uno/shared';
-import { createGame, nextSeat } from '../src/engine/game.js';
+import { createGame, nextSeat, removeFromRound } from '../src/engine/game.js';
 import { buildDeck, rng, shuffle } from '../src/engine/deck.js';
 
 const isNum = (c: Card) => /^\d$/.test(c.value);
@@ -104,5 +104,44 @@ describe('nextSeat', () => {
     expect(nextSeat({ ...g, direction: 1 }, 2)).toBe(0);
     expect(nextSeat({ ...g, direction: -1 }, 0)).toBe(2);
     expect(nextSeat({ ...g, direction: 1 }, 0, 2)).toBe(2);
+  });
+  test('walks past removed seats to the next active one', () => {
+    const g = createGame(4, rng(1));
+    g.players[1]!.removed = true;
+    g.players[2]!.removed = true;
+    expect(nextSeat(g, 0)).toBe(3);
+    expect(nextSeat(g, 3)).toBe(0);
+  });
+  // The walk is bounded by the table size. Without the bound these two spin
+  // forever on the server's only thread — a hang, not a crash.
+  test('a table with no active seat left returns instead of spinning', () => {
+    const g = createGame(3, rng(1));
+    for (const p of g.players) p.removed = true;
+    expect(nextSeat(g, 1)).toBe(1);
+    expect(nextSeat({ ...g, direction: -1 }, 2, 5)).toBe(2);
+  });
+  test('an empty table has nowhere to go', () => {
+    const g = createGame(3, rng(1));
+    expect(nextSeat({ ...g, players: [] }, 0)).toBe(0);
+  });
+});
+
+describe('removeFromRound', () => {
+  test('buries the leaver hand and moves the turn on', () => {
+    const g = createGame(3, rng(1));
+    const pile = g.drawPile.length;
+    const s = removeFromRound(g, 0);
+    expect(s.players[0]!.removed).toBe(true);
+    expect(s.players[0]!.hand).toHaveLength(0);
+    expect(s.drawPile).toHaveLength(pile + 7);
+    expect(s.turn).toBe(1);
+  });
+  test('a seat that is not a seat changes nothing', () => {
+    const g = createGame(3, rng(1));
+    const before = JSON.stringify(g);
+    const notSeats = [3, -1, 1.5, NaN, '__proto__', '1'] as unknown as number[];
+    for (const seat of notSeats) expect(JSON.stringify(removeFromRound(g, seat))).toBe(before);
+    expect(JSON.stringify(g)).toBe(before);
+    expect(([] as unknown as { removed?: boolean }).removed).toBeUndefined();
   });
 });
