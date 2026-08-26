@@ -18,7 +18,7 @@ export function fixedState(hands: Card[][], top: Card, opts: Partial<GameState> 
     pendingDrawn: null,
     catchWindow: null,
     winner: null,
-    reshuffleSeed: 1,
+    reshuffleSeed: '11'.repeat(32),
     rules: { ...CLASSIC_RULES },
     pendingDraw: 0,
     pendingDrawKind: null,

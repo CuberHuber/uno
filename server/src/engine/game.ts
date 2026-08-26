@@ -1,7 +1,6 @@
 import type { Card, Color, Rules } from '@uno/shared';
-import { buildDeck, isColor, shuffle } from './deck.js';
+import { advanceSeed, buildDeck, isColor, newSeed, seedStream, shuffle } from './deck.js';
 import { CLASSIC_RULES, isPlayable, type Effect } from '@uno/shared';
-import { rng } from './deck.js';
 import {
   openingSeating, passTurn, reverseTurn, seatAfter, seatsInRound, withdrawSeat,
 } from './seating.js';
@@ -22,7 +21,7 @@ export interface GameState {
   rules: Rules;
   pendingDraw: number;   // stacking pot the turn seat owes; 0 when settled
   pendingDrawKind: 'draw2' | 'wild4' | null; // which kind answers the pot (strict stacking)
-  reshuffleSeed: number; // advances on every discard reshuffle for determinism
+  reshuffleSeed: string; // 256-bit; advances on every discard reshuffle
 }
 
 /** Number cards are the only ones a stack discard may combine, and the only ones
@@ -62,7 +61,7 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
     mustChooseColor: false,
     pendingDrawn: null, catchWindow: null, winner: null,
     rules: { ...rules }, pendingDraw: 0, pendingDrawKind: null,
-    reshuffleSeed: Math.floor(random() * 2 ** 31),
+    reshuffleSeed: newSeed(random),
   };
 }
 
@@ -86,8 +85,8 @@ function drawFromPile(s: GameState, seat: number, count: number): number {
   for (let i = 0; i < count; i++) {
     if (s.drawPile.length === 0 && s.discard.length > 1) {
       const top = s.discard.pop()!;
-      s.reshuffleSeed = (s.reshuffleSeed + 1) >>> 0;
-      s.drawPile = shuffle(s.discard, rng(s.reshuffleSeed));
+      s.reshuffleSeed = advanceSeed(s.reshuffleSeed);
+      s.drawPile = shuffle(s.discard, seedStream(s.reshuffleSeed));
       s.discard = [top];
     }
     const card = s.drawPile.pop();
