@@ -1,6 +1,6 @@
 import type { Card, Color, Rules } from '@uno/shared';
 import { advanceSeed, buildDeck, isColor, newSeed, seedStream, shuffle } from './deck.js';
-import { CLASSIC_RULES, isPlayable, type Effect } from '@uno/shared';
+import { CLASSIC_RULES, isNumberCard, isPlayable, type Effect } from '@uno/shared';
 import {
   openingSeating, passTurn, reverseTurn, seatAfter, seatsInRound, withdrawSeat,
 } from './seating.js';
@@ -22,10 +22,6 @@ export interface GameState {
   pendingDrawKind: 'draw2' | 'wild4' | null; // which kind answers the pot (strict stacking)
   reshuffleSeed: string; // 256-bit; advances on every discard reshuffle
 }
-
-/** Number cards are the only ones a stack discard may combine, and the only ones
- *  allowed to open a round. */
-const isNumberCard = (c: Card) => /^\d$/.test(c.value);
 
 /** Where the turn lands `steps` places on from `from`. A reading of the turn queue
  *  that moves nothing — kept under its old name because callers and tests ask this

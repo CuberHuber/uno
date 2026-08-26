@@ -39,6 +39,7 @@ export interface RoomStateView {
   phase: Phase;
   yourSeat: number;
   hand: Card[];
+  legal: number[];               // ids in your hand that may lead a play right now
   seats: SeatView[];
   turnSeat: number | null;
   direction: 1 | -1;

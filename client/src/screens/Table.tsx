@@ -2,7 +2,7 @@
 // design/Ochre Eights - Full Game Flexible.dc.html onto the real protocol.
 // The server stays authoritative; effects and view diffs drive the choreography.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { isPlayable, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
+import { isNumberCard, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
 import { track } from '../analytics';
 import HelpSheet from '../components/HelpSheet';
 import PauseOverlay from '../components/PauseOverlay';
@@ -16,7 +16,6 @@ import { seatSlots, stageLayout } from '../table/layout';
 
 const FLY_MS = 620;
 const DRAW_MS = 460;
-const isNumberCard = (c: Card) => /^\d$/.test(c.value);
 
 interface FlyClone { id: number; card: Card; from: string; delay: number; heavy: boolean }
 interface OppAnim { key: number; kind: 'fly' | 'draw'; slot: number; card: Card | null }
@@ -330,12 +329,9 @@ export default function Table() {
   };
   const discTf = (id: number) => `translate(${L.discX}px, ${L.discY}px) rotate(${(id % 11) - 5}deg)`;
 
-  const canPlay = (c: Card) =>
-    yourTurn && leaving.length === 0 &&
-    (view.pendingDrawnCardId === null || view.pendingDrawnCardId === c.id) &&
-    (view.pendingDraw > 0
-      ? c.value === view.pendingDrawKind
-      : isPlayable(c, view.topCard!, view.currentColor));
+  // Playability is the round's answer, not ours: the view carries the ids. The
+  // only thing left here is the local one — a card mid-flight is not clickable.
+  const canPlay = (c: Card) => leaving.length === 0 && view.legal.includes(c.id);
 
   const firstPicked = picked.length ? hand.find((h) => h.id === picked[0]) : undefined;
   const stackAddable = (c: Card) =>
