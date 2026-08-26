@@ -28,16 +28,11 @@ describe('projectView', () => {
     expect(v1.hand[0]!.value).toBe('3');
   });
 
-  test('pendingDrawn and mustChooseColor are personalized', () => {
+  test('pendingDrawn is personalized', () => {
     const c = ctx();
     c.game!.pendingDrawn = { seat: 0, cardId: c.game!.players[0]!.hand[0]!.id };
     expect(projectView(c, 0).pendingDrawnCardId).not.toBeNull();
     expect(projectView(c, 1).pendingDrawnCardId).toBeNull();
-    const c2 = ctx();
-    c2.game!.mustChooseColor = true;
-    c2.game!.turn = 0;
-    expect(projectView(c2, 0).mustChooseColor).toBe(true);
-    expect(projectView(c2, 1).mustChooseColor).toBe(false);
   });
 
   test('removed seats are filtered out of the seat list', () => {

@@ -37,7 +37,6 @@ export function projectView(ctx: ViewContext, seat: number): RoomStateView {
     direction: g ? g.direction : 1,
     topCard: g ? g.discard.at(-1)! : null,
     currentColor: g ? g.currentColor : null,
-    mustChooseColor: g ? g.mustChooseColor && g.turn === seat : false,
     pendingDrawnCardId: g?.pendingDrawn?.seat === seat ? g.pendingDrawn.cardId : null,
     catchableSeat: g?.catchWindow?.seat ?? null,
     drawPileCount: g ? g.drawPile.length : 0,

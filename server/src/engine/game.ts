@@ -14,7 +14,6 @@ export interface GameState {
   turn: number;
   direction: 1 | -1;
   currentColor: Color | null;
-  mustChooseColor: boolean;
   pendingDrawn: { seat: number; cardId: number } | null;
   catchWindow: { seat: number } | null;
   winner: number | null;
@@ -58,7 +57,6 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
     players, drawPile, discard: [first],
     ...openingSeating(players.length),
     currentColor: first.color,
-    mustChooseColor: false,
     pendingDrawn: null, catchWindow: null, winner: null,
     rules: { ...rules }, pendingDraw: 0, pendingDrawKind: null,
     reshuffleSeed: newSeed(random),
@@ -69,7 +67,6 @@ export type Action =
   | { type: 'play'; seat: number; cardIds: number[]; chosenColor?: Color }
   | { type: 'draw'; seat: number }
   | { type: 'pass'; seat: number }
-  | { type: 'chooseColor'; seat: number; color: Color }
   | { type: 'callLastCard'; seat: number }
   | { type: 'catchLastCard'; seat: number };
 
@@ -108,16 +105,8 @@ export function applyAction(state: GameState, action: Action): ActionResult {
   if (!player || player.removed) return err('bad_seat');
 
   switch (action.type) {
-    case 'chooseColor': {
-      if (!s.mustChooseColor || s.turn !== action.seat) return err('no_color_pending');
-      s.currentColor = action.color;
-      s.mustChooseColor = false;
-      return { ok: true, state: s, effects };
-    }
-
     case 'play': {
       if (s.turn !== action.seat) return err('not_your_turn');
-      if (s.mustChooseColor) return err('choose_color_first');
       // A drawn card has to be part of whatever goes down — but under stack discard
       // it may bring the rest of its rank along, so membership is all we require.
       if (s.pendingDrawn && s.pendingDrawn.seat === action.seat
@@ -219,7 +208,6 @@ export function applyAction(state: GameState, action: Action): ActionResult {
 
     case 'draw': {
       if (s.turn !== action.seat) return err('not_your_turn');
-      if (s.mustChooseColor) return err('choose_color_first');
       if (s.pendingDrawn?.seat === action.seat) return err('play_drawn_or_pass');
       s.catchWindow = null;
       if (s.pendingDraw > 0) {
@@ -317,10 +305,6 @@ export function removeFromRound(state: GameState, seat: number): GameState {
     return s;
   }
   if (wasTheirTurn) {
-    if (s.mustChooseColor) {
-      s.mustChooseColor = false;
-      s.currentColor = s.discard.at(-1)?.color ?? 'red';
-    }
     s.pendingDraw = 0; // an owed pot dies with the leaver
     s.pendingDrawKind = null;
   }

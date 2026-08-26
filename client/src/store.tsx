@@ -22,7 +22,6 @@ export interface Store {
     play: (cardIds: number[], chosenColor?: Color) => void;
     draw: () => void;
     pass: () => void;
-    chooseColor: (color: Color) => void;
     call: () => void;
     catchCall: () => void;
     rematch: () => void;
@@ -216,7 +215,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     play: (cardIds, chosenColor) => socket.emit('playCards', { cardIds, chosenColor }),
     draw: () => socket.emit('drawCard'),
     pass: () => socket.emit('passTurn'),
-    chooseColor: (color) => socket.emit('chooseColor', { color }),
     call: () => socket.emit('callLastCard'),
     catchCall: () => socket.emit('catchLastCard'),
     rematch: () => socket.emit('rematch'),

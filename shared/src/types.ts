@@ -44,7 +44,6 @@ export interface RoomStateView {
   direction: 1 | -1;
   topCard: Card | null;
   currentColor: Color | null;
-  mustChooseColor: boolean;      // you flipped/played a positional wild start; pick color first
   pendingDrawnCardId: number | null; // you drew a playable card: play it or pass
   catchableSeat: number | null;  // catch window is open on this seat
   drawPileCount: number;
@@ -93,7 +92,7 @@ export type TxActor =
   | { kind: 'player'; playerId: PlayerId; seat: number }
   | { kind: 'system' };
 
-export type MoveKind = 'play' | 'draw' | 'pass' | 'chooseColor' | 'callLastCard' | 'catchLastCard';
+export type MoveKind = 'play' | 'draw' | 'pass' | 'callLastCard' | 'catchLastCard';
 
 export interface TxPayloads {
   roundStarted: { handCounts: number[]; topCard: Card | null; turnSeat: number | null };
@@ -174,7 +173,6 @@ export interface ClientToServerEvents {
   playCards: (p: { cardIds: number[]; chosenColor?: Color }) => void;
   drawCard: () => void;
   passTurn: () => void;          // decline to play a drawn playable card
-  chooseColor: (p: { color: Color }) => void; // first-flip wild
   callLastCard: () => void;
   catchLastCard: () => void;
   rematch: () => void;

@@ -14,7 +14,6 @@ export function fixedState(hands: Card[][], top: Card, opts: Partial<GameState> 
     turn: 0,
     direction: 1,
     currentColor: top.color,
-    mustChooseColor: false,
     pendingDrawn: null,
     catchWindow: null,
     winner: null,

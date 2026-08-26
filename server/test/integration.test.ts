@@ -48,7 +48,6 @@ test('two clients join, deal, and play to a winner with hidden hands', { timeout
     if (view.winnerSeat !== null) { winner = view.winnerSeat; return; }
     if (view.turnSeat !== view.yourSeat || view.paused) return;
     const sock = view.yourSeat === 0 ? a : b;
-    if (view.mustChooseColor) return void sock.emit('chooseColor', { color: 'red' });
     if (view.pendingDrawnCardId !== null) {
       return void sock.emit('playCards', { cardIds: [view.pendingDrawnCardId], chosenColor: 'red' });
     }

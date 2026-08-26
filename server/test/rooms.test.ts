@@ -63,7 +63,6 @@ describe('starting and playing', () => {
     // hand the winner a single matching card to finish immediately
     const top = g.discard.at(-1)!;
     g.players[g.turn]!.hand = [{ id: 9999, color: top.color ?? 'red', value: top.value }];
-    if (g.mustChooseColor) { g.mustChooseColor = false; g.currentColor = 'red'; g.players[g.turn]!.hand = [{ id: 9999, color: 'red', value: '5' }]; }
     const turnSeat = g.turn;
     const token = turnSeat === 0 ? a.token : (store.getRoom(room.code)!.players[turnSeat]!.token);
     const r = store.act(room.code, token, { type: 'play', cardIds: [9999] } as never);
@@ -242,7 +241,7 @@ function seatRoom(store: RoomStore, names: string[], seed = 42) {
 function forceWin(store: RoomStore, code: string): number {
   const g = store.getRoom(code)!.game!;
   g.pendingDraw = 0; g.pendingDrawKind = null; g.pendingDrawn = null; g.catchWindow = null;
-  g.mustChooseColor = false; g.currentColor = 'red';
+  g.currentColor = 'red';
   g.players[g.turn]!.hand = [{ id: 9999, color: 'red', value: '5' }];
   const seat = g.turn;
   const r = store.act(code, store.getRoom(code)!.players[seat]!.token, { type: 'play', cardIds: [9999] } as never);

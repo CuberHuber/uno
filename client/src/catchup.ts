@@ -28,7 +28,6 @@ const MOVE_KEYS: Record<MoveKind, readonly [MsgKey, MsgKey]> = {
   play: ['catchup.play', 'catchup.playYou'],
   draw: ['catchup.draw', 'catchup.drawYou'],
   pass: ['catchup.pass', 'catchup.passYou'],
-  chooseColor: ['catchup.color', 'catchup.colorYou'],
   callLastCard: ['catchup.call', 'catchup.callYou'],
   catchLastCard: ['catchup.catch', 'catchup.catchYou'],
 };
