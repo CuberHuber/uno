@@ -32,4 +32,27 @@ export function registerGameMetrics(register: Registry, store: RoomStore, analyt
     registers: [register],
     collect() { this.set(analytics.activeSessions()); },
   });
+  // The journal in three readings. Depth says what the transactions cost in
+  // memory and how close a single room comes to the cap; lag says whether the
+  // acknowledgements are working at all — it sits at nothing while they are,
+  // and climbs and stays up when they are not. Each takes its own pass rather
+  // than sharing a cached one, so a single-metric scrape is never stale.
+  new Gauge({
+    name: 'ochre_history_transactions_stored',
+    help: 'Journal transactions held in memory, summed over open rooms',
+    registers: [register],
+    collect() { this.set(store.journalStats().stored); },
+  });
+  new Gauge({
+    name: 'ochre_history_transactions_deepest',
+    help: 'Transactions in the deepest single room journal, against a cap of 200',
+    registers: [register],
+    collect() { this.set(store.journalStats().deepest); },
+  });
+  new Gauge({
+    name: 'ochre_history_lag_transactions_max',
+    help: 'Widest gap between a room journal head and a connected player pointer',
+    registers: [register],
+    collect() { this.set(store.journalStats().lagMax); },
+  });
 }

@@ -70,6 +70,9 @@ export async function buildServer(
   const analytics = opts.analytics
     ?? new Analytics({ log: app.log, register, sendEvent: createUmamiSender({ log: app.log }) });
   registerGameMetrics(register, store, analytics);
+  // The one wire between the store and telemetry: the store reports a broken
+  // turn queue, and has no idea who is listening or what they do with it.
+  store.watchTurnQueue((kind, code) => analytics.turnAnomaly(kind, code));
   registerGaRelay(app);
 
   app.post('/api/rooms', async (req, reply) => {

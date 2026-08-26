@@ -3,16 +3,24 @@ import type {
   CatchUpView, ClientToServerEvents, Effect, JoinAck, SeatRecord, SeatTransaction,
   ServerToClientEvents,
 } from '@uno/shared';
-import type { Analytics } from './analytics.js';
+import type { Analytics, CatchUpOutcome } from './analytics.js';
 import type { RoomStore } from './rooms.js';
 import type { ServerLimits } from './server.js';
+import type { Visitor } from './umami.js';
 import {
   parseAck, parseColor, parseJoin, parseNone, parsePin, parsePlay, parseRules, parseSeat,
   type Parsed,
 } from './wire.js';
 
 /** What a socket holds once it sits down; `socket.data` starts out as `{}`, so
- *  the partial is the honest type and `seated()` is the only way past it. */
+ *  the partial is the honest type and `seated()` is the only way past it.
+ *
+ *  `code` and `token` keep their meaning for as long as the socket lives.
+ *  `seat` does not: it is the seat *as of sitting down*, and the rematch
+ *  compaction renumbers the table underneath it. Anything that needs the seat
+ *  now asks `store.resume(code, token)` — the token is the identity that
+ *  survives the renumbering. Nothing below reads `seat` for anything but the
+ *  guard that says this socket sat down at all. */
 interface Seated { code: string; seat: number; token: string }
 
 type IO = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -55,12 +63,20 @@ export function attachSockets(
    *  projects onto the seat: other people's cards are structurally absent and
    *  the reader's own arrive in `yourCards`. There is no second path from the
    *  journal to a socket. */
-  const catchUpFor = (code: string, seat: number): CatchUpView | null => {
+  const catchUpFor = (code: string, seat: number, back?: { visitor?: Visitor }): CatchUpView | null => {
     const room = store.getRoom(code);
     const player = room?.players[seat];
     if (!room || !player) return null;
     const cursor = store.historyCursor(code, seat);
     if (!cursor.ok) return null;
+    /** Measured only for an actual return. A fresh arrival starts level with
+     *  the head by construction, so counting it would fill the series with
+     *  gapless "returns" that never happened and hide the share that matters:
+     *  how often a gap outran the journal. `back` is present exactly when the
+     *  seat was retaken, and carries the visitor the event belongs to. */
+    const served = (outcome: CatchUpOutcome, gap: number | null) => {
+      if (back) analytics?.catchUpServed(outcome, gap, back.visitor);
+    };
     // The roster is how a `playerId` gets a name. Players who have left stay in
     // it: a transaction they caused is still in the window, and their name is
     // still theirs. Identity here is the id — the seat is only where they sit
@@ -68,7 +84,11 @@ export function attachSockets(
     const seats: SeatRecord[] = room.players.map((p, i) => ({ seat: i, playerId: p.id, name: p.name }));
     const missed = store.historySince(code, seat, cursor.seq);
     if (missed.ok) {
-      if (missed.entries.length === 0) return null;
+      // The gap in transactions, which is what the journal's cap is measured
+      // against. While the answer is `ok` no transaction in it was trimmed, so
+      // this is exactly the number of entries below.
+      if (missed.entries.length === 0) { served('empty', missed.seq - cursor.seq); return null; }
+      served('delta', missed.seq - cursor.seq);
       // This assignment is the one place the server's own transaction type is
       // checked against the shape the protocol promises; a drift between them
       // stops the build rather than reaching a browser.
@@ -78,10 +98,17 @@ export function attachSockets(
         crossedRebuild: missed.crossedRebuild, seats, you: player.id,
       };
     }
-    if (missed.error !== 'history_truncated') return null;
+    if (missed.error !== 'history_truncated') {
+      // A pointer the journal cannot even place: not a gap, a fault. The gap is
+      // not measurable here, so nothing is fed to the distribution.
+      served('failed', null);
+      return null;
+    }
     // Further behind than the journal reaches. The honest answer is the
     // snapshot plus a pointer moved up to the head — never a list with a hole
-    // in it, which would read as "nothing else happened".
+    // in it, which would read as "nothing else happened". The gap is still
+    // known, and it is the reading that says whether the cap is set too low.
+    served('truncated', missed.seq - cursor.seq);
     store.ackHistory(code, seat, missed.seq);
     return {
       seq: missed.seq, entries: [], truncated: true, crossedRebuild: false, seats, you: player.id,
@@ -117,9 +144,28 @@ export function attachSockets(
         ? { code: held.code, seat: held.seat, token: held.token }
         : null;
     };
-    const reject = (reason: string) => {
+    // The client hears one thing — `moveRejected` with a reason — however the
+    // frame died. What differs is who is being told: three refusals that used
+    // to share one counter and answered three unrelated questions with one
+    // number. The wire to the browser is unchanged; only the bookkeeping is.
+    const refuse = (reason: string) => socket.emit('moveRejected', { reason });
+    /** The rules said no: not your turn, that card does not match. Misclicks,
+     *  read by whoever tunes the game. */
+    const rejectMove = (reason: string) => {
       analytics?.moveRejected(reason);
-      socket.emit('moveRejected', { reason });
+      refuse(reason);
+    };
+    /** The frame was never a frame. A real client cannot send one, so this is
+     *  read by whoever watches for someone prodding the socket. */
+    const rejectWire = (reason: string) => {
+      analytics?.wireRejected(reason);
+      refuse(reason);
+    };
+    /** Over the per-socket action budget. Read by whoever sets the ceiling —
+     *  a human at a table never reaches it. */
+    const rejectBudget = () => {
+      analytics?.actionBudgetExceeded();
+      refuse('rate_limited');
     };
     /** Socket.IO runs listeners inside process.nextTick with no try/catch of
      *  its own, so an escaping throw is an exit(1) that takes every room on the
@@ -137,6 +183,12 @@ export function attachSockets(
       const reply = (r: JoinAck) => { if (typeof answer === 'function') answer(r); };
       const parsed = parseJoin(typeof p === 'function' ? undefined : p);
       if (!parsed.ok) {
+        // Both series, and on purpose: the entry funnel counts every attempt it
+        // turned away, and the wire series counts the ones that were not frames
+        // at all. A mistyped code is a string and reaches the store — what is
+        // refused here is a code that is not a string, or is longer than any
+        // code — so the two questions do not contaminate each other.
+        analytics?.wireRejected(parsed.error);
         analytics?.joinFailed('', parsed.error, visitor);
         return reply({ ok: false, error: parsed.error });
       }
@@ -159,7 +211,7 @@ export function attachSockets(
           if (held.code !== code) return refuse('already_seated');
           socket.data = { code, seat: still.seat, token: held.token };
           store.setConnection(code, still.seat, socket.id);
-          const missed = catchUpFor(code, still.seat);
+          const missed = catchUpFor(code, still.seat, { visitor });
           reply({ ok: true, seat: still.seat, token: held.token, roomName: roomName(code) });
           broadcast(code);
           if (missed) socket.emit('catchUp', missed);
@@ -185,9 +237,10 @@ export function attachSockets(
       store.setConnection(code, joined.seat, socket.id);
       if (!existing?.ok) analytics?.playerJoined(code, joined.seat);
       // A fresh arrival starts level with the head and so has nothing to catch
-      // up on; only a seat retaken by token can. No branch needed — the pointer
-      // already says which of the two this is.
-      const missed = catchUpFor(code, joined.seat);
+      // up on; only a seat retaken by token can. No branch needed for the
+      // answer — the pointer already says which of the two this is — but the
+      // telemetry does need it, on the same condition the join counter uses.
+      const missed = catchUpFor(code, joined.seat, existing?.ok ? { visitor } : undefined);
       reply({ ok: true, seat: joined.seat, token: joined.token, roomName: roomName(code) });
       broadcast(code);
       // After the snapshot, deliberately: the state is already current when the
@@ -211,14 +264,14 @@ export function attachSockets(
     ) => {
       const at = seated();
       if (!at) return;
-      if (!limits.action.allow(socket.id)) return reject('rate_limited');
+      if (!limits.action.allow(socket.id)) return rejectBudget();
       const parsed = parse(raw);
-      if (!parsed.ok) return reject(parsed.error);
+      if (!parsed.ok) return rejectWire(parsed.error);
       try {
         const room = store.getRoom(at.code);
         const phaseBefore = room?.phase;
         const result = run(at, parsed.value);
-        if (!result.ok) return reject(result.error);
+        if (!result.ok) return rejectMove(result.error);
         // Rounds start and end only through phase flips, so watching the flip
         // here covers startGame, rematch, the winning play, and continueWithout.
         if (analytics && room && room.phase !== phaseBefore) {
@@ -235,7 +288,10 @@ export function attachSockets(
         broadcast(at.code);
       } catch (err) {
         log?.error({ err }, 'socket handler threw');
-        reject('server_error');
+        // The store, not the frame and not the rules: it counts with the moves
+        // because that is where it happened, and the log line above is what
+        // anyone actually chases it with.
+        rejectMove('server_error');
       }
     };
 
@@ -281,12 +337,22 @@ export function attachSockets(
 
     socket.on('disconnect', safely(() => {
       const at = seated();
-      analytics?.sessionEnded(socket.id, at ? { code: at.code, seat: at.seat } : undefined);
-      if (!at) return;
+      // Not `at.seat`. The number written down at sitting time means the seat
+      // as of *then*, and the rematch compaction renumbers the table: after one
+      // rematch that number is somebody else's seat, or no seat at all. The
+      // acknowledgement handler already re-derives from the token, and for the
+      // same reason both things here must — the report of where the session sat
+      // and, worse, the seat this disconnect darkens. With a stale number the
+      // socket-id pin below refuses to match and the leaver's seat stays lit
+      // for good: never paused, never swept, a ghost at the table.
+      const here = at ? store.resume(at.code, at.token) : null;
+      const seat = here?.ok ? here.seat : null;
+      analytics?.sessionEnded(socket.id, at && seat !== null ? { code: at.code, seat } : undefined);
+      if (!at || seat === null) return;
       // Only the socket that still holds the seat may darken it: a phone that
       // moved Wi-Fi→LTE is already back on a new socket when this one's
       // disconnect finally lands, and the live seat must survive it.
-      store.setConnection(at.code, at.seat, null, socket.id);
+      store.setConnection(at.code, seat, null, socket.id);
       broadcast(at.code);
     }));
   });

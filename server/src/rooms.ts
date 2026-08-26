@@ -10,6 +10,7 @@ import {
   isSeq, RoomHistory,
   type SeatRecord, type SeatTransaction, type TxActor, type TxSecret,
 } from './history.js';
+import type { TurnAnomaly } from './analytics.js';
 
 // No look-alikes (0/O/Q, 1/I/L, 5/S, 8/B, 2/Z) or sound-alikes (U/V, G/J).
 const ALPHABET = '34679ACDEFHKMNPRTWXY';
@@ -103,6 +104,30 @@ function handGains(
   return out;
 }
 
+/** What the ring in `engine/seating.ts` promises, checked from outside it.
+ *
+ *  Each of these three was a real bug once: the turn pointing at a seat the
+ *  table does not have, the turn resting on somebody who has left the round,
+ *  and a round with nobody left to play it. The ring was rewritten so that none
+ *  of them can happen — which is exactly why the check belongs out here, on the
+ *  state an action left behind, rather than inside the code whose promise it is.
+ *
+ *  Reads at most four seats and allocates nothing, so it can sit on the path of
+ *  every accepted action. Only the first breach found is named: the others
+ *  follow from it, and a canary needs to say *that* it broke, not how loudly. */
+export function turnQueueAnomaly(room: Room): TurnAnomaly | null {
+  const g = room.game;
+  // Between rounds the turn means nothing, and a finished round leaves the
+  // cursor wherever the winning card left it. Neither is an anomaly.
+  if (!g || room.phase !== 'playing' || g.winner !== null) return null;
+  const seats = g.players;
+  let anyInRound = false;
+  for (const p of seats) if (!p.removed) { anyInRound = true; break; }
+  if (!anyInRound) return 'no_seats_left';
+  if (!isSeatIndex(g.turn, seats.length)) return 'turn_out_of_range';
+  return seats[g.turn]!.removed ? 'turn_on_removed' : null;
+}
+
 /** The public shape of a round, as `projectView` already shows it to everyone. */
 const tableFacts = (g: GameState) => ({
   handCounts: g.players.map((p) => p.hand.length),
@@ -114,6 +139,27 @@ const tableFacts = (g: GameState) => ({
 export class RoomStore {
   private rooms = new Map<string, Room>();
   constructor(private now: () => number = Date.now) {}
+
+  /** Where a broken turn queue is reported. Wired once, at build time, so the
+   *  store keeps knowing nothing about telemetry. */
+  private turnWatcher: ((kind: TurnAnomaly, code: string) => void) | null = null;
+
+  watchTurnQueue(fn: (kind: TurnAnomaly, code: string) => void): void {
+    this.turnWatcher = fn;
+  }
+
+  /** Called on the state every accepted action leaves behind. The try/catch is
+   *  the rule this whole layer lives under: a watcher that throws costs a
+   *  reading, never a move. */
+  private auditTurnQueue(room: Room): void {
+    const kind = turnQueueAnomaly(room);
+    if (kind === null) return;
+    try {
+      this.turnWatcher?.(kind, room.code);
+    } catch {
+      // Measuring must never break the game.
+    }
+  }
 
   createRoom(opts: { seed?: number; rules?: Partial<Rules>; pin?: string | null } = {}): Room {
     let key: string;
@@ -231,6 +277,7 @@ export class RoomStore {
     room.game = createGame(room.players.length, rng(room.seed), room.rules);
     room.phase = 'playing';
     this.recordDeal(room, this.actorAt(room, seat));
+    this.auditTurnQueue(room);
     return { ok: true as const };
   }
 
@@ -257,6 +304,7 @@ export class RoomStore {
       { effects: result.effects, secrets: handGains(before, result.state, room.players) },
     );
     if (result.state.winner !== null) this.recordRoundEnd(room, result.state.winner);
+    this.auditTurnQueue(room);
     return { ok: true as const, effects: result.effects };
   }
 
@@ -288,6 +336,7 @@ export class RoomStore {
     room.game = createGame(room.players.length, rng(room.seed), room.rules);
     room.phase = 'playing';
     this.recordDeal(room, this.actorAt(room, callerSeat));
+    this.auditTurnQueue(room);
     return { ok: true as const };
   }
 
@@ -319,6 +368,7 @@ export class RoomStore {
       room.phase,
     );
     if (room.game.winner !== null) this.recordRoundEnd(room, room.game.winner);
+    this.auditTurnQueue(room);
     return { ok: true as const };
   }
 
@@ -446,6 +496,30 @@ export class RoomStore {
       }
     }
     return { rooms: this.rooms.size, lobby, playing, roundEnd, seated, connected };
+  }
+
+  /** The journal, from the outside: how much of it is in memory, how deep the
+   *  deepest single room has grown against `MAX_TRANSACTIONS`, and the widest
+   *  gap any *connected* player's pointer has opened against their room's head.
+   *
+   *  Connected only, deliberately. A player who is away is supposed to fall
+   *  behind — that is the gap catch-up exists to close — and counting them would
+   *  drown the one thing this measures: whether acknowledgements are arriving
+   *  at all, or whether every pointer is quietly standing still. */
+  journalStats(): { stored: number; deepest: number; lagMax: number } {
+    let stored = 0, deepest = 0, lagMax = 0;
+    for (const room of this.rooms.values()) {
+      const size = room.history.size;
+      stored += size;
+      if (size > deepest) deepest = size;
+      const head = room.history.seq;
+      for (const p of room.players) {
+        if (p.left || !p.connected) continue;
+        const lag = head - p.historyCursor;
+        if (lag > lagMax) lagMax = lag;
+      }
+    }
+    return { stored, deepest, lagMax };
   }
 
   /** onRemoved lets callers release per-room state held elsewhere
