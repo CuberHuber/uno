@@ -74,7 +74,10 @@ export function shuffle<T>(items: T[], random: () => number): T[] {
   const a = items.slice();
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+    // Both indices are in range by construction: i walks down from length-1 and
+    // j lands in [0, i]. The assertions are what `noUncheckedIndexedAccess` asks
+    // for in exchange for catching the accesses that are not provably in range.
+    [a[i], a[j]] = [a[j]!, a[i]!];
   }
   return a;
 }

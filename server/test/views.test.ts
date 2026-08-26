@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { CLASSIC_RULES, type Rules } from '@uno/shared';
 import { projectView, type ViewContext } from '../src/engine/views.js';
 import { applyAction, createGame, type GameState } from '../src/engine/game.js';
 import { rng } from '../src/engine/deck.js';
@@ -14,7 +15,8 @@ function ctx(overrides: Partial<ViewContext> = {}): ViewContext {
     names: ['Mira', 'Jonas'], hostSeat: 0,
     connected: [true, true], winTally: [0, 0],
     pausedForSeat: null, pausedSinceMs: null,
-    rules: { stacking: false, forcePlay: false },
+    rules: { ...CLASSIC_RULES },
+    hasPin: false, pin: null,
     game, ...overrides,
   };
 }
@@ -84,13 +86,14 @@ describe('legal agrees with the engine', () => {
     return offered;
   };
 
-  for (const rules of [
-    { stacking: false, forcePlay: false },
+  const RULE_SETS: Rules[] = [
+    { ...CLASSIC_RULES },
     { stacking: true, forcePlay: false, drawToMatch: true, multiDiscard: true },
-  ]) {
+  ];
+  for (const rules of RULE_SETS) {
     test(`holds move after move — rules ${JSON.stringify(rules)}`, () => {
       for (let seed = 0; seed < 25; seed++) {
-        let g = createGame(3, rng(seed), rules as never);
+        let g = createGame(3, rng(seed), rules);
         for (let move = 0; move < 60 && g.winner === null; move++) {
           const offered = check(g);
           const next = offered.size > 0
