@@ -1,10 +1,14 @@
 import type { DefaultEventsMap, Server, Socket } from 'socket.io';
-import type { ClientToServerEvents, Effect, JoinAck, ServerToClientEvents } from '@uno/shared';
+import type {
+  CatchUpView, ClientToServerEvents, Effect, JoinAck, SeatRecord, SeatTransaction,
+  ServerToClientEvents,
+} from '@uno/shared';
 import type { Analytics } from './analytics.js';
 import type { RoomStore } from './rooms.js';
 import type { ServerLimits } from './server.js';
 import {
-  parseColor, parseJoin, parseNone, parsePin, parsePlay, parseRules, parseSeat, type Parsed,
+  parseAck, parseColor, parseJoin, parseNone, parsePin, parsePlay, parseRules, parseSeat,
+  type Parsed,
 } from './wire.js';
 
 /** What a socket holds once it sits down; `socket.data` starts out as `{}`, so
@@ -26,11 +30,62 @@ export function attachSockets(
   const broadcast = (code: string) => {
     const room = store.getRoom(code);
     if (!room) return;
+    // The journal number the snapshots below are true as of. A snapshot is the
+    // whole state, so a client that applied one holds everything up to this
+    // number — which is exactly what it acknowledges. Without this the pointer
+    // would only ever move on a reconnect, fall a whole game behind, and turn
+    // every catch-up into `history_truncated`.
+    const head = store.historyHead(code);
     for (const [seat, player] of room.players.entries()) {
       if (player.left || player.socketId === null) continue;
       const view = store.tryViewFor(code, seat);
-      if (view !== null) io.to(player.socketId).emit('roomState', view);
+      if (view === null) continue;
+      io.to(player.socketId).emit('roomState', view);
+      if (head.ok) io.to(player.socketId).emit('historyHead', { seq: head.seq });
     }
+  };
+
+  /** What a returning player missed, or nothing when there is nothing to say.
+   *
+   *  Called *before* the snapshot goes out, and that order is load-bearing: the
+   *  snapshot carries `historyHead`, the client acknowledges it on arrival, and
+   *  the pointer jumps to the head — erasing the very gap this describes.
+   *
+   *  Every transaction it returns came out of `store.historySince`, which
+   *  projects onto the seat: other people's cards are structurally absent and
+   *  the reader's own arrive in `yourCards`. There is no second path from the
+   *  journal to a socket. */
+  const catchUpFor = (code: string, seat: number): CatchUpView | null => {
+    const room = store.getRoom(code);
+    const player = room?.players[seat];
+    if (!room || !player) return null;
+    const cursor = store.historyCursor(code, seat);
+    if (!cursor.ok) return null;
+    // The roster is how a `playerId` gets a name. Players who have left stay in
+    // it: a transaction they caused is still in the window, and their name is
+    // still theirs. Identity here is the id — the seat is only where they sit
+    // now, and before a rematch boundary the same number meant someone else.
+    const seats: SeatRecord[] = room.players.map((p, i) => ({ seat: i, playerId: p.id, name: p.name }));
+    const missed = store.historySince(code, seat, cursor.seq);
+    if (missed.ok) {
+      if (missed.entries.length === 0) return null;
+      // This assignment is the one place the server's own transaction type is
+      // checked against the shape the protocol promises; a drift between them
+      // stops the build rather than reaching a browser.
+      const entries: SeatTransaction[] = missed.entries;
+      return {
+        seq: missed.seq, entries, truncated: false,
+        crossedRebuild: missed.crossedRebuild, seats, you: player.id,
+      };
+    }
+    if (missed.error !== 'history_truncated') return null;
+    // Further behind than the journal reaches. The honest answer is the
+    // snapshot plus a pointer moved up to the head — never a list with a hole
+    // in it, which would read as "nothing else happened".
+    store.ackHistory(code, seat, missed.seq);
+    return {
+      seq: missed.seq, entries: [], truncated: true, crossedRebuild: false, seats, you: player.id,
+    };
   };
   const emitEffects = (code: string, effects: Effect[] | undefined) => {
     const room = store.getRoom(code);
@@ -104,8 +159,11 @@ export function attachSockets(
           if (held.code !== code) return refuse('already_seated');
           socket.data = { code, seat: still.seat, token: held.token };
           store.setConnection(code, still.seat, socket.id);
+          const missed = catchUpFor(code, still.seat);
           reply({ ok: true, seat: still.seat, token: held.token, roomName: roomName(code) });
-          return broadcast(code);
+          broadcast(code);
+          if (missed) socket.emit('catchUp', missed);
+          return;
         }
         socket.data = {}; // the held seat is gone: kicked, or the room was swept
       }
@@ -126,8 +184,15 @@ export function attachSockets(
       socket.data = { code, seat: joined.seat, token: joined.token };
       store.setConnection(code, joined.seat, socket.id);
       if (!existing?.ok) analytics?.playerJoined(code, joined.seat);
+      // A fresh arrival starts level with the head and so has nothing to catch
+      // up on; only a seat retaken by token can. No branch needed — the pointer
+      // already says which of the two this is.
+      const missed = catchUpFor(code, joined.seat);
       reply({ ok: true, seat: joined.seat, token: joined.token, roomName: roomName(code) });
       broadcast(code);
+      // After the snapshot, deliberately: the state is already current when the
+      // list of what was missed is read, so the list is history and not news.
+      if (missed) socket.emit('catchUp', missed);
     }));
 
     /** One path for every seated event: seat, budget, payload, store — in that
@@ -138,6 +203,11 @@ export function attachSockets(
       parse: (p: unknown) => Parsed<T>,
       run: (at: Seated, value: T) => StoreResult,
       onOk?: (at: Seated, value: T) => void,
+      /** `quiet` is for an event that changes nothing anyone can see. The
+       *  acknowledgement is the only one: it moves a pointer, and broadcasting
+       *  for it would send a snapshot, which carries a head, which is
+       *  acknowledged — a loop that never stops. */
+      opts: { quiet?: boolean } = {},
     ) => {
       const at = seated();
       if (!at) return;
@@ -160,6 +230,7 @@ export function attachSockets(
           }
         }
         onOk?.(at, parsed.value);
+        if (opts.quiet) return;
         emitEffects(at.code, result.effects);
         broadcast(at.code);
       } catch (err) {
@@ -190,6 +261,22 @@ export function attachSockets(
       p, parseSeat,
       (at, v) => store.continueWithout(at.code, at.token, v.seat),
       (at, v) => analytics?.playerKicked(at.code, v.seat),
+    ));
+
+    socket.on('ackHistory', (p: unknown) => handle(
+      p, parseAck,
+      (at, v) => {
+        // Not `at.seat`: the number a socket wrote down when it sat goes stale
+        // the moment a rematch compacts the table, and a stale one would move
+        // *another* player's pointer past a gap they still have. The token is
+        // the identity that survives the compaction, so the seat is re-derived
+        // from it on every acknowledgement.
+        const here = store.resume(at.code, at.token);
+        if (!here.ok) return here;
+        return store.ackHistory(at.code, here.seat, v.seq);
+      },
+      undefined,
+      { quiet: true },
     ));
 
     socket.on('disconnect', safely(() => {

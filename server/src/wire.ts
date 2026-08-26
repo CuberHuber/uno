@@ -42,6 +42,15 @@ export const isSeat = (v: unknown): v is number =>
 export const isCardId = (v: unknown): v is number =>
   Number.isSafeInteger(v) && (v as number) >= 0;
 
+/** A journal number is a counter rather than an index, but it is compared and
+ *  it is arithmetic, and that is enough: `'1' > 0` passes, `Math.max(cursor,
+ *  '__proto__')` is `NaN`, `1.5` would wedge a pointer between two
+ *  transactions, and `2 ** 53` sits where integers stop being distinct.
+ *  `Number.isSafeInteger` turns every one of them away without coercing — and
+ *  it rejects `2 ** 53` itself, so no bound of our own is needed. */
+export const isSeq = (v: unknown): v is number =>
+  Number.isSafeInteger(v) && (v as number) >= 0;
+
 /** The room store's own normalisation, repeated here so the code a socket holds
  *  and the code it re-joins with compare as plain equal strings. */
 export const normCode = (code: string): string => code.toUpperCase().replace(/[\s-]/g, '');
@@ -113,6 +122,14 @@ export const parseColor = (p: unknown): Parsed<{ color: Color }> => {
 export const parseSeat = (p: unknown): Parsed<{ seat: number }> => {
   if (!isRecord(p) || !isSeat(p.seat)) return bad('no_such_seat');
   return ok({ seat: p.seat });
+};
+
+/** The acknowledgement of a journal number. `bad_request` and not a code of its
+ *  own: a real client never sends anything else here, because the only numbers
+ *  it ever acknowledges are ones the server just handed it. */
+export const parseAck = (p: unknown): Parsed<{ seq: number }> => {
+  if (!isRecord(p) || !isSeq(p.seq)) return bad(BAD_REQUEST);
+  return ok({ seq: p.seq });
 };
 
 /** Events that carry nothing still go through the same path, so the seat check

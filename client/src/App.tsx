@@ -1,3 +1,4 @@
+import CatchUpSheet from './components/CatchUpSheet';
 import ConnectionBanner from './components/ConnectionBanner';
 import { useT } from './i18n';
 import Landing from './screens/Landing';
@@ -29,5 +30,5 @@ export default function App() {
     : view.phase === 'lobby' ? <Lobby />
     : view.phase === 'playing' ? <Table />
     : <RoundOver />;
-  return <><ConnectionBanner />{screen}</>;
+  return <><ConnectionBanner /><CatchUpSheet />{screen}</>;
 }

@@ -5,7 +5,8 @@ import { buildServer, defaultLimits, installProcessGuards } from '../src/server.
 import { RoomStore } from '../src/rooms.js';
 import { RateLimiter } from '../src/limiter.js';
 import {
-  MAX_CARD_IDS, isSeat, parseColor, parseJoin, parsePin, parsePlay, parseRules, parseSeat,
+  MAX_CARD_IDS, isSeat, isSeq, parseAck, parseColor, parseJoin, parsePin, parsePlay, parseRules,
+  parseSeat,
 } from '../src/wire.js';
 
 // ── parsers ──────────────────────────────────────────────────────────────────
@@ -18,6 +19,27 @@ test('a seat is an array index or nothing at all', () => {
   expect(parseSeat({ seat: 0 })).toEqual({ ok: true, value: { seat: 0 } });
   expect(parseSeat({ seat: 3 })).toEqual({ ok: true, value: { seat: 3 } });
   expect(parseSeat(undefined).ok).toBe(false);
+});
+
+test('a journal number is a whole count or nothing at all', () => {
+  // The same class of value as the seat guard turns away, for the same reason:
+  // this number is compared and it is arithmetic. `'1' > 0` passes, `1.5` would
+  // wedge a pointer between two transactions, `NaN` poisons the `Math.max` the
+  // store advances the pointer with, and `2 ** 53` is where whole numbers stop
+  // being distinct.
+  for (const hostile of ['__proto__', 'length', '1', '0', '', 1.5, -1, NaN, Infinity,
+    2 ** 53, null, undefined, {}, [], true]) {
+    expect(isSeq(hostile)).toBe(false);
+    expect(parseAck({ seq: hostile })).toEqual({ ok: false, error: 'bad_request' });
+  }
+  expect(isSeq(0)).toBe(true);
+  expect(parseAck({ seq: 0 })).toEqual({ ok: true, value: { seq: 0 } });
+  expect(parseAck({ seq: 42 })).toEqual({ ok: true, value: { seq: 42 } });
+  // The largest number that still counts one at a time is legal; the next is not.
+  expect(parseAck({ seq: Number.MAX_SAFE_INTEGER }).ok).toBe(true);
+  expect(parseAck({ seq: Number.MAX_SAFE_INTEGER + 1 }).ok).toBe(false);
+  for (const shape of [undefined, null, 7, 'ok', []]) expect(parseAck(shape).ok).toBe(false);
+  expect(Object.prototype.hasOwnProperty.call(Object.prototype, 'seq')).toBe(false);
 });
 
 test('cardIds must be a bounded array of whole ids', () => {

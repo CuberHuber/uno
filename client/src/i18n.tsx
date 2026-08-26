@@ -103,6 +103,29 @@ const DICT = {
     'pause.body': 'Their seat is held — the game resumes the moment they reopen the link.',
     'pause.continue': 'Continue without them',
     'conn.lost': 'Connection lost — reconnecting…',
+    // What you missed while you were away. Each act carries a "someone else did
+    // it" wording and a "you did it" one: Russian conjugates, so one string with
+    // a name slot cannot serve both — the same split as t.sitsOut / t.youSitOut.
+    'catchup.title': 'While you were away',
+    'catchup.sub': 'The table kept going. Here is what happened.',
+    'catchup.close': 'Got it',
+    'catchup.truncated': 'You were away longer than the table remembers, so the list is gone. What you see is the table as it stands now.',
+    'catchup.crossed': 'The table was rebuilt in the meantime — before that mark the seats belonged to other people.',
+    'catchup.rebuilt': 'The table was rebuilt — seats changed',
+    'catchup.someone': 'Another player',
+    'catchup.cards.one': '{n} card', 'catchup.cards.other': '{n} cards',
+    'catchup.deal': 'A new deal',
+    'catchup.dealYou': 'A new deal — {cards} to you',
+    'catchup.play': '{name} plays {cards}', 'catchup.playYou': 'You play {cards}',
+    'catchup.draw': '{name} draws {cards}', 'catchup.drawYou': 'You draw {cards}',
+    'catchup.pass': '{name} ends the turn', 'catchup.passYou': 'You end the turn',
+    'catchup.color': '{name} calls {color}', 'catchup.colorYou': 'You call {color}',
+    'catchup.call': '{name} calls UNO!', 'catchup.callYou': 'You call UNO!',
+    'catchup.catch': '{name} catches a missed call — +2', 'catchup.catchYou': 'You catch a missed call — +2',
+    'catchup.won': '{name} takes the round', 'catchup.wonYou': 'You take the round',
+    'catchup.left': '{name} leaves the game',
+    'catchup.rules': 'The host changes the house rules',
+    'catchup.gained': '{cards} to you',
     'color.red': 'Red', 'color.yellow': 'Yellow', 'color.green': 'Green', 'color.blue': 'Blue',
     'err.round_over': 'The round is over', 'err.bad_seat': 'Bad seat',
     'err.no_color_pending': 'No colour choice pending', 'err.play_drawn_or_pass': 'Play the drawn card or end your turn',
@@ -128,6 +151,10 @@ const DICT = {
     'err.bad_request': 'The app sent something the table did not understand',
     'err.already_seated': 'This tab already sits at a table — reload to join another',
     'err.server_error': 'Something went wrong on the table — try that again',
+    // Only a hand-made frame reaches these: the numbers a client acknowledges
+    // are ones the table handed it a moment earlier.
+    'err.bad_cursor': 'That is not a place in the table’s log',
+    'err.cursor_ahead': 'That has not happened yet',
   },
   ru: {
     'app.notFoundTitle': 'Стол не найден',
@@ -225,6 +252,29 @@ const DICT = {
     'pause.body': 'Место сохранено — игра продолжится, как только ссылку откроют снова.',
     'pause.continue': 'Продолжить без ожидания',
     'conn.lost': 'Соединение потеряно — переподключаемся…',
+    'catchup.title': 'Пока тебя не было',
+    'catchup.sub': 'Стол не стоял на месте. Вот что случилось.',
+    'catchup.close': 'Понятно',
+    'catchup.truncated': 'Тебя не было дольше, чем стол помнит, — списка уже нет. Перед тобой стол как есть сейчас.',
+    'catchup.crossed': 'За это время стол пересобрали: до этой отметки места принадлежали другим людям.',
+    'catchup.rebuilt': 'Стол пересобрали — места сменились',
+    'catchup.someone': 'Кто-то из игроков',
+    // Винительный падеж: «кладёт 1 карту», не «1 карта» — форма для одного
+    // отличается от именительной, поэтому это отдельный набор, а не table.cards.
+    'catchup.cards.one': '{n} карту', 'catchup.cards.few': '{n} карты',
+    'catchup.cards.many': '{n} карт', 'catchup.cards.other': '{n} карт',
+    'catchup.deal': 'Новая раздача',
+    'catchup.dealYou': 'Новая раздача — тебе сдали {cards}',
+    'catchup.play': '{name} кладёт {cards}', 'catchup.playYou': 'Ты кладёшь {cards}',
+    'catchup.draw': '{name} берёт {cards}', 'catchup.drawYou': 'Ты берёшь {cards}',
+    'catchup.pass': '{name} завершает ход', 'catchup.passYou': 'Ты завершаешь ход',
+    'catchup.color': '{name} выбирает цвет: {color}', 'catchup.colorYou': 'Ты выбираешь цвет: {color}',
+    'catchup.call': '{name} объявляет UNO!', 'catchup.callYou': 'Ты объявляешь UNO!',
+    'catchup.catch': '{name} ловит зевок — +2', 'catchup.catchYou': 'Ты ловишь зевок — +2',
+    'catchup.won': 'Раунд забирает {name}', 'catchup.wonYou': 'Раунд забираешь ты',
+    'catchup.left': '{name} выходит из партии',
+    'catchup.rules': 'Хост меняет правила стола',
+    'catchup.gained': 'тебе пришло {cards}',
     'color.red': 'Красный', 'color.yellow': 'Жёлтый', 'color.green': 'Зелёный', 'color.blue': 'Синий',
     'err.round_over': 'Раунд окончен', 'err.bad_seat': 'Нет такого места',
     'err.no_color_pending': 'Цвет сейчас не выбирают', 'err.play_drawn_or_pass': 'Сыграй вытянутую карту или заверши ход',
@@ -250,6 +300,8 @@ const DICT = {
     'err.bad_request': 'Приложение отправило то, чего стол не понял',
     'err.already_seated': 'Эта вкладка уже за столом — перезагрузи, чтобы сесть за другой',
     'err.server_error': 'На столе что-то пошло не так — попробуй ещё раз',
+    'err.bad_cursor': 'Такого места в журнале стола нет',
+    'err.cursor_ahead': 'Этого ещё не случилось',
   },
 } as const;
 
@@ -258,7 +310,7 @@ export type MsgKey = keyof (typeof DICT)['en'];
 /** Labels stored as `<base>.<plural form>` instead of as one string, read through
  *  `tn`. English wants two forms here and Russian four, so the dictionaries carry
  *  what each language needs and the call site only supplies the number. */
-export type PluralKey = 'table.cards' | 'over.wins';
+export type PluralKey = 'table.cards' | 'over.wins' | 'catchup.cards';
 const PLURALS: Record<Locale, Intl.PluralRules> = {
   ru: new Intl.PluralRules('ru'),
   en: new Intl.PluralRules('en'),
