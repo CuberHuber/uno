@@ -875,7 +875,7 @@ export default function Table() {
             onClick={() => { cue('press'); track('help_open'); setHelpOpen(true); }}>?</button>
           {/* The switch belongs on the felt too: until now the only way to reach it was
               to leave the game and go back to the landing. */}
-          <SoundSettings />
+          <SoundSettings className="sound-left" />
         </div>
         <a className="btn btn-ghost ghost-pill" href="/"
           style={{ position: 'absolute', right: L.ngR, top: L.ngT, zIndex: 45 }}>

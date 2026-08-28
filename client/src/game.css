@@ -393,6 +393,9 @@ body {
   background: var(--color-surface); border-radius: 20px; box-shadow: var(--shadow-lg);
   animation: ob-pop .25s cubic-bezier(.34,1.56,.64,1) both;
 }
+/* Where the button sits at the LEFT of its row — the table's chip cluster — the panel
+   has to open rightward, or it hangs off the edge of the screen. */
+.sound-left .sound-pop { left: 0; right: auto; }
 .sound-pop-title {
   font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   color: var(--color-neutral-600); padding: 2px 4px;
