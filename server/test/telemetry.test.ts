@@ -307,6 +307,7 @@ beforeAll(async () => {
   const wide = () => new RateLimiter(1e9, 60_000);
   ctx = await buildServer(new RoomStore(() => clock.ms), {
     create: wide(), join: wide(), pin: wide(), action: new RateLimiter(1e9, 10_000),
+    history: wide(),
   }, { analytics });
   await ctx.app.listen({ port: 0 }); // ephemeral: :3000 belongs to whoever runs the app
   const address = ctx.app.server.address();
@@ -434,6 +435,7 @@ test('the action budget answers for itself instead of hiding among the misclicks
   const tight = await buildServer(new RoomStore(() => clock.ms), {
     create: new RateLimiter(1e9, 60_000), join: new RateLimiter(1e9, 60_000),
     pin: new RateLimiter(1e9, 60_000), action: new RateLimiter(2, 60_000),
+    history: new RateLimiter(1e9, 60_000),
   }, { analytics: ctx.analytics });
   await tight.app.listen({ port: 0 });
   try {

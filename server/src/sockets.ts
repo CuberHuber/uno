@@ -348,7 +348,12 @@ export function attachSockets(
       const answer = typeof ack === 'function' ? (ack as (v: CatchUpView | null) => void) : undefined;
       const at = seated();
       if (!at) return answer?.(null);
-      if (!limits.action.allow(socket.id)) { rejectBudget(); return answer?.(null); }
+      // Its own budget, and its own way of saying no. Routing this through
+      // `rejectBudget` announced a *rejected move* to a player who had only
+      // asked to read: the table snapped the cards of the move they had in fact
+      // played back into their hand, buzzed, and toasted a refusal. The ack is
+      // the only thing that asked a question, so it is the only thing answered.
+      if (!limits.history.allow(socket.id)) return answer?.(null);
       // The seat is re-derived from the token, as it is for the acknowledgement:
       // a rematch compacts the table, and the number this socket wrote down when
       // it sat would then name somebody else's journal.

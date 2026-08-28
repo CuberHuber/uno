@@ -119,6 +119,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // The table is the only thing that drains the queue, and it unmounts with the
+  // round: the winning turn emits `played` and `win` in the flush that flips the
+  // phase, so whatever is still queued at that moment can never be shown. Left
+  // there, it would be waiting at the head when a rematch remounts the table,
+  // and the new deal would open by replaying the last card of the old one.
+  useEffect(() => {
+    if (view && view.phase !== 'playing') setEffects([]);
+  }, [view?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The journal pointer. The server moves it only on our word, and only
   // forward, so this is the one thing standing between a reconnect that replays
   // exactly what was missed and one that is told the gap is too old to answer.

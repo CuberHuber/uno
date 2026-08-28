@@ -23,6 +23,7 @@ beforeAll(async () => {
   const wide = () => new RateLimiter(1e9, 60_000);
   ctx = await buildServer(new RoomStore(), {
     create: wide(), join: wide(), pin: wide(), action: new RateLimiter(1e9, 10_000),
+    history: new RateLimiter(1e9, 10_000),
   });
   await ctx.app.listen({ port: 0 }); // ephemeral: :3000 belongs to whoever runs the app
   const address = ctx.app.server.address();
@@ -376,4 +377,74 @@ test('a repeated or stale acknowledgement never rolls the pointer back', async (
   await waitFor(() => a.rejections.length > 0, 'the refusal');
   expect(a.rejections).toEqual(['cursor_ahead']);
   expect(cursorOf(code, 0)).toBe(head);
+});
+
+/** The panel's question — "what has happened in this room" — asked mid-round by
+ *  a player who never went anywhere. */
+const askHistory = (s: Socket) =>
+  new Promise<CatchUpView | null>((resolve) => s.emit('getHistory', resolve));
+
+test('listing the journal hands over the whole of it and moves nobody’s pointer', async () => {
+  const { code, a } = await seatTwo(606, false);
+  await waitFor(() => headOf(code) === 1, 'the deal');
+  a.s.emit('ackHistory', { seq: 1 });
+  await waitFor(() => cursorOf(code, 0) === 1, 'one honest acknowledgement');
+
+  for (let i = 0; i < 3; i++) step(code);
+  expect(headOf(code)).toBe(4);
+
+  const listed = await askHistory(a.s);
+  expect(listed).not.toBeNull();
+  // The whole journal, not the gap: the panel shows the round, not the absence.
+  expect(listed!.entries.map((e) => e.seq)).toEqual([1, 2, 3, 4]);
+  expect(listed!.seq).toBe(4);
+  expect(listed!.truncated).toBe(false);
+  expect(listed!.you).toBe(ctx.store.getRoom(code)!.players[0]!.id);
+
+  // The whole point of the event, and the one thing no other read does: listing
+  // is not seeing. A pointer moved here would tell the server this player has
+  // applied three transactions they have only read about.
+  expect(cursorOf(code, 0)).toBe(1);
+  expect(cursorOf(code, 1)).toBe(0); // nobody else's either
+  // So the gap a real return would still be owed is untouched and complete.
+  expect(ctx.store.historySince(code, 0, 1)).toMatchObject({
+    ok: true, entries: [{ seq: 2 }, { seq: 3 }, { seq: 4 }],
+  });
+
+  // A whole-journal read is a wider window than any catch-up, so it is also the
+  // widest chance to leak: the deal itself is in here.
+  const json = JSON.stringify(listed!.entries);
+  const theirs = ctx.store.getRoom(code)!.game!.players[1]!.hand;
+  expect(theirs.length).toBeGreaterThan(0);
+  for (const c of theirs) expect(holdsCardId(json, c.id)).toBe(false);
+});
+
+test('a listing whose head the journal has dropped says so, and still lists the rest', async () => {
+  const { code, a } = await seatTwo(707, false);
+  await waitFor(() => headOf(code) === 1, 'the deal');
+  a.s.emit('ackHistory', { seq: 1 });
+  await waitFor(() => cursorOf(code, 0) === 1, 'one honest acknowledgement');
+
+  for (let i = 0; i < MAX_TRANSACTIONS + 20; i++) step(code);
+  const head = headOf(code);
+  expect(ctx.store.getRoom(code)!.history.size).toBe(MAX_TRANSACTIONS);
+
+  const listed = await askHistory(a.s);
+  expect(listed).not.toBeNull();
+  // Where a catch-up answers an unanswerable gap with an empty list, the panel
+  // still has something true to show — everything the journal kept — and says
+  // out loud that the front of it is gone.
+  expect(listed!.truncated).toBe(true);
+  expect(listed!.entries.length).toBe(MAX_TRANSACTIONS);
+  expect(listed!.entries[0]!.seq).toBe(head - MAX_TRANSACTIONS + 1);
+  expect(listed!.entries.at(-1)!.seq).toBe(head);
+
+  // Still no acknowledgement — least of all here, where the pointer is already
+  // further behind than the journal reaches.
+  expect(cursorOf(code, 0)).toBe(1);
+}, 30_000);
+
+test('a socket that never sat down is told nothing', async () => {
+  const stranger = client();
+  expect(await askHistory(stranger.s)).toBeNull();
 });

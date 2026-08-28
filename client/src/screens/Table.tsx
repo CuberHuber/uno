@@ -460,7 +460,14 @@ export default function Table() {
   };
 
   const oppAnim = oppQueue[0] ?? null;
-  const oppAnimSeat = oppAnim ? L.seats[oppAnim.slot === -1 ? 1 : oppAnim.slot]! : null;
+  // The seats ring is only as long as there are opponents, so index 1 is a real
+  // anchor from three players up. A force-played flight (slot -1) flies from the
+  // pile and never reads this, but the render guard below still asks for it — and
+  // an undefined anchor there would drop the one `onDone` that shifts the queue,
+  // wedging every later animation for the rest of the round.
+  const oppAnimSeat = oppAnim
+    ? (L.seats[oppAnim.slot === -1 ? 1 : oppAnim.slot] ?? L.seats[0] ?? null)
+    : null;
 
   return (
     <main className="stage-wrap">

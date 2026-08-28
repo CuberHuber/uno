@@ -120,6 +120,7 @@ beforeAll(async () => {
     // Entry limiters out of the way (one IP runs every client here); the action
     // budget is the one under test, shrunk so the test needs 25 frames, not 130.
     create: wide(), join: wide(), pin: wide(), action: new RateLimiter(ACTION_BUDGET, 60_000),
+    history: wide(),
   });
   await ctx.app.listen({ port: 0 });
   const address = ctx.app.server.address();
