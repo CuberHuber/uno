@@ -1,7 +1,6 @@
 import type { Card, Color, Rules } from '@uno/shared';
-import { buildDeck, isColor, shuffle } from './deck.js';
-import { CLASSIC_RULES, isPlayable, type Effect } from '@uno/shared';
-import { rng } from './deck.js';
+import { advanceSeed, buildDeck, isColor, newSeed, seedStream, shuffle } from './deck.js';
+import { CLASSIC_RULES, isNumberCard, isPlayable, type Effect } from '@uno/shared';
 import {
   openingSeating, passTurn, reverseTurn, seatAfter, seatsInRound, withdrawSeat,
 } from './seating.js';
@@ -15,19 +14,14 @@ export interface GameState {
   turn: number;
   direction: 1 | -1;
   currentColor: Color | null;
-  mustChooseColor: boolean;
   pendingDrawn: { seat: number; cardId: number } | null;
   catchWindow: { seat: number } | null;
   winner: number | null;
   rules: Rules;
   pendingDraw: number;   // stacking pot the turn seat owes; 0 when settled
   pendingDrawKind: 'draw2' | 'wild4' | null; // which kind answers the pot (strict stacking)
-  reshuffleSeed: number; // advances on every discard reshuffle for determinism
+  reshuffleSeed: string; // 256-bit; advances on every discard reshuffle
 }
-
-/** Number cards are the only ones a stack discard may combine, and the only ones
- *  allowed to open a round. */
-const isNumberCard = (c: Card) => /^\d$/.test(c.value);
 
 /** Where the turn lands `steps` places on from `from`. A reading of the turn queue
  *  that moves nothing — kept under its old name because callers and tests ask this
@@ -59,10 +53,9 @@ export function createGame(numPlayers: number, random: () => number, rules: Rule
     players, drawPile, discard: [first],
     ...openingSeating(players.length),
     currentColor: first.color,
-    mustChooseColor: false,
     pendingDrawn: null, catchWindow: null, winner: null,
     rules: { ...rules }, pendingDraw: 0, pendingDrawKind: null,
-    reshuffleSeed: Math.floor(random() * 2 ** 31),
+    reshuffleSeed: newSeed(random),
   };
 }
 
@@ -70,7 +63,6 @@ export type Action =
   | { type: 'play'; seat: number; cardIds: number[]; chosenColor?: Color }
   | { type: 'draw'; seat: number }
   | { type: 'pass'; seat: number }
-  | { type: 'chooseColor'; seat: number; color: Color }
   | { type: 'callLastCard'; seat: number }
   | { type: 'catchLastCard'; seat: number };
 
@@ -86,8 +78,8 @@ function drawFromPile(s: GameState, seat: number, count: number): number {
   for (let i = 0; i < count; i++) {
     if (s.drawPile.length === 0 && s.discard.length > 1) {
       const top = s.discard.pop()!;
-      s.reshuffleSeed = (s.reshuffleSeed + 1) >>> 0;
-      s.drawPile = shuffle(s.discard, rng(s.reshuffleSeed));
+      s.reshuffleSeed = advanceSeed(s.reshuffleSeed);
+      s.drawPile = shuffle(s.discard, seedStream(s.reshuffleSeed));
       s.discard = [top];
     }
     const card = s.drawPile.pop();
@@ -109,16 +101,8 @@ export function applyAction(state: GameState, action: Action): ActionResult {
   if (!player || player.removed) return err('bad_seat');
 
   switch (action.type) {
-    case 'chooseColor': {
-      if (!s.mustChooseColor || s.turn !== action.seat) return err('no_color_pending');
-      s.currentColor = action.color;
-      s.mustChooseColor = false;
-      return { ok: true, state: s, effects };
-    }
-
     case 'play': {
       if (s.turn !== action.seat) return err('not_your_turn');
-      if (s.mustChooseColor) return err('choose_color_first');
       // A drawn card has to be part of whatever goes down — but under stack discard
       // it may bring the rest of its rank along, so membership is all we require.
       if (s.pendingDrawn && s.pendingDrawn.seat === action.seat
@@ -220,7 +204,6 @@ export function applyAction(state: GameState, action: Action): ActionResult {
 
     case 'draw': {
       if (s.turn !== action.seat) return err('not_your_turn');
-      if (s.mustChooseColor) return err('choose_color_first');
       if (s.pendingDrawn?.seat === action.seat) return err('play_drawn_or_pass');
       s.catchWindow = null;
       if (s.pendingDraw > 0) {
@@ -318,10 +301,6 @@ export function removeFromRound(state: GameState, seat: number): GameState {
     return s;
   }
   if (wasTheirTurn) {
-    if (s.mustChooseColor) {
-      s.mustChooseColor = false;
-      s.currentColor = s.discard.at(-1)?.color ?? 'red';
-    }
     s.pendingDraw = 0; // an owed pot dies with the leaver
     s.pendingDrawKind = null;
   }

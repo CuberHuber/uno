@@ -2,7 +2,7 @@
 // design/Ochre Eights - Full Game Flexible.dc.html onto the real protocol.
 // The server stays authoritative; effects and view diffs drive the choreography.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { isPlayable, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
+import { isNumberCard, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
 import { track } from '../analytics';
 import HelpSheet from '../components/HelpSheet';
 import PauseOverlay from '../components/PauseOverlay';
@@ -16,7 +16,6 @@ import { seatSlots, stageLayout } from '../table/layout';
 
 const FLY_MS = 620;
 const DRAW_MS = 460;
-const isNumberCard = (c: Card) => /^\d$/.test(c.value);
 
 interface FlyClone { id: number; card: Card; from: string; delay: number; heavy: boolean }
 interface OppAnim { key: number; kind: 'fly' | 'draw'; slot: number; card: Card | null }
@@ -262,7 +261,7 @@ export default function Table() {
     const v = view;
     if (!v?.topCard) return;
     const wild = v.topCard.value === 'wild' || v.topCard.value === 'wild4';
-    const target = wild && v.currentColor && !v.mustChooseColor ? v.currentColor : null;
+    const target = wild && v.currentColor ? v.currentColor : null;
     const mkOffs = () => [0, 1, 2, 3].map((i) => ({
       dx: (Math.random() - 0.5) * (30 + i * 45),
       dy: (Math.random() - 0.5) * (24 + i * 36),
@@ -281,7 +280,7 @@ export default function Table() {
       const t = setTimeout(() => setTint(null), 620);
       return () => clearTimeout(t);
     }
-  }, [view?.topCard?.id, view?.currentColor, view?.mustChooseColor]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view?.topCard?.id, view?.currentColor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Selection dies with the turn or a hand change.
   useEffect(() => { setPicked([]); }, [view?.turnSeat, view?.hand.length]);
@@ -330,12 +329,9 @@ export default function Table() {
   };
   const discTf = (id: number) => `translate(${L.discX}px, ${L.discY}px) rotate(${(id % 11) - 5}deg)`;
 
-  const canPlay = (c: Card) =>
-    yourTurn && !view.mustChooseColor && leaving.length === 0 &&
-    (view.pendingDrawnCardId === null || view.pendingDrawnCardId === c.id) &&
-    (view.pendingDraw > 0
-      ? c.value === view.pendingDrawKind
-      : isPlayable(c, view.topCard!, view.currentColor));
+  // Playability is the round's answer, not ours: the view carries the ids. The
+  // only thing left here is the local one — a card mid-flight is not clickable.
+  const canPlay = (c: Card) => leaving.length === 0 && view.legal.includes(c.id);
 
   const firstPicked = picked.length ? hand.find((h) => h.id === picked[0]) : undefined;
   const stackAddable = (c: Card) =>
@@ -367,7 +363,7 @@ export default function Table() {
   };
 
   const onCardClick = (c: Card) => {
-    if (!yourTurn || view.mustChooseColor || leaving.length > 0) return;
+    if (!yourTurn || leaving.length > 0) return;
     if (picked.includes(c.id)) { setPicked((p) => p.filter((id) => id !== c.id)); return; }
     if (picked.length > 0 && stackAddable(c)) { setPicked((p) => [...p, c.id]); return; }
     if (!canPlay(c)) { shake(c.id); return; }
@@ -383,7 +379,7 @@ export default function Table() {
     playNow([c.id]);
   };
 
-  const canDraw = yourTurn && !view.mustChooseColor && view.pendingDrawnCardId === null && leaving.length === 0;
+  const canDraw = yourTurn && view.pendingDrawnCardId === null && leaving.length === 0;
   const canPass = yourTurn && view.pendingDrawnCardId !== null && !view.rules.forcePlay && picked.length === 0;
   const canCall = !!you && !you.calledLastCard && hand.length > 0 &&
     ((yourTurn && hand.length <= 2) || view.catchableSeat === view.yourSeat);
@@ -397,21 +393,18 @@ export default function Table() {
   for (const c of live) if (canPlay(c)) playableCount++;
 
   const turnName = view.seats.find((s) => s.seat === view.turnSeat)?.name;
-  const statusText = view.mustChooseColor
-    ? t('table.flipWild')
-    : yourTurn
-      ? view.pendingDraw > 0
-        ? t('st.answer', { n: view.pendingDraw })
-        : view.pendingDrawnCardId !== null
-          ? t('st.drawn')
-          : picked.length > 0
-            ? t('st.throwing', { n: picked.length })
-            : t('st.turn', { n: playableCount })
-      : t('st.waiting', { name: turnName ?? '…' });
+  const statusText = yourTurn
+    ? view.pendingDraw > 0
+      ? t('st.answer', { n: view.pendingDraw })
+      : view.pendingDrawnCardId !== null
+        ? t('st.drawn')
+        : picked.length > 0
+          ? t('st.throwing', { n: picked.length })
+          : t('st.turn', { n: playableCount })
+    : t('st.waiting', { name: turnName ?? '…' });
 
-  const pickerOpen = view.mustChooseColor || wildIds !== null || (forcedWildId !== null && wildIds === null);
+  const pickerOpen = wildIds !== null || (forcedWildId !== null && wildIds === null);
   const onPickColor = (c: Color) => {
-    if (view.mustChooseColor) { actions.chooseColor(c); return; }
     if (wildIds) { playNow(wildIds, c); return; }
     if (forcedWildId !== null) playNow([forcedWildId], c);
   };
@@ -808,11 +801,9 @@ export default function Table() {
             animation: 'ob-pop .45s cubic-bezier(.34,1.56,.64,1) both',
           }}>
             <span style={{ fontSize: 13, fontWeight: 700 }}>
-              {view.mustChooseColor
-                ? t('table.flipWild')
-                : forcedWildId !== null && wildIds === null
-                  ? t('table.forcedWild')
-                  : t('table.chooseColour')}
+              {forcedWildId !== null && wildIds === null
+                ? t('table.forcedWild')
+                : t('table.chooseColour')}
             </span>
             <div style={{ display: 'flex', gap: 12 }}>
               {(['red', 'blue', 'yellow', 'green'] as Color[]).map((c) => (
@@ -827,7 +818,7 @@ export default function Table() {
         )}
 
         {/* called-colour chip */}
-        {topIsWild && view.currentColor && !view.mustChooseColor && (
+        {topIsWild && view.currentColor && (
           <div style={{
             position: 'absolute', left: L.chipX, top: L.chipY, display: 'flex', gap: 7,
             alignItems: 'center', background: '#fdf8ef', borderRadius: 999, padding: '5px 13px',

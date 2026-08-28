@@ -114,11 +114,6 @@ export const parsePlay = (p: unknown): Parsed<PlayFields> => {
   return ok(fields);
 };
 
-export const parseColor = (p: unknown): Parsed<{ color: Color }> => {
-  if (!isRecord(p) || !isColor(p.color)) return bad('wild_needs_color');
-  return ok({ color: p.color });
-};
-
 export const parseSeat = (p: unknown): Parsed<{ seat: number }> => {
   if (!isRecord(p) || !isSeat(p.seat)) return bad('no_such_seat');
   return ok({ seat: p.seat });

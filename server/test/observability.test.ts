@@ -89,7 +89,6 @@ test('a played round lands in the metrics: joins, rounds, sessions', { timeout: 
     if (view.winnerSeat !== null) { winner = view.winnerSeat; return; }
     if (view.turnSeat !== view.yourSeat || view.paused) return;
     const sock = view.yourSeat === 0 ? a : b;
-    if (view.mustChooseColor) return void sock.emit('chooseColor', { color: 'red' });
     if (view.pendingDrawnCardId !== null) {
       return void sock.emit('playCards', { cardIds: [view.pendingDrawnCardId], chosenColor: 'red' });
     }

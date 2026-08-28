@@ -8,7 +8,7 @@ import type { RoomStore } from './rooms.js';
 import type { ServerLimits } from './server.js';
 import type { Visitor } from './umami.js';
 import {
-  parseAck, parseColor, parseJoin, parseNone, parsePin, parsePlay, parseRules, parseSeat,
+  parseAck, parseJoin, parseNone, parsePin, parsePlay, parseRules, parseSeat,
   type Parsed,
 } from './wire.js';
 
@@ -307,9 +307,6 @@ export function attachSockets(
     )));
     socket.on('drawCard', () => handle(null, parseNone, (at) => store.act(at.code, at.token, { type: 'draw' })));
     socket.on('passTurn', () => handle(null, parseNone, (at) => store.act(at.code, at.token, { type: 'pass' })));
-    socket.on('chooseColor', (p: unknown) => handle(
-      p, parseColor, (at, v) => store.act(at.code, at.token, { type: 'chooseColor', color: v.color }),
-    ));
     socket.on('callLastCard', () => handle(null, parseNone, (at) => store.act(at.code, at.token, { type: 'callLastCard' })));
     socket.on('catchLastCard', () => handle(null, parseNone, (at) => store.act(at.code, at.token, { type: 'catchLastCard' })));
     socket.on('rematch', () => handle(null, parseNone, (at) => store.rematch(at.code, at.token)));

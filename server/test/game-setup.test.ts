@@ -69,13 +69,15 @@ describe('createGame', () => {
     expect(g.drawPile.length + g.discard.length + g.players.reduce((n, p) => n + p.hand.length, 0)).toBe(108);
   });
 
-  test('the round opens on seat 0, on the card colour, with no colour pending', () => {
+  test('the round opens on seat 0, on a colour the opener actually has', () => {
     for (let seed = 0; seed < 50; seed++) {
       const g = createGame(3, rng(seed));
       expect(g.turn).toBe(0);
       expect(g.direction).toBe(1);
       expect(g.currentColor).toBe(g.discard[0]!.color);
-      expect(g.mustChooseColor).toBe(false);
+      // The invariant that used to need a "pick a colour first" state: an opener
+      // is always a coloured number card, so no colour is ever left pending.
+      expect(g.currentColor).not.toBeNull();
       expect(g.players[0]!.hand).toHaveLength(7); // no opening penalty is possible
     }
   });
@@ -91,7 +93,6 @@ describe('createGame', () => {
       expect(g.direction).toBe(1);
       expect(g.pendingDraw).toBe(0);
       expect(g.pendingDrawKind).toBeNull();
-      expect(g.mustChooseColor).toBe(false);
       expect(g.pendingDrawn).toBeNull();
       for (const p of g.players) expect(p.hand).toHaveLength(7);
     }

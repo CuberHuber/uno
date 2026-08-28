@@ -1,5 +1,25 @@
-import type { Phase, RoomStateView, Rules } from '@uno/shared';
+import { isPlayable, type Phase, type RoomStateView, type Rules } from '@uno/shared';
 import type { GameState } from './game.js';
+
+/** Which of the viewer's cards may lead a play right now. The rules used to live
+ *  twice — once here in the engine, once again in the browser — and nothing kept
+ *  the two honest. Now the round says what is legal and the client only draws it.
+ *  Mirrors the lead-card acceptance in `applyAction`'s `play` case exactly. */
+function legalFor(g: GameState, seat: number): number[] {
+  if (g.winner !== null || g.turn !== seat) return [];
+  const player = g.players[seat];
+  const top = g.discard.at(-1);
+  if (!player || player.removed || !top) return [];
+  // A drawn card owes an answer: it either goes down itself or the turn passes.
+  const owed = g.pendingDrawn?.seat === seat ? g.pendingDrawn.cardId : null;
+  return player.hand
+    .filter((c) => owed === null || owed === c.id)
+    // Strict stacking: an owed pot is answered only by its own kind.
+    .filter((c) => (g.pendingDraw > 0
+      ? c.value === g.pendingDrawKind
+      : isPlayable(c, top, g.currentColor)))
+    .map((c) => c.id);
+}
 
 export interface ViewContext {
   roomCode: string;
@@ -23,6 +43,7 @@ export function projectView(ctx: ViewContext, seat: number): RoomStateView {
     phase: ctx.phase,
     yourSeat: seat,
     hand: g ? g.players[seat]!.hand : [],
+    legal: g ? legalFor(g, seat) : [],
     seats: ctx.names
       .map((name, i) => ({
         seat: i,
@@ -37,7 +58,6 @@ export function projectView(ctx: ViewContext, seat: number): RoomStateView {
     direction: g ? g.direction : 1,
     topCard: g ? g.discard.at(-1)! : null,
     currentColor: g ? g.currentColor : null,
-    mustChooseColor: g ? g.mustChooseColor && g.turn === seat : false,
     pendingDrawnCardId: g?.pendingDrawn?.seat === seat ? g.pendingDrawn.cardId : null,
     catchableSeat: g?.catchWindow?.seat ?? null,
     drawPileCount: g ? g.drawPile.length : 0,
