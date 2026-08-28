@@ -13,7 +13,7 @@ import { useT, type MsgKey } from '../i18n';
 import { useStore } from '../store';
 import { initialOf, roundsPlayed, ruleChips, seatColor } from '../ui';
 import { CardFront, faceOf, PileBack, SUIT, type Face } from '../table/cards';
-import { seatSlots, stageLayout } from '../table/layout';
+import { stageLayout } from '../table/layout';
 
 const FLY_MS = 620;
 const DRAW_MS = 460;
@@ -57,7 +57,9 @@ export default function Table() {
     window.addEventListener('resize', onR);
     return () => window.removeEventListener('resize', onR);
   }, []);
-  const L = stageLayout(vp.w, vp.h);
+  // The seat ring's angles depend on how many opponents there are, so the count
+  // has to reach the layout. `seats` includes you.
+  const L = stageLayout(vp.w, vp.h, (view?.seats.length ?? 4) - 1);
 
   const viewRef = useRef<RoomStateView | null>(view);
   viewRef.current = view;
@@ -117,10 +119,11 @@ export default function Table() {
     () => (view?.seats ?? []).filter((s) => s.seat !== yourSeat),
     [view?.seats, yourSeat],
   );
-  const slots = seatSlots(opponents.length);
+  // One anchor per opponent now, in seating order — the arc already accounts for
+  // how many there are, so there is no fixed slot table to index through.
   const slotOfSeat = (seat: number): number => {
     const k = opponents.findIndex((s) => s.seat === seat);
-    return k === -1 ? 1 : (slots[k] ?? 1);
+    return k === -1 ? 0 : k;
   };
 
   // ── Effects → choreography ────────────────────────────────────────────────
@@ -335,11 +338,27 @@ export default function Table() {
   const topIsWild = view.topCard.value === 'wild' || view.topCard.value === 'wild4';
   const calledHex = view.currentColor ? SUIT[view.currentColor]! : '#2a2621';
 
+  // Two rows from eleven cards — exactly where a single arc's total spread locks
+  // and every further card starts subdividing the same wedge. Below eleven the
+  // geometry is the old one, unchanged.
+  //
+  // The rows separate by pushing the FRONT row down rather than lifting the back
+  // row up, so the hand's top edge is the single-row arc at every card count —
+  // which is what keeps the table's bottom fifth the most the hand ever covers.
   const fanPos = (i: number, n: number) => {
-    const spread = n > 1 ? Math.min(6.5, L.spreadTot / (n - 1)) : 0;
-    const a0 = (i - (n - 1) / 2) * spread;
+    const rows = n >= 11 ? 2 : 1;
+    const backN = rows === 2 ? Math.ceil(n / 2) : n;
+    const row = rows === 2 && i >= backN ? 1 : 0;
+    const rn = row === 0 ? backN : n - backN;
+    const ri = row === 0 ? i : i - backN;
+    const spread = rn > 1 ? Math.min(6.5, L.spreadTot / (rn - 1)) : 0;
+    const a0 = (ri - (rn - 1) / 2) * spread;
     const rad = (a0 * Math.PI) / 180;
-    return { x: L.cx + Math.sin(rad) * L.R - 52, y: L.anchorY - Math.cos(rad) * L.R - 78, a: a0 };
+    return {
+      x: L.cx + Math.sin(rad) * L.R - 52 + (row === 0 ? -L.rowShift : L.rowShift),
+      y: L.anchorY - Math.cos(rad) * L.R - 78 + (row === 1 ? L.rowGap : 0),
+      a: a0, row,
+    };
   };
   const discTf = (id: number) => `translate(${L.discX}px, ${L.discY}px) rotate(${(id % 11) - 5}deg)`;
 
@@ -432,17 +451,42 @@ export default function Table() {
         width: L.W, height: L.H,
         transform: `translate(-50%, -50%) scale(${L.scale.toFixed(3)})`,
         ['--stage-k' as never]: L.scale.toFixed(3),
-        background: 'var(--felt)',
+        background: 'var(--color-bg)',
         animation: quaking ? 'ob-quake .65s ease-in-out' : 'none',
       }}>
-        {/* direction ring */}
+        {/* The table itself. It used to be the stage's background colour; the
+            sketch draws a real piece of furniture, so the felt is now a rimmed
+            disc sitting on the ground and the seats sit around it. */}
         <div style={{
-          position: 'absolute', left: L.ringL, top: L.ringT, width: 350, height: 350,
-          borderRadius: '50%', border: '3px dashed rgba(42,38,33,.16)',
-          animation: 'ob-spin 26s linear infinite',
-          animationDirection: view.direction === 1 ? 'normal' : 'reverse',
-          pointerEvents: 'none', zIndex: 1,
-        }} />
+          position: 'absolute', left: L.tblL, top: L.tblT, width: L.tblW, height: L.tblH,
+          borderRadius: '50%', padding: L.rimW, boxSizing: 'border-box',
+          background: 'linear-gradient(96deg, var(--color-accent-900) 0%, var(--color-accent-800) 24%, '
+            + 'var(--color-accent-900) 49%, var(--color-accent-800) 74%, var(--color-accent-900) 100%)',
+          boxShadow: '0 24px 54px rgba(46,43,37,.26), inset 0 0 0 2px rgba(42,38,33,.30), '
+            + 'inset 0 2px 0 rgba(247,237,220,.10)',
+          zIndex: 0, pointerEvents: 'none',
+          transition: 'left .35s cubic-bezier(.2,.7,.3,1), top .35s cubic-bezier(.2,.7,.3,1),'
+            + ' width .35s cubic-bezier(.2,.7,.3,1), height .35s cubic-bezier(.2,.7,.3,1)',
+        }}>
+          <div style={{
+            width: '100%', height: '100%', borderRadius: '50%', background: 'var(--felt)',
+            boxShadow: 'inset 0 0 0 3px rgba(42,38,33,.10), inset 0 8px 22px rgba(42,38,33,.16)',
+          }} />
+        </div>
+
+        {/* Direction ring — absorbed into the rim. It no longer spins as a shape:
+            the dashes march instead, so the rim and the direction are one object. */}
+        <svg className="ob-march-ring" width={L.ringW} height={L.ringH}
+          viewBox={`0 0 ${L.ringW} ${L.ringH}`}
+          style={{
+            position: 'absolute', left: L.ringL, top: L.ringT, zIndex: 1, pointerEvents: 'none',
+            animation: 'ob-dashmarch 3.2s linear infinite',
+            animationDirection: view.direction === 1 ? 'normal' : 'reverse',
+            transition: 'left .35s cubic-bezier(.2,.7,.3,1), top .35s cubic-bezier(.2,.7,.3,1)',
+          }}>
+          <ellipse cx={L.ringW / 2} cy={L.ringH / 2} rx={L.ringW / 2 - 2} ry={L.ringH / 2 - 2}
+            fill="none" stroke="rgba(42,38,33,.22)" strokeWidth="3" strokeDasharray="13 13" />
+        </svg>
 
         {/* called-colour tint splash (pops in, folds away on colour change) */}
         {tint && (
@@ -476,7 +520,10 @@ export default function Table() {
 
         {/* opponent seats */}
         {opponents.map((s, k) => {
-          const slot = L.seats[slots[k]!]!;
+          const slot = L.seats[k] ?? L.seats[0]!;
+          // The avatar always faces the middle of the table, so a seat left of
+          // centre wears its pill the other way round.
+          const mir = slot.ang < -6;
           const active = view.turnSeat === s.seat;
           const m = Math.min(s.cardCount, 9);
           return (
@@ -484,8 +531,13 @@ export default function Table() {
               position: 'absolute', left: slot.x, top: slot.y, width: 220,
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
               zIndex: 8, transform: `scale(${L.seatScale})`, transformOrigin: 'top center',
+              transition: 'left .35s cubic-bezier(.2,.7,.3,1), top .35s cubic-bezier(.2,.7,.3,1)',
             }}>
-              <div style={{ position: 'relative', width: 200, height: 78 }}>
+              {/* Held cards angle away from the middle, like a real hand at that seat. */}
+              <div style={{
+                position: 'relative', width: 200, height: 78,
+                transform: `rotate(${(slot.ang * 0.15).toFixed(1)}deg)`, transformOrigin: '50% 118%',
+              }}>
                 {Array.from({ length: m }, (_, j) => {
                   const off = j - (m - 1) / 2;
                   return (
@@ -507,10 +559,17 @@ export default function Table() {
                   }}>{t('table.uno')}</span>
                 )}
               </div>
-              {active && <span className="march-badge" style={{ margin: '0 0 -6px', position: 'relative', zIndex: 2 }}>{t('table.playing')}</span>}
+              {active && (
+                <span className="march-badge" style={{
+                  margin: mir ? '0 -70px -6px 0' : '0 0 -6px -70px', position: 'relative', zIndex: 2,
+                  borderRadius: mir ? '999px 999px 4px 999px' : '999px 999px 999px 4px',
+                }}>{t('table.playing')}</span>
+              )}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10, background: '#fdf8ef',
-                borderRadius: 999, padding: '5px 16px 5px 5px', boxShadow: 'var(--shadow-md)',
+                flexDirection: mir ? 'row-reverse' : 'row',
+                borderRadius: 999, padding: mir ? '5px 5px 5px 16px' : '5px 16px 5px 5px',
+                boxShadow: 'var(--shadow-md)',
                 border: `2px solid ${active ? 'var(--color-accent)' : 'transparent'}`, boxSizing: 'border-box',
               }}>
                 <div style={{
@@ -675,25 +734,44 @@ export default function Table() {
           </Flight>
         ))}
 
-        {/* you: badge + pill */}
+        {/* You: badge + pill. It used to sit in the bottom-left corner, nowhere
+            near your own cards; it now sits centred under the hand, at the bright
+            core of the your-turn glow, so marker and glow read as one idea. */}
         <div style={{
-          position: 'absolute', left: L.youL, bottom: L.youB,
-          display: 'flex', flexDirection: 'column', alignItems: 'flex-start', zIndex: 40,
+          position: 'absolute', left: L.cx - L.meW / 2, bottom: L.meB, width: L.meW,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          // Above the hand, not below it: the front row of a two-row fan reaches
+          // the stage floor, and at twenty cards it buried this pill entirely.
+          zIndex: 120,
+          transition: 'left .35s cubic-bezier(.2,.7,.3,1)',
         }}>
           {yourTurn && (
-            <span className="march-badge" style={{ fontSize: 12, padding: '5px 14px', margin: '0 0 -6px 14px', position: 'relative', zIndex: 2 }}>
+            <span className="march-badge" style={{ fontSize: 12, padding: '5px 14px', margin: '0 0 -6px', position: 'relative', zIndex: 2 }}>
               {t('table.yourTurn')}
             </span>
           )}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 11, background: '#fdf8ef',
-            borderRadius: 999, padding: '6px 18px 6px 6px', boxShadow: 'var(--shadow-md)',
+            display: 'flex', alignItems: 'center', gap: 11,
+            background: yourTurn ? 'var(--color-accent-100)' : '#fdf8ef',
+            borderRadius: 999, padding: '6px 18px 6px 6px',
+            boxShadow: yourTurn
+              ? 'var(--shadow-md), 0 0 0 9px rgba(198,113,57,.15)'
+              : 'var(--shadow-md)',
             border: `2px solid ${yourTurn ? 'var(--color-accent)' : 'transparent'}`, boxSizing: 'border-box',
           }}>
+            {/* The ring only exists while there is something to count. It used to
+                be a conic gradient frozen at 72% — a dial that never turned. */}
             <div style={{
               width: 46, height: 46, borderRadius: '50%', display: 'grid', placeItems: 'center',
-              background: yourTurn ? 'conic-gradient(var(--color-accent) 72%, var(--color-neutral-200) 0)' : 'var(--color-neutral-200)',
+              background: 'var(--color-neutral-200)', position: 'relative',
             }}>
+              {view.catchableSeat === view.yourSeat && (
+                <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true"
+                  style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+                  <circle cx="23" cy="23" r="21" fill="none" stroke="var(--color-accent)" strokeWidth="4"
+                    strokeLinecap="round" strokeDasharray="132" className="ob-dial" />
+                </svg>
+              )}
               <div style={{
                 width: 38, height: 38, borderRadius: '50%', background: seatColor(view.yourSeat),
                 color: '#fdf8ef', display: 'grid', placeItems: 'center',
@@ -717,18 +795,20 @@ export default function Table() {
           const addable = stackAddable(c);
           const fresh = freshIds.has(c.id);
           let tf: string;
+          let row = 0;
           if (fresh) {
             tf = `translate(${L.pileX}px, ${L.pileY}px) rotate(0deg)`;
           } else {
-            let { x, y, a } = fanPos(i, live.length);
+            const pos = fanPos(i, live.length);
+            const { x } = pos;
+            let { y, a } = pos;
+            row = pos.row;
             let scale = '';
             if (p) y -= 9;
-            if (isPicked) { y -= 52; a *= 0.3; scale = ' scale(1.06)'; }
-            else if (hi >= 0) {
-              const dd = i - hi;
-              if (dd === 0) { y -= 52; a *= 0.3; scale = ' scale(1.06)'; }
-              else { const push = [0, 26, 14, 6][Math.min(Math.abs(dd), 3)]!; x += Math.sign(dd) * push; }
-            }
+            // No neighbour shove any more: past ten cards that push was wider
+            // than the gap between cards and the fan visibly buckled. Two rows
+            // make the gap instead, so nothing has to be shoved aside.
+            if (isPicked || (hi >= 0 && i === hi)) { y -= 52; a *= 0.3; scale = ' scale(1.06)'; }
             tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${a.toFixed(2)}deg)${scale}`;
           }
           const hovered = hoverId === c.id && !fresh;
@@ -740,7 +820,9 @@ export default function Table() {
               style={{
                 position: 'absolute', left: 0, top: 0, width: 104, height: 156,
                 transform: tf, transition: `transform ${FLY_MS}ms cubic-bezier(.34,1.45,.64,1)`,
-                zIndex: hovered || isPicked ? 50 : 10 + i,
+                // The front row is nearer the player, so it draws over the back
+                // one; back cards show through the gaps between front cards.
+                zIndex: hovered || isPicked ? 200 : (row === 1 ? 90 : 10) + i,
                 cursor: yourTurn ? 'pointer' : 'default',
               }}>
               <div style={{

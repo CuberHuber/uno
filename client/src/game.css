@@ -380,6 +380,18 @@ body {
   background: var(--color-neutral-100); border-radius: 14px;
 }
 .lobby-rules .rulerow-details { background: var(--color-surface); }
+/* — the table's rim and the turn dial — */
+/* The direction ring was a dashed circle that spun as a shape. It is now part of
+   the rim, so the shape holds still and the dashes march around it instead. */
+@keyframes ob-dashmarch { to { stroke-dashoffset: -26; } }
+/* The catch window, and only the catch window: 100 → 0 over the same two seconds
+   the call button's drain bar runs, so the two read as one clock. */
+@keyframes ob-dialdrain { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 132; } }
+.ob-dial { animation: ob-dialdrain 2s linear forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .ob-march-ring { animation: none !important; }
+}
+
 /* — the sound switch, on every screen — */
 /* Anchored, not fixed: it sits inside whatever header or chip row hosts it, and the
    panel hangs off that. On the table the host is inside `.stage`, which is
