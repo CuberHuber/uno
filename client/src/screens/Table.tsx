@@ -17,6 +17,11 @@ import { stageLayout } from '../table/layout';
 
 const FLY_MS = 620;
 const DRAW_MS = 460;
+/** Start-to-start of consecutive beats, from the redesign's timing contract. One
+ *  beat is the 620ms flight; the next starts 480ms in, so the 140ms of overlap
+ *  falls inside the previous beat's rest. A spectator never sees two things move
+ *  at once, and a three-action turn still does not read as three separate turns. */
+const STRIDE_MS = 480;
 
 interface FlyClone { id: number; card: Card; from: string; delay: number; heavy: boolean }
 interface OppAnim { key: number; kind: 'fly' | 'draw'; slot: number; card: Card | null }
@@ -47,7 +52,7 @@ function Flight({ from, to, ms, delay = 0, z, ease, anim, onDone, children }: {
 }
 
 export default function Table() {
-  const { view, actions, rejection, effect } = useStore();
+  const { view, actions, rejection, effects, consumeEffect } = useStore();
   const { t, tn, terr, locale } = useT();
 
   // Viewport → stage geometry (fixed design space, scaled).
@@ -127,10 +132,20 @@ export default function Table() {
   };
 
   // ── Effects → choreography ────────────────────────────────────────────────
-  const processed = useRef<Effect | null>(effect);
+  //
+  // One at a time, oldest first. The head is animated, then dropped a stride
+  // later, which promotes the next one — so a burst that arrives in a single
+  // network flush is played out as a sequence instead of collapsing into its
+  // last member. Everything below reads `head.e` and is otherwise unchanged.
+  const head = effects[0] ?? null;
+  const effect = head?.e ?? null;
   useEffect(() => {
-    if (!effect || effect === processed.current) return;
-    processed.current = effect;
+    if (!head) return;
+    const done = setTimeout(() => consumeEffect(head.seq), STRIDE_MS);
+    return () => clearTimeout(done);
+  }, [head?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!effect) return;
     const v = viewRef.current;
     if (!v) return;
     const nameOf = (seat: number) => (seat === v.yourSeat ? t('t.you') : v.seats.find((s) => s.seat === seat)?.name ?? 'Player');
@@ -212,7 +227,7 @@ export default function Table() {
     // 'win' is deliberately absent: the same packet that carries it flips the phase
     // to roundEnd, and React batches the two, so this component can be gone before
     // the effect runs. The cue is fired from the store, where nothing unmounts.
-  }, [effect]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [head?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The deal, heard by everyone at the table. It used to be the host's lobby button,
   // so every guest — who never pressed it — was dealt into silence. Once per round,

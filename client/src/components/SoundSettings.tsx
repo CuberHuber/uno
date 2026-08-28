@@ -6,7 +6,9 @@
 // than each keeping a `useState` of its own and drifting.
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n';
-import { cue, onSoundChange, setChannel, soundSettings, type Channel } from '../sound';
+import {
+  cue, musicLevel, onSoundChange, setChannel, setMusicLevel, soundSettings, type Channel,
+} from '../sound';
 
 const ROWS: { ch: Channel; name: 'sound.sfx' | 'sound.music'; hint: 'sound.sfxHint' | 'sound.musicHint' }[] = [
   { ch: 'sfx', name: 'sound.sfx', hint: 'sound.sfxHint' },
@@ -16,6 +18,7 @@ const ROWS: { ch: Channel; name: 'sound.sfx' | 'sound.music'; hint: 'sound.sfxHi
 export default function SoundSettings({ className }: { className?: string }) {
   const { t } = useT();
   const [s, setS] = useState(soundSettings);
+  const [vol, setVol] = useState(musicLevel);
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement | null>(null);
 
@@ -68,6 +71,18 @@ export default function SoundSettings({ className }: { className?: string }) {
               </span>
             </button>
           ))}
+          {/* The bed's level was a measured constant, right for a quiet room and
+              wrong for a loud one. Only the player knows which they are in. */}
+          <label className={`sound-vol${s.music ? '' : ' sound-vol-off'}`}>
+            <span>{t('sound.musicLevel')}</span>
+            <input type="range" min={2} max={100} step={2} value={Math.round(vol * 100)}
+              disabled={!s.music} aria-label={t('sound.musicLevel')}
+              onChange={(e) => {
+                const next = Number(e.target.value) / 100;
+                setVol(next);
+                setMusicLevel(next);
+              }} />
+          </label>
         </div>
       )}
     </div>

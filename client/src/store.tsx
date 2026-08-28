@@ -6,13 +6,26 @@ import { socket } from './socket';
 import { cue } from './sound';
 import { roundsPlayed } from './ui';
 
+/** One queued effect. The sequence number is the client's own — it exists so the
+ *  table can say which effect it has finished with, without comparing values. */
+export interface PendingEffect { seq: number; e: Effect }
+
 export interface Store {
   view: RoomStateView | null;
   error: string | null;      // fatal join error → "table not found" screen
   joinError: string | null;  // transient join failure: pin_required / wrong_pin / rate_limited…
   rejection: string | null;  // transient moveRejected, clears itself
   selfDisconnected: boolean; // OUR socket dropped (not another player's)
-  effect: Effect | null;
+  /** Effects waiting to be played out, oldest first.
+   *
+   *  This used to be a single slot, and that quietly lost moves: the server emits
+   *  one packet per effect, socket.io delivers a burst in one flush, React batches
+   *  the setStates, and the table's consumer ran once — for the last of them. A
+   *  forced play, which emits `drew` and `played` for the same seat, lost a beat
+   *  every time. A queue is what lets a three-action turn arrive as three actions. */
+  effects: PendingEffect[];
+  /** Drop the effect the table has finished animating. */
+  consumeEffect: (seq: number) => void;
   catchUp: CatchUpView | null; // what happened while we were away; null when nothing did
   dismissCatchUp: () => void;
   join: (code: string, name?: string, pin?: string) => void;
@@ -55,7 +68,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
   const [selfDisconnected, setSelfDisconnected] = useState(false);
-  const [effect, setEffect] = useState<Effect | null>(null);
+  const [effects, setEffects] = useState<PendingEffect[]>([]);
+  const effectSeq = useRef(0);
   const [catchUp, setCatchUp] = useState<CatchUpView | null>(null);
 
   // Our own transport state, for the "connection lost" banner: PauseOverlay
@@ -84,7 +98,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     // has to live.
     const onEffect = (e: Effect) => {
       if (e.type === 'win') cue('win');
-      setEffect(e);
+      // Append, never replace: two effects in one flush are two things that
+      // happened, and the table has to be able to show both.
+      setEffects((q) => [...q, { seq: (effectSeq.current += 1), e }]);
     };
     socket.on('roomState', setView);
     socket.on('moveRejected', onReject);
@@ -233,7 +249,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider value={{
-      view, error, joinError, rejection, selfDisconnected, effect,
+      view, error, joinError, rejection, selfDisconnected, effects,
+      consumeEffect: (seq) => setEffects((q) => q.filter((p) => p.seq !== seq)),
       catchUp, dismissCatchUp: () => setCatchUp(null), join, actions,
     }}>
       {children}

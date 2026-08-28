@@ -416,6 +416,16 @@ body {
 .join-head { display: flex; justify-content: flex-end; margin-bottom: 4px; }
 /* On the create card the title and the host tag lead; the switch takes the far end. */
 .host-sound { margin-left: auto; }
+.sound-vol {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 4px 12px 8px; font-size: 11.5px; font-weight: 600;
+  color: var(--color-neutral-600);
+}
+.sound-vol input { width: 100%; accent-color: var(--color-accent); cursor: pointer; }
+/* Music off: the level stays visible, so the switch and the slider never
+   disagree about what you will hear. */
+.sound-vol-off { opacity: .45; }
+.sound-vol-off input { cursor: not-allowed; }
 .sound-row { padding: 10px 12px; gap: 10px; }
 .sound-row .rulerow-name { font-size: 14px; }
 .sound-row .rulerow-desc { font-size: 11.5px; }

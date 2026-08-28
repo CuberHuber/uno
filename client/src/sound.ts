@@ -39,7 +39,39 @@ const LEVEL: Record<Cue, number> = {
 // bed a few decibels below even `press`, the quietest thing in the game. It was
 // 0.34 while the music was still the -10.8 LUFS master, where the bed came out
 // over the top of nearly every cue.
+// That reasoning fixes the *default*, not the value: a bed that is right in a
+// quiet room is wrong in a loud one, and only the player can hear which they are
+// in. The number below is where the slider starts.
 const MUSIC_LEVEL = 0.2;
+const MUSIC_VOL_KEY = 'ochre:musicvol';
+
+let musicVol: number | null = null;
+
+/** The music bed's level, 0…1. Separate from the on/off switch: turning music
+ *  down to nothing and turning it off are different intentions, and only the
+ *  second should stop the stream. */
+export function musicLevel(): number {
+  if (musicVol === null) {
+    let v = NaN;
+    try {
+      v = Number(localStorage.getItem(MUSIC_VOL_KEY));
+    } catch {
+      // Storage refused; this session gets the default and forgets it.
+    }
+    musicVol = Number.isFinite(v) && v > 0 && v <= 1 ? v : MUSIC_LEVEL;
+  }
+  return musicVol;
+}
+
+export function setMusicLevel(v: number): void {
+  musicVol = Math.max(0.02, Math.min(1, v));
+  try {
+    localStorage.setItem(MUSIC_VOL_KEY, String(musicVol));
+  } catch {
+    // As above.
+  }
+  if (music) music.volume = musicVol;
+}
 
 /** Cues that fire dozens of times a round get a little pitch and level scatter, so
  *  the fortieth card does not land on exactly the same sample as the first. Real
@@ -186,7 +218,7 @@ export async function startMusic(): Promise<void> {
     music.loop = true;
     music.preload = 'none';
   }
-  music.volume = MUSIC_LEVEL;
+  music.volume = musicLevel();
   // Autoplay can still be refused; a rejected promise is not an error worth showing.
   await music.play().catch(() => {});
 }
