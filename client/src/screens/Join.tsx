@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import SoundSettings from '../components/SoundSettings';
 import { useT } from '../i18n';
+import { cue } from '../sound';
 import { useStore } from '../store';
 import { fmtCode } from '../ui';
 
@@ -20,9 +22,10 @@ export default function Join({ code }: { code: string }) {
     return (
       <main className="centered">
         <div className="panel panel-pad join-card">
+          <div className="join-head"><SoundSettings /></div>
           <h2>{t('join.pinTitle')}</h2>
           <p className="card-sub">{t('join.sub', { code: fmtCode(code.toUpperCase()) })}</p>
-          <form onSubmit={(e) => { e.preventDefault(); join(code, name || undefined, pin); }}>
+          <form onSubmit={(e) => { e.preventDefault(); cue('press'); join(code, name || undefined, pin); }}>
             <div className="field">
               <label htmlFor="pin">{t('join.pinLabel')}</label>
               <input id="pin" className="input-pill input-token" value={pin}
@@ -43,9 +46,12 @@ export default function Join({ code }: { code: string }) {
   return (
     <main className="centered">
       <div className="panel panel-pad join-card">
+        {/* The invite link is where a guest starts, and it never rendered the landing —
+            so this used to be a screen you could not turn the sound on from. */}
+        <div className="join-head"><SoundSettings /></div>
         <h2>{t('join.title')}</h2>
         <p className="card-sub">{t('join.sub', { code: fmtCode(code.toUpperCase()) })}</p>
-        <form onSubmit={(e) => { e.preventDefault(); join(code, name); }}>
+        <form onSubmit={(e) => { e.preventDefault(); cue('press'); join(code, name); }}>
           <div className="field">
             <label htmlFor="name">{t('join.nameLabel')}</label>
             <input id="name" className="input-pill" value={name} maxLength={24}

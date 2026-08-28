@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { RULES_CATALOG } from '@uno/shared';
 import { track } from '../analytics';
 import RuleRow from '../components/RuleRow';
+import SoundSettings from '../components/SoundSettings';
 import { LangSwitcher, useT } from '../i18n';
 import { cue } from '../sound';
 import { useStore } from '../store';
@@ -29,6 +30,7 @@ export default function Lobby() {
   const host = view.seats.find((s) => s.isHost);
   const link = `${window.location.origin}/r/${view.roomCode}`;
   const copy = () => {
+    cue('press');
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 1400);
@@ -44,6 +46,7 @@ export default function Lobby() {
         {view.hasPin && !isHost && <span className="chip">PIN</span>}
         <span className="chip">{fmtCode(view.roomCode)}</span>
         <LangSwitcher />
+        <SoundSettings />
         <button className="btn btn-secondary btn-solid lobby-copy" onClick={copy}>
           {copied ? t('lobby.copied') : t('lobby.copy')}
         </button>
@@ -55,6 +58,7 @@ export default function Lobby() {
             <RuleRow key={r.id} name={r.title[locale]} desc={r.tagline[locale]}
               details={r.details[locale]} on={view.rules[r.id]}
               onToggle={() => {
+                cue('press');
                 track('rules_toggle', { rule: r.id, on: !view.rules[r.id], where: 'lobby' });
                 actions.setRules({ ...view.rules, [r.id]: !view.rules[r.id] });
               }} />
@@ -63,7 +67,7 @@ export default function Lobby() {
             {view.pin !== null ? (
               <>
                 <span className="chip">{t('lobby.pinChip', { pin: view.pin })}</span>
-                <button className="btn btn-ghost" onClick={() => actions.setPin(null)}>
+                <button className="btn btn-ghost" onClick={() => { cue('press'); actions.setPin(null); }}>
                   {t('lobby.pinRemove')}
                 </button>
               </>
@@ -73,7 +77,7 @@ export default function Lobby() {
                   inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="····"
                   onChange={(e) => setPinDraft(e.target.value.replace(/\D/g, ''))} />
                 <button className="btn btn-secondary btn-solid" disabled={!/^\d{4}$/.test(pinDraft)}
-                  onClick={() => { actions.setPin(pinDraft); setPinDraft(''); }}>
+                  onClick={() => { cue('press'); actions.setPin(pinDraft); setPinDraft(''); }}>
                   {t('lobby.pinSet')}
                 </button>
               </>
@@ -113,7 +117,7 @@ export default function Lobby() {
         </span>
         {isHost
           ? <button className="btn btn-primary btn-big" disabled={view.seats.length < 2}
-              onClick={() => { cue('deal'); actions.start(); }}>
+              onClick={() => { cue('press'); actions.start(); }}>
               {t('lobby.deal')}
             </button>
           : <span className="lobby-note">{t('lobby.waitHost')}</span>}

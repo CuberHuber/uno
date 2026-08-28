@@ -6,6 +6,7 @@ import { isNumberCard, type Card, type Color, type Effect, type RoomStateView } 
 import { track } from '../analytics';
 import HelpSheet from '../components/HelpSheet';
 import PauseOverlay from '../components/PauseOverlay';
+import SoundSettings from '../components/SoundSettings';
 import { cue } from '../sound';
 import RulesSlide, { hasSeenSlide, markSlideSeen } from './RulesSlide';
 import { useT, type MsgKey } from '../i18n';
@@ -204,10 +205,23 @@ export default function Table() {
     } else if (effect.type === 'caught') {
       showToast(t('t.caught', { name: nameOf(effect.seat) }));
       buzz(100); cue('caught');
-    } else if (effect.type === 'win') {
-      cue('win');
     }
+    // 'win' is deliberately absent: the same packet that carries it flips the phase
+    // to roundEnd, and React batches the two, so this component can be gone before
+    // the effect runs. The cue is fired from the store, where nothing unmounts.
   }, [effect]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The deal, heard by everyone at the table. It used to be the host's lobby button,
+  // so every guest — who never pressed it — was dealt into silence. Once per round,
+  // and only while no card has moved yet, so a mid-game reconnect stays quiet.
+  const dealt = useRef(false);
+  useEffect(() => {
+    const n = view?.hand.length ?? 0;
+    if (dealt.current || !n || !view) return;
+    if (view.seats.some((s) => s.cardCount !== n)) return;
+    dealt.current = true;
+    cue('deal');
+  }, [view?.hand.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rejected move: cards snap back, culprit shakes, reason toasts.
   useEffect(() => {
@@ -760,7 +774,7 @@ export default function Table() {
         {/* action buttons */}
         {picked.length > 0 ? (
           <div style={{ position: 'absolute', right: L.endR, bottom: L.endB, display: 'flex', gap: 10, zIndex: 45 }}>
-            <button type="button" className="btn ghost-pill" onClick={() => setPicked([])}>{t('table.clear')}</button>
+            <button type="button" className="btn ghost-pill" onClick={() => { cue('press'); setPicked([]); }}>{t('table.clear')}</button>
             <button type="button" className="btn end-btn" onClick={() => playNow(picked)}>
               {t('table.discardN', { n: picked.length })}
             </button>
@@ -768,7 +782,7 @@ export default function Table() {
         ) : canPass ? (
           <button type="button" className="btn end-btn"
             style={{ position: 'absolute', right: L.endR, bottom: L.endB, zIndex: 45 }}
-            onClick={actions.pass}>
+            onClick={() => { cue('press'); actions.pass(); }}>
             {t('table.endTurn')}
           </button>
         ) : null}
@@ -776,7 +790,7 @@ export default function Table() {
         {(canCatch || canCall) && (
           <button type="button" className="btn uno-btn"
             style={{ position: 'absolute', left: L.unoL, bottom: L.unoB, zIndex: 45 }}
-            onClick={canCatch ? actions.catchCall : actions.call}>
+            onClick={() => { cue('press'); if (canCatch) actions.catchCall(); else actions.call(); }}>
             {canCatch ? t('table.catch') : t('table.uno')}
             {view.catchableSeat === view.yourSeat && !canCatch && (
               <span style={{
@@ -807,7 +821,8 @@ export default function Table() {
             </span>
             <div style={{ display: 'flex', gap: 12 }}>
               {(['red', 'blue', 'yellow', 'green'] as Color[]).map((c) => (
-                <button key={c} type="button" aria-label={c} onClick={() => onPickColor(c)} style={{
+                <button key={c} type="button" aria-label={c}
+                  onClick={() => { cue('press'); onPickColor(c); }} style={{
                   width: 46, height: 46, borderRadius: '50%', background: SUIT[c],
                   border: '3px solid #fdf8ef', boxShadow: '0 0 0 2px rgba(0,0,0,.14)',
                   cursor: 'pointer', transition: 'transform .15s',
@@ -857,7 +872,10 @@ export default function Table() {
               it opens nothing until it is asked to. */}
           <button type="button" className="btn btn-ghost ghost-pill"
             aria-label={t('rules.helpOpen')} title={t('rules.helpOpen')}
-            onClick={() => { track('help_open'); setHelpOpen(true); }}>?</button>
+            onClick={() => { cue('press'); track('help_open'); setHelpOpen(true); }}>?</button>
+          {/* The switch belongs on the felt too: until now the only way to reach it was
+              to leave the game and go back to the landing. */}
+          <SoundSettings />
         </div>
         <a className="btn btn-ghost ghost-pill" href="/"
           style={{ position: 'absolute', right: L.ngR, top: L.ngT, zIndex: 45 }}>

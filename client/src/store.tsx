@@ -3,6 +3,7 @@ import type { CatchUpView, Color, Effect, RoomStateView, Rules } from '@uno/shar
 import { rulesPreset, setAnalyticsDimensions, track, trackProgression } from './analytics';
 import { reportError } from './errors';
 import { socket } from './socket';
+import { cue } from './sound';
 import { roundsPlayed } from './ui';
 
 export interface Store {
@@ -76,13 +77,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setRejection(p.reason);
       setTimeout(() => setRejection(null), 1500);
     };
+    // The win cue is fired here rather than on the table, because the packet that
+    // carries the effect is the one that ends the round: React batches both, the
+    // phase flips to roundEnd and the table unmounts before its own effect hook can
+    // run. Nothing unmounts the store, so this is where the last sound of a round
+    // has to live.
+    const onEffect = (e: Effect) => {
+      if (e.type === 'win') cue('win');
+      setEffect(e);
+    };
     socket.on('roomState', setView);
     socket.on('moveRejected', onReject);
-    socket.on('effect', setEffect);
+    socket.on('effect', onEffect);
     return () => {
       socket.off('roomState', setView);
       socket.off('moveRejected', onReject);
-      socket.off('effect', setEffect);
+      socket.off('effect', onEffect);
     };
   }, []);
 

@@ -380,6 +380,37 @@ body {
   background: var(--color-neutral-100); border-radius: 14px;
 }
 .lobby-rules .rulerow-details { background: var(--color-surface); }
+/* — the sound switch, on every screen — */
+/* Anchored, not fixed: it sits inside whatever header or chip row hosts it, and the
+   panel hangs off that. On the table the host is inside `.stage`, which is
+   transform-scaled — an absolute child scales with it and stays put, where a fixed
+   one would be dragged out of the stage's coordinate space. */
+.sound-wrap { position: relative; display: inline-flex; }
+.sound-btn { line-height: 1; }
+.sound-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 95;
+  width: 268px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--color-surface); border-radius: 20px; box-shadow: var(--shadow-lg);
+  animation: ob-pop .25s cubic-bezier(.34,1.56,.64,1) both;
+}
+.sound-pop-title {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--color-neutral-600); padding: 2px 4px;
+}
+/* The join panel has no header of its own to hang the switch on. */
+.join-head { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+/* On the create card the title and the host tag lead; the switch takes the far end. */
+.host-sound { margin-left: auto; }
+.sound-row { padding: 10px 12px; gap: 10px; }
+.sound-row .rulerow-name { font-size: 14px; }
+.sound-row .rulerow-desc { font-size: 11.5px; }
+.sound-row .rulerow-track { width: 44px; height: 25px; }
+.sound-row .rulerow-knob { width: 19px; height: 19px; }
+/* Near the right edge of a phone the panel would run off the screen. */
+@media (max-width: 720px) {
+  .sound-pop { width: min(268px, calc(100vw - 32px)); }
+}
+
 .pin-row { display: flex; align-items: center; gap: 10px; }
 .pin-input { width: 120px; letter-spacing: 0.35em; text-align: center; }
 .lang-switch { font-size: 12.5px; padding: 6px 12px; border-radius: 999px; }
