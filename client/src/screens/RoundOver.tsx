@@ -1,5 +1,7 @@
 import { track } from '../analytics';
+import SoundSettings from '../components/SoundSettings';
 import { useT } from '../i18n';
+import { cue } from '../sound';
 import { useStore } from '../store';
 import { initialOf, roundsPlayed, seatColor } from '../ui';
 
@@ -37,8 +39,10 @@ export default function RoundOver() {
         })}
       </div>
       <div className="hand-actions">
+        <SoundSettings />
         <a className="btn btn-secondary btn-solid btn-big" href="/">{t('over.leave')}</a>
         <button className="btn btn-primary btn-big" onClick={() => {
+          cue('press');
           // The B-002 KPI ("rooms with more than one game") hangs off this event.
           track('rematch', { game: roundsPlayed(view.winTally) + 1 });
           actions.rematch();

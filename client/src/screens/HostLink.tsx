@@ -3,7 +3,9 @@ import { RULES_CATALOG, sanitizeRules, type Rules } from '@uno/shared';
 import { rulesPreset, track } from '../analytics';
 import { reportError } from '../errors';
 import RuleRow from '../components/RuleRow';
+import SoundSettings from '../components/SoundSettings';
 import { useT } from '../i18n';
+import { cue } from '../sound';
 
 // Two phases: configure (rules + optional PIN, no room yet) → share (link).
 export default function HostLink() {
@@ -19,6 +21,7 @@ export default function HostLink() {
   // The old version ignored res.ok: a 429 or a network hiccup on the main
   // conversion button left the user staring at the form with no feedback.
   const create = async () => {
+    cue('press');
     setCreating(true);
     setCreateError(null);
     try {
@@ -48,6 +51,7 @@ export default function HostLink() {
   if (code) {
     const link = `${window.location.origin}/r/${code}`;
     const copy = () => {
+      cue('press');
       navigator.clipboard.writeText(link).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1400);
@@ -59,6 +63,7 @@ export default function HostLink() {
           <div className="host-head">
             <h2>{t('create.title')}</h2>
             <span className="tag tag-neutral">{t('create.hostTag')}</span>
+            <SoundSettings className="host-sound" />
           </div>
           <div className="label-sm">{t('create.linkLabel')}</div>
           <div className="invite-row">
@@ -82,6 +87,7 @@ export default function HostLink() {
         <div className="host-head">
           <h2>{t('create.title')}</h2>
           <span className="tag tag-neutral">{t('create.hostTag')}</span>
+          <SoundSettings className="host-sound" />
         </div>
         <p className="card-sub">{t('create.sub')}</p>
         <div className="rulerows">
@@ -89,6 +95,7 @@ export default function HostLink() {
             <RuleRow key={r.id} name={r.title[locale]} desc={r.tagline[locale]}
               details={r.details[locale]} on={rules[r.id]}
               onToggle={() => {
+                cue('press');
                 track('rules_toggle', { rule: r.id, on: !rules[r.id], where: 'create' });
                 setRules({ ...rules, [r.id]: !rules[r.id] });
               }} />

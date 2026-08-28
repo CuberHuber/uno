@@ -10,7 +10,8 @@ import { useEffect, useRef, useState } from 'react';
 import { RULES_CATALOG } from '@uno/shared';
 import { track } from '../analytics';
 import { LangSwitcher, useT } from '../i18n';
-import { cue, isMuted, setMuted, startMusic, stopMusic } from '../sound';
+import SoundSettings from '../components/SoundSettings';
+import { cue } from '../sound';
 import HostLink from './HostLink';
 import LandingRules from './LandingRules';
 
@@ -49,7 +50,6 @@ export default function Landing() {
   const [creating, setCreating] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [code, setCode] = useState('');
-  const [muted, setMutedState] = useState(isMuted);
   // Demo toggles. The landing shows what the switches do; the host sets the real
   // ones on the create screen.
   const [demo, setDemo] = useState([true, false, true, false]);
@@ -79,6 +79,7 @@ export default function Landing() {
   const go = () => {
     const c = code.trim().replace(/[\s-]/g, '').toUpperCase();
     if (c.length === 5) {
+      cue('press');
       track('join_code_submitted'); // the code itself never goes to analytics
       window.location.href = `/r/${c}`;
     }
@@ -88,15 +89,6 @@ export default function Landing() {
     track('landing_cta', { variant });
     fn();
   };
-  // The switch owns both halves of the audio layer. Turning it on is itself the
-  // gesture the browser was waiting for, so the music may start on the same click.
-  const toggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    setMutedState(next);
-    if (next) stopMusic(); else void startMusic();
-  };
-
   const rules = RULES_CATALOG.map((r, i) => ({ ...r, suit: SUITS[i]!, on: demo[i]! }));
   const flip = (i: number) => setDemo((d) => d.map((v, k) => (k === i ? !v : v)));
   const barHidden = heroCtaOn && !joinOpen;
@@ -108,9 +100,9 @@ export default function Landing() {
         <span className="lp-name">Ochre Eights</span>
         <div className="lp-head-right">
           <LangSwitcher />
-          {/* One switch for the lot: the room's music and every cue at the table. */}
-          <button type="button" className="btn btn-ghost" aria-pressed={!muted}
-            onClick={toggleMute}>{muted ? '○' : '●'}</button>
+          {/* The same control the lobby and the table carry — set it here and it holds
+              all the way through the game. */}
+          <SoundSettings />
         </div>
       </header>
 
@@ -126,7 +118,7 @@ export default function Landing() {
               <button className="btn btn-primary btn-big" onClick={cta('hero', () => { cue('press'); setCreating(true); })}>
                 {t('landing.create')}
               </button>
-              <button className="btn btn-secondary btn-solid btn-big" onClick={cta('join_hero', () => setJoinOpen(true))}>
+              <button className="btn btn-secondary btn-solid btn-big" onClick={cta('join_hero', () => { cue('press'); setJoinOpen(true); })}>
                 {t('landing.joinCta')}
               </button>
             </div>
@@ -235,14 +227,14 @@ export default function Landing() {
               <button className="btn btn-primary" style={{ flex: 1, minHeight: 46 }}
                 onClick={cta('bar', () => { cue('press'); setCreating(true); })}>{t('landing.create')}</button>
               <button className="btn btn-secondary btn-solid" style={{ minHeight: 46 }}
-                onClick={cta('join_bar', () => setJoinOpen(true))}>{t('bar.join')}</button>
+                onClick={cta('join_bar', () => { cue('press'); setJoinOpen(true); })}>{t('bar.join')}</button>
             </div>
           ) : (
             <form onSubmit={(e) => { e.preventDefault(); go(); }}>
               <div className="lp-bar-head">
                 <span className="lp-bar-label">{t('bar.roomCode')}</span>
                 <button type="button" className="lp-bar-ghost"
-                  onClick={() => { setJoinOpen(false); setCode(''); }}>{t('bar.cancel')}</button>
+                  onClick={() => { cue('press'); setJoinOpen(false); setCode(''); }}>{t('bar.cancel')}</button>
               </div>
               <div className="lp-bar-row">
                 <input ref={codeRef} className="lp-code-input" value={code} maxLength={5} placeholder="ABCDE"
