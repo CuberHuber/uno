@@ -4,13 +4,18 @@ import { CLASSIC_RULES, sanitizeRules } from '@uno/shared';
 import {
   applyAction, createGame, removeFromRound, type Action, type GameState,
 } from './engine/game.js';
-import { rng } from './engine/deck.js';
+import { cryptoRandom, rng } from './engine/deck.js';
 import { projectView } from './engine/views.js';
 import {
   isSeq, RoomHistory,
   type SeatRecord, type SeatTransaction, type TxActor, type TxSecret,
 } from './history.js';
 import type { TurnAnomaly } from './analytics.js';
+
+/** Where a deal's randomness comes from. The seam the audit asked for: real
+ *  rooms get an unguessable source, a test that passed a seed still replays. */
+const dealSource = (seed: number | null): (() => number) =>
+  seed === null ? cryptoRandom() : rng(seed);
 
 // No look-alikes (0/O/Q, 1/I/L, 5/S, 8/B, 2/Z) or sound-alikes (U/V, G/J).
 const ALPHABET = '34679ACDEFHKMNPRTWXY';
@@ -38,7 +43,9 @@ export interface Room {
   code: string;
   createdAtMs: number; emptySinceMs: number | null;
   phase: Phase; players: RoomPlayer[]; hostSeat: number;
-  game: GameState | null; winTally: number[]; seed: number;
+  /** `null` in a real room: the deal is drawn from the OS and there is no seed
+   *  to recover. A number only ever comes from a test asking for a replay. */
+  game: GameState | null; winTally: number[]; seed: number | null;
   rules: Rules;
   pin: string | null; // ephemeral room secret, plain text by design (rate limits guard it)
   /** Accepted changes, in order, capped and swept with the room. Never learns
@@ -171,7 +178,7 @@ export class RoomStore {
       createdAtMs: this.now(), emptySinceMs: this.now(),
       phase: 'lobby', players: [], hostSeat: 0,
       game: null, winTally: [],
-      seed: opts.seed ?? randomInt(2 ** 31),
+      seed: opts.seed ?? null,
       rules: sanitizeRules(opts.rules),
       pin: isPin(opts.pin) ? opts.pin : null,
       history: new RoomHistory(this.now),
@@ -274,7 +281,7 @@ export class RoomStore {
     if (seat !== room.hostSeat) return { ok: false as const, error: 'host_only_deal' };
     if (room.phase !== 'lobby') return { ok: false as const, error: 'already_dealt' };
     if (room.players.length < 2) return { ok: false as const, error: 'need_two_players' };
-    room.game = createGame(room.players.length, rng(room.seed), room.rules);
+    room.game = createGame(room.players.length, dealSource(room.seed), room.rules);
     room.phase = 'playing';
     this.recordDeal(room, this.actorAt(room, seat));
     this.auditTurnQueue(room);
@@ -332,8 +339,10 @@ export class RoomStore {
     const callerSeat = room.players.indexOf(caller);
     const seats: SeatRecord[] = room.players.map((p, i) => ({ seat: i, playerId: p.id, name: p.name }));
     room.history.reseat({ kind: 'player', playerId: caller.id, seat: callerSeat }, seats, room.phase);
-    room.seed = randomInt(2 ** 31);
-    room.game = createGame(room.players.length, rng(room.seed), room.rules);
+    // A seeded room stays seeded across a rematch, one step on, so a test can
+    // replay both rounds; a real room simply draws afresh.
+    room.seed = room.seed === null ? null : (room.seed + 1) >>> 0;
+    room.game = createGame(room.players.length, dealSource(room.seed), room.rules);
     room.phase = 'playing';
     this.recordDeal(room, this.actorAt(room, callerSeat));
     this.auditTurnQueue(room);

@@ -1,6 +1,6 @@
 // Sub-project C: the audio layer.
 //
-// Two very different jobs behind one switch.
+// Two very different jobs, and now a switch each — see `SoundSettings`.
 //
 // Event cues are short, fire often and sometimes overlap — two cards can land inside
 // the same animation — so they go through WebAudio: decoded once, held as buffers and
@@ -14,7 +14,11 @@
 // Nothing here makes a sound until the visitor has interacted with the page. That is
 // not politeness, it is policy: browsers refuse to start an AudioContext otherwise,
 // and a page that tries is left holding a suspended context it never resumes.
-const MUTE_KEY = 'ochre:muted';
+const SFX_KEY = 'ochre:sfx';
+const MUSIC_KEY = 'ochre:music';
+// The single switch these two replaced. It only ever exists for a browser that
+// pressed it, so its presence — not its absence — is the visitor's opinion.
+const LEGACY_MUTE_KEY = 'ochre:muted';
 const MUSIC_SRC = '/audio/table.m4a';
 
 /** Every moment that can speak. Names are the file names: `/audio/<cue>.m4a`. */
@@ -35,7 +39,39 @@ const LEVEL: Record<Cue, number> = {
 // bed a few decibels below even `press`, the quietest thing in the game. It was
 // 0.34 while the music was still the -10.8 LUFS master, where the bed came out
 // over the top of nearly every cue.
+// That reasoning fixes the *default*, not the value: a bed that is right in a
+// quiet room is wrong in a loud one, and only the player can hear which they are
+// in. The number below is where the slider starts.
 const MUSIC_LEVEL = 0.2;
+const MUSIC_VOL_KEY = 'ochre:musicvol';
+
+let musicVol: number | null = null;
+
+/** The music bed's level, 0…1. Separate from the on/off switch: turning music
+ *  down to nothing and turning it off are different intentions, and only the
+ *  second should stop the stream. */
+export function musicLevel(): number {
+  if (musicVol === null) {
+    let v = NaN;
+    try {
+      v = Number(localStorage.getItem(MUSIC_VOL_KEY));
+    } catch {
+      // Storage refused; this session gets the default and forgets it.
+    }
+    musicVol = Number.isFinite(v) && v > 0 && v <= 1 ? v : MUSIC_LEVEL;
+  }
+  return musicVol;
+}
+
+export function setMusicLevel(v: number): void {
+  musicVol = Math.max(0.02, Math.min(1, v));
+  try {
+    localStorage.setItem(MUSIC_VOL_KEY, String(musicVol));
+  } catch {
+    // As above.
+  }
+  if (music) music.volume = musicVol;
+}
 
 /** Cues that fire dozens of times a round get a little pitch and level scatter, so
  *  the fortieth card does not land on exactly the same sample as the first. Real
@@ -43,37 +79,65 @@ const MUSIC_LEVEL = 0.2;
  *  can say why. Kept small — this is variation, not an effect. */
 const SCATTER: Partial<Record<Cue, number>> = { play: 0.05, draw: 0.06, action: 0.04 };
 
+/** The two halves of the layer, switched apart. They used to share one flag, which
+ *  made "I want the cards to click but not the loop" unsayable. */
+export interface SoundSettings { sfx: boolean; music: boolean }
+export type Channel = keyof SoundSettings;
+
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let music: HTMLAudioElement | null = null;
-let musicWanted = false;
 const buffers = new Map<Cue, AudioBuffer | null>(); // null = asked for, not available
-const listeners = new Set<(muted: boolean) => void>();
+const listeners = new Set<(s: SoundSettings) => void>();
 
-/** Muted unless the visitor has said otherwise — silence is the safe default, and the
- *  landing's switch is the only thing that changes it. */
-export const isMuted = (): boolean => {
+const read = (key: string): 'on' | 'off' | null => {
   try {
-    return localStorage.getItem(MUTE_KEY) !== 'off';
+    const v = localStorage.getItem(key);
+    return v === 'on' || v === 'off' ? v : null;
   } catch {
-    return true;
+    return null;
   }
 };
 
-export function setMuted(muted: boolean): void {
+/** Sound is on until the visitor says otherwise. It used to be off until they said
+ *  otherwise, and the only switch lived on the landing — so a guest who opened an
+ *  invite link went through the whole game in silence with nothing to press. The
+ *  browser's own gesture gate, not a default, is what keeps the page quiet on load. */
+function initial(): SoundSettings {
+  const legacy = read(LEGACY_MUTE_KEY);
+  const fallback = legacy === null ? true : legacy === 'off';
+  const pick = (key: string): boolean => read(key) === null ? fallback : read(key) === 'on';
+  return { sfx: pick(SFX_KEY), music: pick(MUSIC_KEY) };
+}
+
+let settings: SoundSettings | null = null;
+
+export function soundSettings(): SoundSettings {
+  if (!settings) settings = initial();
+  return settings;
+}
+
+export function setChannel(ch: Channel, on: boolean): void {
+  settings = { ...soundSettings(), [ch]: on };
   try {
-    localStorage.setItem(MUTE_KEY, muted ? 'on' : 'off');
+    localStorage.setItem(ch === 'sfx' ? SFX_KEY : MUSIC_KEY, on ? 'on' : 'off');
   } catch {
     // A browser refusing storage still gets sound this session; it just forgets.
   }
-  if (master && ctx) master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.02);
-  if (music) music.volume = muted ? 0 : MUSIC_LEVEL;
-  if (!muted) void resume();
-  for (const fn of listeners) fn(muted);
+  if (ch === 'sfx') {
+    if (master && ctx) master.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.02);
+    if (on) void resume();
+  } else if (on) {
+    void startMusic();
+  } else {
+    stopMusic();
+  }
+  for (const fn of listeners) fn(settings);
 }
 
-/** Subscribe a control to the mute state; returns the unsubscribe. */
-export function onMuteChange(fn: (muted: boolean) => void): () => void {
+/** Subscribe a control to the settings; returns the unsubscribe. Every copy of the
+ *  switch is mounted on a different screen, and they must not drift apart. */
+export function onSoundChange(fn: (s: SoundSettings) => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
@@ -86,7 +150,7 @@ async function resume(): Promise<AudioContext | null> {
   if (!ctx) {
     ctx = new Ctor();
     master = ctx.createGain();
-    master.gain.value = isMuted() ? 0 : 1;
+    master.gain.value = soundSettings().sfx ? 1 : 0;
     master.connect(ctx.destination);
   }
   if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
@@ -94,9 +158,14 @@ async function resume(): Promise<AudioContext | null> {
 }
 
 /** Called once from the first real gesture anywhere in the app. Before this, every
- *  `cue()` is a no-op — by browser policy, not by choice. */
+ *  `cue()` is a no-op — by browser policy, not by choice.
+ *
+ *  This is also what carries the music through the door. Every way into a room is a
+ *  hard navigation (`/r/CODE`, and `/` on the way out), so the module is rebuilt from
+ *  scratch each time; the want has to live in storage rather than in a variable, or
+ *  the bed plays on the landing and dies at the lobby. */
 export function unlockAudio(): void {
-  void resume().then(() => { if (musicWanted) void startMusic(); });
+  void resume().then(() => { if (soundSettings().music) void startMusic(); });
 }
 
 async function load(name: Cue): Promise<AudioBuffer | null> {
@@ -125,9 +194,9 @@ async function load(name: Cue): Promise<AudioBuffer | null> {
 /** Fire and forget. Silent when muted, before the first gesture, or while a cue's
  *  file is still missing — the table must never wait on, or break for, audio. */
 export function cue(name: Cue): void {
-  if (isMuted() || !ctx) return;
+  if (!soundSettings().sfx || !ctx) return;
   void load(name).then((buf) => {
-    if (!buf || !ctx || !master || isMuted()) return;
+    if (!buf || !ctx || !master || !soundSettings().sfx) return;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     const g = ctx.createGain();
@@ -143,19 +212,17 @@ export function cue(name: Cue): void {
 }
 
 export async function startMusic(): Promise<void> {
-  musicWanted = true;
-  if (isMuted()) return;
+  if (!soundSettings().music) return;
   if (!music) {
     music = new Audio(MUSIC_SRC);
     music.loop = true;
     music.preload = 'none';
   }
-  music.volume = MUSIC_LEVEL;
+  music.volume = musicLevel();
   // Autoplay can still be refused; a rejected promise is not an error worth showing.
   await music.play().catch(() => {});
 }
 
 export function stopMusic(): void {
-  musicWanted = false;
   music?.pause();
 }

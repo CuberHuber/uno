@@ -380,6 +380,119 @@ body {
   background: var(--color-neutral-100); border-radius: 14px;
 }
 .lobby-rules .rulerow-details { background: var(--color-surface); }
+/* — the move list — */
+/* Real pixels, outside the transform-scaled stage: a sheet inside it would be
+   scaled with the felt. The table recentres to make room (see `shW`). */
+.moves-tab {
+  position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+  z-index: 70; border: 0; cursor: pointer; font: inherit;
+  writing-mode: vertical-rl; padding: 16px 7px;
+  background: var(--color-surface); color: var(--color-text);
+  font-size: 12px; font-weight: 700; letter-spacing: .04em;
+  border-radius: 14px 0 0 14px; box-shadow: var(--shadow-md);
+}
+.moves-tab:hover { color: var(--color-accent-700); }
+.moves-sheet {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 372px; z-index: 71;
+  display: flex; flex-direction: column;
+  background: var(--color-surface); box-shadow: var(--shadow-lg);
+  animation: ob-sheet-in .3s cubic-bezier(.2,.7,.3,1) both;
+}
+@keyframes ob-sheet-in { from { transform: translateX(100%); } to { transform: none; } }
+.moves-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 14px 10px 18px; border-bottom: 1px solid var(--color-divider);
+}
+.moves-title { font-family: var(--font-heading); font-size: 19px; }
+.moves-count { font-size: 11px; color: var(--color-neutral-600); margin-left: auto; }
+.moves-close { padding: 4px 12px; font-size: 16px; line-height: 1; }
+.moves-trimmed {
+  margin: 0; padding: 10px 18px; font-size: 12px; line-height: 1.4;
+  color: var(--color-neutral-600); border-bottom: 1px dashed var(--color-neutral-300);
+}
+.moves-list { flex: 1; overflow-y: auto; margin: 0; padding: 10px 18px 18px; list-style: none; }
+.moves-row {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 7px 0 7px 10px; font-size: 13px; line-height: 1.35;
+  color: var(--color-neutral-700); border-left: 3px solid transparent;
+}
+.moves-text { flex: 1; }
+.moves-time { font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.moves-mine {
+  color: var(--color-text); font-weight: 600;
+  border-left-color: var(--color-accent); background: var(--color-accent-100);
+}
+.moves-boundary {
+  justify-content: center; margin: 10px 0; padding: 5px 0; border-left: 0;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--color-neutral-600); background: var(--color-neutral-100); border-radius: 999px;
+}
+.moves-empty { padding: 14px 0; font-size: 13px; color: var(--color-neutral-500); }
+/* On a phone it comes up from the bottom, like the rules panel already does —
+   a side sheet there would bury the hand. */
+@media (max-width: 720px) {
+  .moves-sheet { width: auto; left: 0; top: 38%; border-radius: 22px 22px 0 0; }
+  @keyframes ob-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+  .moves-tab { top: auto; bottom: 0; right: 50%; transform: translateX(50%);
+    writing-mode: horizontal-tb; border-radius: 14px 14px 0 0; padding: 7px 18px; }
+}
+
+/* — the table's rim and the turn dial — */
+/* The direction ring was a dashed circle that spun as a shape. It is now part of
+   the rim, so the shape holds still and the dashes march around it instead. */
+@keyframes ob-dashmarch { to { stroke-dashoffset: -26; } }
+/* The catch window, and only the catch window: 100 → 0 over the same two seconds
+   the call button's drain bar runs, so the two read as one clock. */
+@keyframes ob-dialdrain { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 132; } }
+.ob-dial { animation: ob-dialdrain 2s linear forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .ob-march-ring { animation: none !important; }
+}
+
+/* — the sound switch, on every screen — */
+/* Anchored, not fixed: it sits inside whatever header or chip row hosts it, and the
+   panel hangs off that. On the table the host is inside `.stage`, which is
+   transform-scaled — an absolute child scales with it and stays put, where a fixed
+   one would be dragged out of the stage's coordinate space. */
+.sound-wrap { position: relative; display: inline-flex; }
+.sound-btn { line-height: 1; }
+.sound-pop {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 95;
+  width: 268px; padding: 12px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--color-surface); border-radius: 20px; box-shadow: var(--shadow-lg);
+  animation: ob-pop .25s cubic-bezier(.34,1.56,.64,1) both;
+}
+/* Where the button sits at the LEFT of its row — the table's chip cluster — the panel
+   has to open rightward, or it hangs off the edge of the screen. */
+.sound-left .sound-pop { left: 0; right: auto; }
+.sound-pop-title {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--color-neutral-600); padding: 2px 4px;
+}
+/* The join panel has no header of its own to hang the switch on. */
+.join-head { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+/* On the create card the title and the host tag lead; the switch takes the far end. */
+.host-sound { margin-left: auto; }
+.sound-vol {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 4px 12px 8px; font-size: 11.5px; font-weight: 600;
+  color: var(--color-neutral-600);
+}
+.sound-vol input { width: 100%; accent-color: var(--color-accent); cursor: pointer; }
+/* Music off: the level stays visible, so the switch and the slider never
+   disagree about what you will hear. */
+.sound-vol-off { opacity: .45; }
+.sound-vol-off input { cursor: not-allowed; }
+.sound-row { padding: 10px 12px; gap: 10px; }
+.sound-row .rulerow-name { font-size: 14px; }
+.sound-row .rulerow-desc { font-size: 11.5px; }
+.sound-row .rulerow-track { width: 44px; height: 25px; }
+.sound-row .rulerow-knob { width: 19px; height: 19px; }
+/* Near the right edge of a phone the panel would run off the screen. */
+@media (max-width: 720px) {
+  .sound-pop { width: min(268px, calc(100vw - 32px)); }
+}
+
 .pin-row { display: flex; align-items: center; gap: 10px; }
 .pin-input { width: 120px; letter-spacing: 0.35em; text-align: center; }
 .lang-switch { font-size: 12.5px; padding: 6px 12px; border-radius: 999px; }

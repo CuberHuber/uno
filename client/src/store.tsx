@@ -3,7 +3,12 @@ import type { CatchUpView, Color, Effect, RoomStateView, Rules } from '@uno/shar
 import { rulesPreset, setAnalyticsDimensions, track, trackProgression } from './analytics';
 import { reportError } from './errors';
 import { socket } from './socket';
+import { cue } from './sound';
 import { roundsPlayed } from './ui';
+
+/** One queued effect. The sequence number is the client's own — it exists so the
+ *  table can say which effect it has finished with, without comparing values. */
+export interface PendingEffect { seq: number; e: Effect }
 
 export interface Store {
   view: RoomStateView | null;
@@ -11,8 +16,20 @@ export interface Store {
   joinError: string | null;  // transient join failure: pin_required / wrong_pin / rate_limited…
   rejection: string | null;  // transient moveRejected, clears itself
   selfDisconnected: boolean; // OUR socket dropped (not another player's)
-  effect: Effect | null;
+  /** Effects waiting to be played out, oldest first.
+   *
+   *  This used to be a single slot, and that quietly lost moves: the server emits
+   *  one packet per effect, socket.io delivers a burst in one flush, React batches
+   *  the setStates, and the table's consumer ran once — for the last of them. A
+   *  forced play, which emits `drew` and `played` for the same seat, lost a beat
+   *  every time. A queue is what lets a three-action turn arrive as three actions. */
+  effects: PendingEffect[];
+  /** Drop the effect the table has finished animating. */
+  consumeEffect: (seq: number) => void;
   catchUp: CatchUpView | null; // what happened while we were away; null when nothing did
+  /** Where the room's journal stands. The move list refreshes off this rather
+   *  than off every snapshot: it rises exactly when something was written. */
+  historyHead: number;
   dismissCatchUp: () => void;
   join: (code: string, name?: string, pin?: string) => void;
   actions: {
@@ -22,11 +39,13 @@ export interface Store {
     play: (cardIds: number[], chosenColor?: Color) => void;
     draw: () => void;
     pass: () => void;
-    chooseColor: (color: Color) => void;
     call: () => void;
     catchCall: () => void;
     rematch: () => void;
     continueWithout: (seat: number) => void;
+    /** The room's whole move journal, for the in-room list. Read-only on the
+     *  server: asking never moves this seat's catch-up pointer. */
+    getHistory: (then: (v: CatchUpView | null) => void) => void;
   };
 }
 
@@ -55,8 +74,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
   const [selfDisconnected, setSelfDisconnected] = useState(false);
-  const [effect, setEffect] = useState<Effect | null>(null);
+  const [effects, setEffects] = useState<PendingEffect[]>([]);
+  const effectSeq = useRef(0);
   const [catchUp, setCatchUp] = useState<CatchUpView | null>(null);
+  const [historyHead, setHistoryHead] = useState(0);
 
   // Our own transport state, for the "connection lost" banner: PauseOverlay
   // only covers OTHER players dropping; before this, your own drop just froze
@@ -77,15 +98,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setRejection(p.reason);
       setTimeout(() => setRejection(null), 1500);
     };
+    // The win cue is fired here rather than on the table, because the packet that
+    // carries the effect is the one that ends the round: React batches both, the
+    // phase flips to roundEnd and the table unmounts before its own effect hook can
+    // run. Nothing unmounts the store, so this is where the last sound of a round
+    // has to live.
+    const onEffect = (e: Effect) => {
+      if (e.type === 'win') cue('win');
+      // Append, never replace: two effects in one flush are two things that
+      // happened, and the table has to be able to show both.
+      setEffects((q) => [...q, { seq: (effectSeq.current += 1), e }]);
+    };
     socket.on('roomState', setView);
     socket.on('moveRejected', onReject);
-    socket.on('effect', setEffect);
+    socket.on('effect', onEffect);
     return () => {
       socket.off('roomState', setView);
       socket.off('moveRejected', onReject);
-      socket.off('effect', setEffect);
+      socket.off('effect', onEffect);
     };
   }, []);
+
+  // The table is the only thing that drains the queue, and it unmounts with the
+  // round: the winning turn emits `played` and `win` in the flush that flips the
+  // phase, so whatever is still queued at that moment can never be shown. Left
+  // there, it would be waiting at the head when a rematch remounts the table,
+  // and the new deal would open by replaying the last card of the old one.
+  useEffect(() => {
+    if (view && view.phase !== 'playing') setEffects([]);
+  }, [view?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The journal pointer. The server moves it only on our word, and only
   // forward, so this is the one thing standing between a reconnect that replays
@@ -110,6 +151,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       socket.emit('ackHistory', { seq });
     };
     const onHead = (p: { seq: number }) => {
+      // Recorded before the acknowledgement bookkeeping below, which returns
+      // early once the pointer is level — the open move list still wants to know
+      // the journal grew.
+      setHistoryHead((h) => (p.seq > h ? p.seq : h));
       if (p.seq === acked.current || p.seq === pending) return;
       pending = p.seq;
       if (timer === null) timer = setTimeout(flush, ACK_COALESCE_MS);
@@ -216,17 +261,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     play: (cardIds, chosenColor) => socket.emit('playCards', { cardIds, chosenColor }),
     draw: () => socket.emit('drawCard'),
     pass: () => socket.emit('passTurn'),
-    chooseColor: (color) => socket.emit('chooseColor', { color }),
     call: () => socket.emit('callLastCard'),
     catchCall: () => socket.emit('catchLastCard'),
     rematch: () => socket.emit('rematch'),
     continueWithout: (seat) => socket.emit('continueWithout', { seat }),
+    getHistory: (then) => socket.emit('getHistory', then),
   }), []);
 
   return (
     <Ctx.Provider value={{
-      view, error, joinError, rejection, selfDisconnected, effect,
-      catchUp, dismissCatchUp: () => setCatchUp(null), join, actions,
+      view, error, joinError, rejection, selfDisconnected, effects,
+      consumeEffect: (seq) => setEffects((q) => q.filter((p) => p.seq !== seq)),
+      catchUp, historyHead, dismissCatchUp: () => setCatchUp(null), join, actions,
     }}>
       {children}
     </Ctx.Provider>

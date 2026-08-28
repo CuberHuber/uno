@@ -23,7 +23,7 @@ export type TxActor =
   | { kind: 'player'; playerId: PlayerId; seat: number }
   | { kind: 'system' };
 
-export type MoveKind = 'play' | 'draw' | 'pass' | 'chooseColor' | 'callLastCard' | 'catchLastCard';
+export type MoveKind = 'play' | 'draw' | 'pass' | 'callLastCard' | 'catchLastCard';
 
 /** The public payload of each kind of transaction.
  *

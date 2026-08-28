@@ -29,17 +29,28 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
 @keyframes ob-shufr{0%,100%{transform:translate(0,0) rotate(0)}50%{transform:translate(66px,10px) rotate(12deg)}}
 @keyframes ob-heavy{0%{transform:scale(1) translateY(0)}42%{transform:scale(1.5) translateY(-30px) rotate(-5deg)}58%{transform:scale(1.52) translateY(-32px) rotate(-4deg)}88%{transform:scale(.95) translateY(2px)}100%{transform:scale(1) translateY(0)}}
 @keyframes ob-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes ob-dashmarch{to{stroke-dashoffset:-52}}
+@keyframes ob-drainring{from{stroke-dashoffset:0}to{stroke-dashoffset:132}}
+@keyframes ob-sheetin{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes ob-sheetup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){
+  .ob-march-ring{animation:none !important}
+  .ob-sheet{animation:none !important}
+}
 </style>
 </helmet>
 <div style="height:100dvh;width:100%;position:relative;overflow:hidden;box-sizing:border-box">
-  <div data-screen-label="Full game" style="position:absolute;left:50%;top:50%;width:{{ stageW }}px;height:{{ stageH }}px;transform:translate(-50%,-50%) scale({{ stageScale }});border-radius:0;background:{{ feltBg }};transition:background .9s ease;box-shadow:inset 0 0 0 12px rgba(0,0,0,.05),var(--shadow-lg);position:relative;overflow:hidden;animation:{{ stageAnim }}">
+  <div data-screen-label="Full game" style="position:absolute;left:50%;top:50%;width:{{ stageW }}px;height:{{ stageH }}px;transform:translate(-50%,-50%) scale({{ stageScale }});background:var(--color-bg);box-shadow:inset 0 0 0 12px rgba(0,0,0,.04),var(--shadow-lg);position:relative;overflow:hidden;animation:{{ stageAnim }}">
 
-    <div style="position:absolute;left:{{ ringL }}px;top:{{ ringT }}px;width:350px;height:350px;border-radius:50%;border:3px dashed rgba(42,38,33,.16);animation:ob-spin 26s linear infinite;animation-direction:{{ ringDir }};pointer-events:none;z-index:1"></div>
+    <div style="position:absolute;left:{{ tblL }}px;top:{{ tblT }}px;width:{{ tblW }}px;height:{{ tblH }}px;border-radius:50%;padding:{{ rimW }}px;box-sizing:border-box;background:repeating-linear-gradient(85deg,rgba(247,237,220,.055) 0 1px,rgba(0,0,0,0) 1px 6px,rgba(42,38,33,.16) 6px 7px,rgba(0,0,0,0) 7px 15px),repeating-linear-gradient(85deg,rgba(42,38,33,.09) 0 4px,rgba(0,0,0,0) 4px 17px,rgba(247,237,220,.03) 17px 19px,rgba(0,0,0,0) 19px 38px),linear-gradient(96deg,var(--color-accent-900) 0%,var(--color-accent-800) 24%,var(--color-accent-900) 49%,var(--color-accent-800) 74%,var(--color-accent-900) 100%);box-shadow:0 24px 54px rgba(46,43,37,.26),inset 0 0 0 2px rgba(42,38,33,.30),inset 0 2px 0 rgba(247,237,220,.10);z-index:0;pointer-events:none;transition:left .35s cubic-bezier(.2,.7,.3,1),top .35s cubic-bezier(.2,.7,.3,1),width .35s cubic-bezier(.2,.7,.3,1),height .35s cubic-bezier(.2,.7,.3,1)">
+      <div style="width:100%;height:100%;border-radius:50%;background:{{ feltBg }};transition:background .9s ease;box-shadow:inset 0 0 0 3px rgba(42,38,33,.10),inset 0 8px 22px rgba(42,38,33,.16)"></div>
+    </div>
+    <svg class="ob-march-ring" width="{{ ringW }}" height="{{ ringH }}" viewBox="0 0 {{ ringW }} {{ ringH }}" style="position:absolute;left:{{ ringL }}px;top:{{ ringT }}px;transition:left .35s cubic-bezier(.2,.7,.3,1),top .35s cubic-bezier(.2,.7,.3,1);z-index:1;pointer-events:none;animation:ob-dashmarch 3.2s linear infinite;animation-direction:{{ ringDir }}">
+      <ellipse cx="{{ ringCx }}" cy="{{ ringCy }}" rx="{{ ringRx }}" ry="{{ ringRy }}" fill="none" stroke="rgba(42,38,33,.22)" stroke-width="3" stroke-dasharray="13 13"></ellipse>
+    </svg>
 
     <sc-if value="{{ hasTint }}" hint-placeholder-val="{{ false }}">
-      <sc-for list="{{ tintCircles }}" as="tc" hint-placeholder-count="4">
-        <div style="position:absolute;left:{{ tc.left }}px;top:{{ tc.top }}px;width:{{ tc.d }}px;height:{{ tc.d }}px;border-radius:50%;background:{{ tc.bg }};opacity:{{ tc.op }};z-index:1;pointer-events:none;animation:{{ tc.anim }}"></div>
-      </sc-for>
+      <div style="position:absolute;left:{{ feltL }}px;top:{{ feltT }}px;width:{{ feltD }}px;height:{{ feltD }}px;border-radius:50%;background:{{ tintGrad }};z-index:1;pointer-events:none;animation:{{ tintAnim }}"></div>
     </sc-if>
 
     <sc-if value="{{ yourTurn }}" hint-placeholder-val="{{ true }}">
@@ -47,8 +58,8 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
     </sc-if>
 
     <sc-for list="{{ seats }}" as="s" hint-placeholder-count="3">
-      <div style="position:absolute;left:{{ s.x }}px;top:{{ s.y }}px;width:220px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:8;opacity:{{ s.op }};transition:opacity .7s ease;transform:scale({{ seatScale }});transform-origin:top center">
-        <div style="position:relative;width:200px;height:78px">
+      <div style="position:absolute;left:{{ s.x }}px;top:{{ s.y }}px;width:220px;display:flex;flex-direction:column;align-items:center;gap:2px;z-index:8;opacity:{{ s.op }};transition:opacity .7s ease,left .35s cubic-bezier(.2,.7,.3,1),top .35s cubic-bezier(.2,.7,.3,1);transform:scale({{ seatScale }});transform-origin:top center">
+        <div style="position:relative;width:200px;height:78px;transform:rotate({{ s.fanRot }}deg);transform-origin:50% 118%">
           <sc-for list="{{ s.backs }}" as="b" hint-placeholder-count="5">
             <div style="position:absolute;left:50%;top:8px;width:46px;height:70px;margin-left:-23px;border-radius:8px;background:#2a2621;border:2px solid rgba(247,237,220,.35);box-sizing:border-box;transform:{{ b.tf }};transition:transform .5s cubic-bezier(.34,1.45,.64,1);box-shadow:0 4px 10px rgba(46,43,37,.25)"></div>
           </sc-for>
@@ -60,13 +71,13 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
           </sc-if>
         </div>
         <sc-if value="{{ s.active }}" hint-placeholder-val="{{ false }}">
-          <span style="font-family:var(--font-heading);font-size:11px;color:#fdf8ef;background:repeating-linear-gradient(45deg,var(--color-accent) 0 10px,var(--color-accent-600) 10px 20px);background-size:28px 100%;animation:ob-march 1.2s linear infinite;border-radius:999px 999px 999px 4px;padding:4px 12px;margin:0 0 -6px -70px;position:relative;z-index:2;box-shadow:var(--shadow-sm)">PLAYING</span>
+          <span style="font-family:var(--font-heading);font-size:11px;color:#fdf8ef;background:repeating-linear-gradient(45deg,var(--color-accent) 0 10px,var(--color-accent-600) 10px 20px);background-size:28px 100%;animation:ob-march 1.2s linear infinite;border-radius:{{ s.tabRad }};padding:4px 12px;margin:{{ s.tabMargin }};position:relative;z-index:2;box-shadow:var(--shadow-sm)">PLAYING</span>
         </sc-if>
-        <div style="display:flex;align-items:center;gap:10px;background:#fdf8ef;border-radius:999px;padding:5px 16px 5px 5px;box-shadow:var(--shadow-md);border:2px solid {{ s.border }};box-sizing:border-box">
-          <div style="width:38px;height:38px;border-radius:50%;background:{{ s.color }};color:#fdf8ef;display:grid;place-items:center;font-family:var(--font-heading);font-size:16px;border:2px solid #fdf8ef;box-sizing:border-box">{{ s.initial }}</div>
+        <div style="display:flex;flex-direction:{{ s.dir }};align-items:center;gap:10px;background:#fdf8ef;border-radius:999px;padding:{{ s.pad }};box-shadow:var(--shadow-md);border:2px solid {{ s.border }};box-sizing:border-box">
+          <div style="width:{{ s.avD }}px;height:{{ s.avD }}px;border-radius:50%;background:{{ s.color }};color:#fdf8ef;display:grid;place-items:center;font-family:var(--font-heading);font-size:{{ s.avFs }}px;border:2px solid #fdf8ef;box-sizing:border-box;flex:none">{{ s.initial }}</div>
           <div>
-            <div style="font-weight:700;font-size:13.5px;line-height:1.15">{{ s.name }}</div>
-            <div style="font-size:11px;color:{{ s.statusColor }};font-weight:600">{{ s.status }}</div>
+            <div style="font-weight:700;font-size:{{ s.nameFs }}px;line-height:1.15">{{ s.name }}</div>
+            <div style="font-size:{{ s.statusFs }}px;color:{{ s.statusColor }};font-weight:600">{{ s.status }}</div>
           </div>
         </div>
       </div>
@@ -84,7 +95,7 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
           </div>
         </div>
       </div>
-      <div style="position:absolute;left:50%;top:166px;transform:translateX(-50%);white-space:nowrap;font-size:12px;font-weight:700;color:{{ pileHintColor }};background:#fdf8ef;border-radius:999px;padding:4px 12px;box-shadow:var(--shadow-sm)">Draw · {{ pileCount }}</div>
+      <div style="position:absolute;left:50%;top:{{ pileHintT }}px;transform:translateX(-50%);white-space:nowrap;font-size:{{ pileFs }}px;font-weight:700;color:{{ pileHintColor }};background:#fdf8ef;border-radius:999px;padding:4px 12px;box-shadow:var(--shadow-sm)">Draw · {{ pileCount }}</div>
       <sc-if value="{{ shuffling }}" hint-placeholder-val="{{ false }}">
         <div style="position:absolute;left:0;top:0;width:104px;height:156px;border-radius:15px;background:#2a2621;border:3px solid rgba(247,237,220,.4);box-sizing:border-box;z-index:3;animation:ob-shufl .45s ease-in-out 2"></div>
         <div style="position:absolute;left:0;top:0;width:104px;height:156px;border-radius:15px;background:#26221d;border:3px solid rgba(247,237,220,.3);box-sizing:border-box;z-index:2;animation:ob-shufr .45s ease-in-out .12s 2"></div>
@@ -92,10 +103,10 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
     </div>
 
     <sc-if value="{{ pendingOn }}" hint-placeholder-val="{{ false }}">
-      <div style="position:absolute;left:50%;top:{{ pendTop }}px;transform:translateX(-50%);background:#c23b2e;color:#f7eddc;border-radius:999px;padding:10px 24px;font-family:var(--font-heading);font-size:15px;letter-spacing:.02em;z-index:91;box-shadow:var(--shadow-md);animation:ob-pop .4s cubic-bezier(.34,1.56,.64,1) both,ob-pulse 1.6s ease-out .4s infinite;white-space:nowrap">{{ pendingText }}</div>
+      <div style="position:absolute;left:{{ cxPx }}px;top:{{ pendTop }}px;transform:translateX(-50%);background:#c23b2e;color:#f7eddc;border-radius:999px;padding:10px 24px;font-family:var(--font-heading);font-size:{{ pendFs }}px;letter-spacing:.02em;z-index:91;box-shadow:var(--shadow-md);animation:ob-pop .4s cubic-bezier(.34,1.56,.64,1) both,ob-pulse 1.6s ease-out .4s infinite;white-space:nowrap">{{ pendingText }}</div>
     </sc-if>
     <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
-      <div style="position:absolute;left:50%;top:{{ toastTop }}px;transform:translateX(-50%);background:#2a2621;color:#f7eddc;border-radius:999px;padding:9px 20px;font-size:13.5px;font-weight:700;z-index:92;box-shadow:var(--shadow-md);animation:ob-pop .4s cubic-bezier(.34,1.56,.64,1) both;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis">{{ toastText }}</div>
+      <div style="position:absolute;left:{{ cxPx }}px;top:{{ toastTop }}px;transform:translateX(-50%);background:#2a2621;color:#f7eddc;border-radius:999px;padding:9px 20px;font-size:{{ toastFs }}px;font-weight:700;z-index:92;box-shadow:var(--shadow-md);animation:ob-pop .4s cubic-bezier(.34,1.56,.64,1) both;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis">{{ toastText }}</div>
     </sc-if>
 
     <div style="position:absolute;left:{{ discX }}px;top:{{ discY }}px;width:104px;height:156px;z-index:4;transition:left .5s ease,top .5s ease">
@@ -103,23 +114,33 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
       <div style="position:absolute;inset:0;border-radius:15px;background:rgba(0,0,0,.08);transform:rotate(5deg)"></div>
       <div style="position:absolute;inset:0;border-radius:15px;background:{{ disc.bg }};padding:7px;box-sizing:border-box;box-shadow:var(--shadow-md);transform:rotate({{ disc.rot }}deg)">
         <div style="width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:2.5px solid {{ disc.rim }};display:grid;place-items:center;position:relative">
+          <div style="position:absolute;top:3px;left:3px;width:{{ badgeD }}px;height:{{ badgeD }}px;border-radius:50%;background:#f7eddc;box-shadow:0 1px 3px rgba(42,38,33,.28);display:grid;place-items:center;z-index:2">
+            <sc-if value="{{ disc.isText }}" hint-placeholder-val="{{ true }}">
+              <span style="font-family:var(--font-heading);font-size:{{ disc.cfs }}px;line-height:1;color:{{ disc.num }}">{{ disc.v }}</span>
+            </sc-if>
+            <sc-if value="{{ disc.isSkip }}" hint-placeholder-val="{{ false }}">
+              <span style="color:{{ disc.num }};display:grid"><svg width="{{ gsz }}" height="{{ gsz }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg></span>
+            </sc-if>
+            <sc-if value="{{ disc.isRev }}" hint-placeholder-val="{{ false }}">
+              <span style="color:{{ disc.num }};display:grid"><svg width="{{ gsz }}" height="{{ gsz }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg></span>
+            </sc-if>
+            <sc-if value="{{ disc.isWild }}" hint-placeholder-val="{{ false }}">
+              <span style="display:grid;grid-template-columns:{{ dotCols }};gap:{{ dotGap }}px"><span style="width:{{ dotD }}px;height:{{ dotD }}px;border-radius:50%;background:#c23b2e"></span><span style="width:{{ dotD }}px;height:{{ dotD }}px;border-radius:50%;background:#2e6f8a"></span><span style="width:{{ dotD }}px;height:{{ dotD }}px;border-radius:50%;background:#66923f"></span><span style="width:{{ dotD }}px;height:{{ dotD }}px;border-radius:50%;background:#e0a020"></span></span>
+            </sc-if>
+          </div>
           <sc-if value="{{ disc.isText }}" hint-placeholder-val="{{ true }}">
-            <span style="position:absolute;top:2px;left:7px;font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ disc.v }}</span>
-            <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ disc.v }}</span>
+            <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:{{ miniFs }}px;color:#f7eddc">{{ disc.v }}</span>
           </sc-if>
           <sc-if value="{{ disc.isSkip }}" hint-placeholder-val="{{ false }}">
-            <span style="position:absolute;top:4px;left:7px;color:#f7eddc;display:grid"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg></span>
-            <span style="position:absolute;bottom:4px;right:7px;transform:rotate(180deg);color:#f7eddc;display:grid"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg></span>
+            <span style="position:absolute;bottom:4px;right:7px;transform:rotate(180deg);color:#f7eddc;display:grid"><svg width="{{ mgsz }}" height="{{ mgsz }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg></span>
           </sc-if>
           <sc-if value="{{ disc.isRev }}" hint-placeholder-val="{{ false }}">
-            <span style="position:absolute;top:4px;left:7px;color:#f7eddc;display:grid"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg></span>
-            <span style="position:absolute;bottom:4px;right:7px;transform:rotate(180deg);color:#f7eddc;display:grid"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg></span>
+            <span style="position:absolute;bottom:4px;right:7px;transform:rotate(180deg);color:#f7eddc;display:grid"><svg width="{{ mgsz }}" height="{{ mgsz }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg></span>
           </sc-if>
           <sc-if value="{{ disc.isWild }}" hint-placeholder-val="{{ false }}">
-            <span style="position:absolute;top:5px;left:7px;display:grid;grid-template-columns:5px 5px;gap:2px"><span style="width:5px;height:5px;border-radius:50%;background:#c23b2e"></span><span style="width:5px;height:5px;border-radius:50%;background:#2e6f8a"></span><span style="width:5px;height:5px;border-radius:50%;background:#66923f"></span><span style="width:5px;height:5px;border-radius:50%;background:#e0a020"></span></span>
-            <span style="position:absolute;bottom:5px;right:7px;display:grid;grid-template-columns:5px 5px;gap:2px;transform:rotate(180deg)"><span style="width:5px;height:5px;border-radius:50%;background:#c23b2e"></span><span style="width:5px;height:5px;border-radius:50%;background:#2e6f8a"></span><span style="width:5px;height:5px;border-radius:50%;background:#66923f"></span><span style="width:5px;height:5px;border-radius:50%;background:#e0a020"></span></span>
+            <span style="position:absolute;bottom:5px;right:7px;display:grid;grid-template-columns:{{ mdotCols }};gap:{{ mdotGap }}px;transform:rotate(180deg)"><span style="width:{{ mdotD }}px;height:{{ mdotD }}px;border-radius:50%;background:#c23b2e"></span><span style="width:{{ mdotD }}px;height:{{ mdotD }}px;border-radius:50%;background:#2e6f8a"></span><span style="width:{{ mdotD }}px;height:{{ mdotD }}px;border-radius:50%;background:#66923f"></span><span style="width:{{ mdotD }}px;height:{{ mdotD }}px;border-radius:50%;background:#e0a020"></span></span>
           </sc-if>
-          <div style="width:62px;height:92px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
+          <div style="width:{{ ovalW }}px;height:{{ ovalH }}px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
             <sc-if value="{{ disc.isWild }}" hint-placeholder-val="{{ false }}">
               <div style="display:grid;grid-template-columns:21px 21px;gap:5px;transform:rotate(16deg)"><span style="width:21px;height:21px;border-radius:50%;background:#c23b2e"></span><span style="width:21px;height:21px;border-radius:50%;background:#2e6f8a"></span><span style="width:21px;height:21px;border-radius:50%;background:#66923f"></span><span style="width:21px;height:21px;border-radius:50%;background:#e0a020"></span></div>
             </sc-if>
@@ -142,10 +163,10 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
         <div style="width:100%;height:100%;border-radius:15px;background:{{ oppFly.bg }};padding:7px;box-sizing:border-box;box-shadow:0 18px 34px rgba(46,43,37,.3)">
           <div style="width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:2.5px solid #2a2621;display:grid;place-items:center;position:relative">
             <sc-if value="{{ oppFly.isText }}" hint-placeholder-val="{{ true }}">
-              <span style="position:absolute;top:2px;left:7px;font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ oppFly.v }}</span>
-              <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ oppFly.v }}</span>
+              <span style="position:absolute;top:2px;left:7px;font-family:var(--font-heading);font-size:{{ miniFs }}px;color:#f7eddc">{{ oppFly.v }}</span>
+              <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:{{ miniFs }}px;color:#f7eddc">{{ oppFly.v }}</span>
             </sc-if>
-            <div style="width:62px;height:92px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
+            <div style="width:{{ ovalW }}px;height:{{ ovalH }}px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
               <sc-if value="{{ oppFly.isText }}" hint-placeholder-val="{{ true }}">
                 <span style="font-family:var(--font-heading);font-size:{{ oppFly.fs }}px;color:{{ oppFly.num }};transform:rotate(16deg)">{{ oppFly.v }}</span>
               </sc-if>
@@ -170,53 +191,75 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
       </div>
     </sc-if>
 
-    <div style="position:absolute;left:{{ youL }}px;bottom:{{ youB }}px;display:flex;flex-direction:column;align-items:flex-start;z-index:40">
-    <sc-if value="{{ yourTurn }}" hint-placeholder-val="{{ true }}">
-      <span style="font-family:var(--font-heading);font-size:12px;color:#fdf8ef;background:repeating-linear-gradient(45deg,var(--color-accent) 0 10px,var(--color-accent-600) 10px 20px);background-size:28px 100%;animation:ob-march 1.2s linear infinite;border-radius:999px 999px 999px 4px;padding:5px 14px;margin:0 0 -6px 14px;position:relative;z-index:2;box-shadow:var(--shadow-sm)">YOUR TURN</span>
+    <div style="position:absolute;left:{{ meL }}px;bottom:{{ meB }}px;width:{{ meW }}px;display:flex;flex-direction:column;align-items:center;z-index:88;transition:left .35s cubic-bezier(.2,.7,.3,1)">
+    <sc-if value="{{ turnTab }}" hint-placeholder-val="{{ true }}">
+      <span style="font-family:var(--font-heading);font-size:12px;color:#fdf8ef;background:repeating-linear-gradient(45deg,var(--color-accent) 0 10px,var(--color-accent-600) 10px 20px);background-size:28px 100%;animation:ob-march 1.2s linear infinite;border-radius:999px 999px 4px 4px;padding:5px 16px 7px;margin:0 0 -8px;position:relative;z-index:2;box-shadow:var(--shadow-sm)">YOUR TURN</span>
     </sc-if>
     <sc-if value="{{ isSpec }}" hint-placeholder-val="{{ false }}">
-      <span style="font-family:var(--font-heading);font-size:12px;color:#f7eddc;background:#2a2621;border-radius:999px 999px 999px 4px;padding:5px 14px;margin:0 0 -6px 14px;position:relative;z-index:2;box-shadow:var(--shadow-sm);animation:ob-pop .45s cubic-bezier(.34,1.56,.64,1) both">{{ specFlag }}</span>
+      <span style="font-family:var(--font-heading);font-size:12px;color:#f7eddc;background:#2a2621;border-radius:999px 999px 4px 4px;padding:5px 16px 7px;margin:0 0 -8px;position:relative;z-index:2;box-shadow:var(--shadow-sm);animation:ob-pop .45s cubic-bezier(.34,1.56,.64,1) both">{{ specFlag }}</span>
     </sc-if>
-    <div style="display:flex;align-items:center;gap:11px;background:#fdf8ef;border-radius:999px;padding:6px 18px 6px 6px;box-shadow:var(--shadow-md);border:2px solid {{ pillBorder }};box-sizing:border-box">
-      <div style="width:46px;height:46px;border-radius:50%;background:{{ ringBg }};display:grid;place-items:center">
-        <div style="width:38px;height:38px;border-radius:50%;background:#e0a020;color:#fdf8ef;display:grid;place-items:center;font-family:var(--font-heading);font-size:17px;border:2px solid #fdf8ef;box-sizing:border-box">M</div>
+    <div style="display:flex;align-items:center;gap:11px;background:{{ pillBg }};border-radius:999px;padding:6px 18px 6px 6px;box-shadow:{{ pillHalo }};border:2px solid {{ pillBorder }};box-sizing:border-box;transition:background .4s ease,box-shadow .4s ease">
+      <div style="position:relative;width:{{ meAvD }}px;height:{{ meAvD }}px;display:grid;place-items:center;flex:none">
+        <sc-if value="{{ ringOn }}" hint-placeholder-val="{{ false }}">
+          <svg width="46" height="46" viewBox="0 0 46 46" style="position:absolute;left:50%;top:50%;margin:-23px 0 0 -23px;transform:rotate(-90deg)">
+            <circle cx="23" cy="23" r="21" fill="none" stroke="var(--color-neutral-300)" stroke-width="4"></circle>
+            <circle cx="23" cy="23" r="21" fill="none" stroke="var(--color-accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="132" style="animation:ob-drainring 2s linear forwards"></circle>
+          </svg>
+        </sc-if>
+        <div style="width:{{ meAvIn }}px;height:{{ meAvIn }}px;border-radius:50%;background:#e0a020;color:#fdf8ef;display:grid;place-items:center;font-family:var(--font-heading);font-size:{{ meAvFs }}px;border:2px solid #fdf8ef;box-sizing:border-box;position:relative">M</div>
       </div>
       <div>
-        <div style="font-weight:700;font-size:14px;line-height:1.15">Mira</div>
-        <div style="font-size:11.5px;color:{{ statusColor }};font-weight:600">{{ statusText }}</div>
+        <div style="font-weight:700;font-size:{{ meNameFs }}px;line-height:1.15">Mira</div>
+        <div style="font-size:{{ meStatusFs }}px;color:{{ statusColor }};font-weight:600">{{ statusText }}</div>
       </div>
     </div>
     </div>
 
     <sc-if value="{{ isSpec }}" hint-placeholder-val="{{ false }}">
-      <div style="position:absolute;left:50%;bottom:46px;transform:translateX(-50%);background:rgba(253,248,239,.88);border-radius:999px;padding:11px 24px;font-size:13.5px;font-weight:600;color:var(--color-neutral-700);box-shadow:var(--shadow-md);z-index:40;display:flex;align-items:center;gap:9px;animation:ob-pop .5s cubic-bezier(.34,1.56,.64,1) both;white-space:nowrap;max-width:94%">
+      <div style="position:absolute;left:{{ cxPx }}px;bottom:46px;transform:translateX(-50%);background:rgba(253,248,239,.88);border-radius:999px;padding:11px 24px;font-size:13.5px;font-weight:600;color:var(--color-neutral-700);box-shadow:var(--shadow-md);z-index:88;display:flex;align-items:center;gap:9px;animation:ob-pop .5s cubic-bezier(.34,1.56,.64,1) both;white-space:nowrap;max-width:94%">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>
         <span>{{ specNote }}</span>
       </div>
     </sc-if>
+    <sc-if value="{{ drumOn }}" hint-placeholder-val="{{ false }}">
+      <div onPointerDown="{{ drumDown }}" onPointerMove="{{ drumMove }}" onPointerUp="{{ drumUp }}" onPointerCancel="{{ drumUp }}" style="position:absolute;left:0;right:0;top:{{ domeT }}px;bottom:0;z-index:20;touch-action:none;cursor:grab"></div>
+      <div style="position:absolute;left:0;right:0;top:{{ railY }}px;bottom:0;background:var(--color-bg);border-top:2.5px solid rgba(42,38,33,.24);z-index:80;pointer-events:none"></div>
+      <div style="position:absolute;left:{{ domeL }}px;top:{{ domeT }}px;width:172px;height:172px;border-radius:50%;background:var(--color-bg);border:2.5px solid rgba(42,38,33,.24);clip-path:inset(0 0 73% 0);z-index:81;pointer-events:none;box-sizing:border-box"></div>
+    </sc-if>
+    <div role="listbox" aria-label="Your hand — arrow keys to move, Enter to play">
     <sc-for list="{{ handView }}" as="c" hint-placeholder-count="6">
-      <div onClick="{{ c.click }}" onMouseEnter="{{ c.enter }}" onMouseLeave="{{ c.leave }}" style="position:absolute;left:0;top:0;width:104px;height:156px;transform:{{ c.tf }};transition:{{ handTrans }};z-index:{{ c.z }};cursor:{{ c.cursor }}">
+      <div role="option" aria-selected="{{ c.sel }}" aria-label="{{ c.aria }}" onClick="{{ c.click }}" onMouseEnter="{{ c.enter }}" onMouseLeave="{{ c.leave }}" onPointerDown="{{ drumDown }}" onPointerMove="{{ drumMove }}" onPointerUp="{{ drumUp }}" style="position:absolute;left:0;top:0;width:104px;height:156px;transform:{{ c.tf }};transition:{{ c.trans }};z-index:{{ c.z }};cursor:{{ c.cursor }};opacity:{{ c.op }};touch-action:none;user-select:none">
         <div style="width:100%;height:100%;animation:{{ c.anim }}">
           <div style="width:100%;height:100%;box-sizing:border-box;border-radius:15px;background:#fdf8ef;position:relative;outline:{{ c.outline }};outline-offset:3px;box-shadow:{{ c.shadow }}">
           <div style="position:absolute;inset:0;border-radius:15px;background:{{ c.bg }};padding:7px;box-sizing:border-box">
             <div style="width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:2.5px solid #2a2621;display:grid;place-items:center;position:relative">
+              <div style="position:absolute;top:3px;left:3px;width:{{ badgeD }}px;height:{{ badgeD }}px;border-radius:50%;background:#f7eddc;box-shadow:0 1px 3px rgba(42,38,33,.28);display:grid;place-items:center;z-index:2">
+                <sc-if value="{{ c.isText }}" hint-placeholder-val="{{ true }}">
+                  <span style="font-family:var(--font-heading);font-size:{{ c.cfs }}px;line-height:1;color:{{ c.num }}">{{ c.v }}</span>
+                </sc-if>
+                <sc-if value="{{ c.isSkip }}" hint-placeholder-val="{{ false }}">
+                  <span style="color:{{ c.num }};display:grid"><svg width="{{ gsz }}" height="{{ gsz }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg></span>
+                </sc-if>
+                <sc-if value="{{ c.isRev }}" hint-placeholder-val="{{ false }}">
+                  <span style="color:{{ c.num }};display:grid"><svg width="{{ gsz }}" height="{{ gsz }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg></span>
+                </sc-if>
+                <sc-if value="{{ c.isWild }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:grid;grid-template-columns:{{ dotCols }};gap:{{ dotGap }}px"><span style="width:{{ dotD }}px;height:{{ dotD }}px;border-radius:50%;background:#c23b2e"></span><span style="width:{{ dotD }}px;height:{{ dotD }}px;border-radius:50%;background:#2e6f8a"></span><span style="width:{{ dotD }}px;height:{{ dotD }}px;border-radius:50%;background:#66923f"></span><span style="width:{{ dotD }}px;height:{{ dotD }}px;border-radius:50%;background:#e0a020"></span></span>
+                </sc-if>
+              </div>
               <sc-if value="{{ c.isText }}" hint-placeholder-val="{{ true }}">
-                <span style="position:absolute;top:2px;left:7px;font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ c.v }}</span>
-                <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:14px;color:#f7eddc">{{ c.v }}</span>
+                <span style="position:absolute;bottom:2px;right:7px;transform:rotate(180deg);font-family:var(--font-heading);font-size:{{ miniFs }}px;color:#f7eddc">{{ c.v }}</span>
               </sc-if>
               <sc-if value="{{ c.isSkip }}" hint-placeholder-val="{{ false }}">
-                <span style="position:absolute;top:4px;left:7px;color:#f7eddc;display:grid"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg></span>
-                <span style="position:absolute;bottom:4px;right:7px;transform:rotate(180deg);color:#f7eddc;display:grid"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg></span>
+                <span style="position:absolute;bottom:4px;right:7px;transform:rotate(180deg);color:#f7eddc;display:grid"><svg width="{{ mgsz }}" height="{{ mgsz }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg></span>
               </sc-if>
               <sc-if value="{{ c.isRev }}" hint-placeholder-val="{{ false }}">
-                <span style="position:absolute;top:4px;left:7px;color:#f7eddc;display:grid"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg></span>
-                <span style="position:absolute;bottom:4px;right:7px;transform:rotate(180deg);color:#f7eddc;display:grid"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg></span>
+                <span style="position:absolute;bottom:4px;right:7px;transform:rotate(180deg);color:#f7eddc;display:grid"><svg width="{{ mgsz }}" height="{{ mgsz }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path><path d="m7 22-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path></svg></span>
               </sc-if>
               <sc-if value="{{ c.isWild }}" hint-placeholder-val="{{ false }}">
-                <span style="position:absolute;top:5px;left:7px;display:grid;grid-template-columns:5px 5px;gap:2px"><span style="width:5px;height:5px;border-radius:50%;background:#c23b2e"></span><span style="width:5px;height:5px;border-radius:50%;background:#2e6f8a"></span><span style="width:5px;height:5px;border-radius:50%;background:#66923f"></span><span style="width:5px;height:5px;border-radius:50%;background:#e0a020"></span></span>
-                <span style="position:absolute;bottom:5px;right:7px;display:grid;grid-template-columns:5px 5px;gap:2px;transform:rotate(180deg)"><span style="width:5px;height:5px;border-radius:50%;background:#c23b2e"></span><span style="width:5px;height:5px;border-radius:50%;background:#2e6f8a"></span><span style="width:5px;height:5px;border-radius:50%;background:#66923f"></span><span style="width:5px;height:5px;border-radius:50%;background:#e0a020"></span></span>
+                <span style="position:absolute;bottom:5px;right:7px;display:grid;grid-template-columns:{{ mdotCols }};gap:{{ mdotGap }}px;transform:rotate(180deg)"><span style="width:{{ mdotD }}px;height:{{ mdotD }}px;border-radius:50%;background:#c23b2e"></span><span style="width:{{ mdotD }}px;height:{{ mdotD }}px;border-radius:50%;background:#2e6f8a"></span><span style="width:{{ mdotD }}px;height:{{ mdotD }}px;border-radius:50%;background:#66923f"></span><span style="width:{{ mdotD }}px;height:{{ mdotD }}px;border-radius:50%;background:#e0a020"></span></span>
               </sc-if>
-              <div style="width:62px;height:92px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
+              <div style="width:{{ ovalW }}px;height:{{ ovalH }}px;border-radius:50%;background:#f7eddc;transform:rotate(-16deg);display:grid;place-items:center">
                 <sc-if value="{{ c.isWild }}" hint-placeholder-val="{{ false }}">
                   <div style="display:grid;grid-template-columns:21px 21px;gap:5px;transform:rotate(16deg)"><span style="width:21px;height:21px;border-radius:50%;background:#c23b2e"></span><span style="width:21px;height:21px;border-radius:50%;background:#2e6f8a"></span><span style="width:21px;height:21px;border-radius:50%;background:#66923f"></span><span style="width:21px;height:21px;border-radius:50%;background:#e0a020"></span></div>
                 </sc-if>
@@ -237,19 +280,38 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
         </div>
       </div>
     </sc-for>
+    </div>
+
+    <sc-if value="{{ drumOn }}" hint-placeholder-val="{{ false }}">
+      <div onPointerDown="{{ drumDown }}" onPointerMove="{{ drumMove }}" onPointerUp="{{ drumUp }}" onPointerCancel="{{ drumUp }}" aria-hidden="true" style="position:absolute;left:{{ hubL }}px;top:{{ hubT }}px;width:76px;height:76px;z-index:90;touch-action:none;cursor:grab">
+        <div style="position:absolute;inset:0;border-radius:50%;border:4px solid {{ hubInk }};box-sizing:border-box;background:#fdf8ef;box-shadow:var(--shadow-md)"></div>
+        <div style="position:absolute;inset:0;transform:{{ hubSpin }};transition:transform .3s cubic-bezier(.17,.84,.44,1)">
+          <div style="position:absolute;left:50%;top:7px;bottom:7px;width:5px;margin-left:-2.5px;border-radius:3px;background:{{ hubInk }}"></div>
+          <div style="position:absolute;left:50%;top:7px;bottom:7px;width:5px;margin-left:-2.5px;border-radius:3px;background:{{ hubInk }};transform:rotate(60deg)"></div>
+          <div style="position:absolute;left:50%;top:7px;bottom:7px;width:5px;margin-left:-2.5px;border-radius:3px;background:{{ hubInk }};transform:rotate(120deg)"></div>
+          <div style="position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#fdf8ef;border:3px solid {{ hubInk }};box-sizing:border-box"></div>
+        </div>
+      </div>
+      <button onClick="{{ stepPrev }}" aria-label="Previous card" style="position:absolute;left:{{ arrowLL }}px;top:{{ arrowT }}px;width:44px;height:44px;border-radius:50%;background:#fdf8ef;border:1.5px solid rgba(32,30,29,.18);box-shadow:var(--shadow-sm);cursor:pointer;z-index:90;display:grid;place-items:center;padding:0">
+        <span style="width:11px;height:11px;border-left:2.6px solid var(--color-neutral-700);border-bottom:2.6px solid var(--color-neutral-700);transform:rotate(45deg);margin-left:-3px"></span>
+      </button>
+      <button onClick="{{ stepNext }}" aria-label="Next card" style="position:absolute;left:{{ arrowRL }}px;top:{{ arrowT }}px;width:44px;height:44px;border-radius:50%;background:#fdf8ef;border:1.5px solid rgba(32,30,29,.18);box-shadow:var(--shadow-sm);cursor:pointer;z-index:90;display:grid;place-items:center;padding:0">
+        <span style="width:11px;height:11px;border-right:2.6px solid var(--color-neutral-700);border-top:2.6px solid var(--color-neutral-700);transform:rotate(45deg);margin-right:-3px"></span>
+      </button>
+    </sc-if>
 
     <sc-if value="{{ canEnd }}" hint-placeholder-val="{{ false }}">
-      <button class="btn" onClick="{{ endTurn }}" style="position:absolute;right:{{ endR }}px;bottom:{{ endB }}px;border-radius:999px;padding:14px 26px;font-size:15px;z-index:45;animation:ob-pop .5s cubic-bezier(.34,1.56,.64,1) .1s both;box-shadow:var(--shadow-md);background:#ffffff;color:#201e1d;border:1.5px solid rgba(32,30,29,.22);cursor:pointer" style-hover="background:#f5ead8">End turn</button>
+      <button class="btn" onClick="{{ endTurn }}" style="position:absolute;right:{{ endR }}px;bottom:{{ endB }}px;border-radius:999px;padding:14px 26px;font-size:15px;z-index:88;animation:ob-pop .5s cubic-bezier(.34,1.56,.64,1) .1s both;box-shadow:var(--shadow-md);background:#ffffff;color:#201e1d;border:1.5px solid rgba(32,30,29,.22);cursor:pointer" style-hover="background:#f5ead8">End turn</button>
     </sc-if>
     <sc-if value="{{ unoLive }}" hint-placeholder-val="{{ false }}">
-      <button class="btn" onClick="{{ callUno }}" style="position:absolute;left:{{ unoL }}px;bottom:{{ unoB }}px;border-radius:999px;padding:16px 30px;font-size:17px;font-weight:800;background:#2a2621 radial-gradient(circle at 6px 6px, rgba(194,59,46,.95) 2.5px, transparent 3.2px);background-size:20px 20px;color:#f7eddc;border:2.5px solid #c23b2e;z-index:45;animation:ob-pop .5s cubic-bezier(.34,1.56,.64,1) both,ob-pulse 1.5s ease-out .5s infinite;cursor:pointer;font-family:var(--font-heading);letter-spacing:.03em" style-hover="background-color:#3b352d">{{ callLabel }}
+      <button class="btn" onClick="{{ callUno }}" style="position:absolute;left:{{ unoL }}px;bottom:{{ unoB }}px;border-radius:999px;padding:16px 30px;font-size:17px;font-weight:800;background:#2a2621 radial-gradient(circle at 6px 6px, rgba(194,59,46,.95) 2.5px, transparent 3.2px);background-size:20px 20px;color:#f7eddc;border:2.5px solid #c23b2e;z-index:88;animation:ob-pop .5s cubic-bezier(.34,1.56,.64,1) both,ob-pulse 1.5s ease-out .5s infinite;cursor:pointer;font-family:var(--font-heading);letter-spacing:.03em" style-hover="background-color:#3b352d">{{ callLabel }}
         <sc-if value="{{ unoWindow }}" hint-placeholder-val="{{ false }}">
           <span style="position:absolute;left:16px;right:16px;bottom:7px;height:4px;border-radius:999px;background:rgba(247,237,220,.25);display:block"><span style="display:block;height:100%;border-radius:999px;background:#c23b2e;animation:ob-drain 2s linear forwards"></span></span>
         </sc-if>
       </button>
     </sc-if>
     <sc-if value="{{ pickingColor }}" hint-placeholder-val="{{ false }}">
-      <div style="position:absolute;left:50%;top:{{ pickTop }}px;transform:translateX(-50%);background:#fdf8ef;border-radius:22px;padding:16px 22px;box-shadow:var(--shadow-lg);z-index:90;display:flex;flex-direction:column;align-items:center;gap:12px;animation:ob-pop .45s cubic-bezier(.34,1.56,.64,1) both">
+      <div style="position:absolute;left:{{ cxPx }}px;top:{{ pickTop }}px;transform:translateX(-50%);background:#fdf8ef;border-radius:22px;padding:16px 22px;box-shadow:var(--shadow-lg);z-index:90;display:flex;flex-direction:column;align-items:center;gap:12px;animation:ob-pop .45s cubic-bezier(.34,1.56,.64,1) both">
         <span style="font-size:13px;font-weight:700">Choose a colour</span>
         <div style="display:flex;gap:12px">
           <sc-for list="{{ colorChoices }}" as="cc" hint-placeholder-count="4">
@@ -260,18 +322,18 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
     </sc-if>
     <sc-if value="{{ hasCalled }}" hint-placeholder-val="{{ false }}">
       <div style="position:absolute;left:{{ chipX }}px;top:{{ chipY }}px;display:flex;gap:7px;align-items:center;background:#fdf8ef;border-radius:999px;padding:5px 13px;box-shadow:var(--shadow-sm);z-index:6;animation:ob-pop .4s cubic-bezier(.34,1.56,.64,1) both">
-        <span style="width:11px;height:11px;border-radius:50%;background:{{ calledHex }}"></span>
-        <span style="font-size:12px;font-weight:700">{{ calledName }}</span>
+        <span style="width:{{ chipDot }}px;height:{{ chipDot }}px;border-radius:50%;background:{{ calledHex }}"></span>
+        <span style="font-size:{{ chipFs }}px;font-weight:700">{{ calledName }}</span>
       </div>
     </sc-if>
     <sc-if value="{{ bigCounter }}" hint-placeholder-val="{{ false }}">
-      <div style="position:absolute;inset:0;display:grid;place-items:center;z-index:85;pointer-events:none">
+      <div style="position:absolute;left:0;top:0;bottom:0;right:{{ shWR }}px;display:grid;place-items:center;z-index:85;pointer-events:none">
         <span style="font-family:var(--font-heading);font-size:{{ bigFs }}px;line-height:1;color:#fdf8ef;background:var(--color-accent);padding:18px 58px 30px;border-radius:44px;box-shadow:0 24px 60px rgba(46,43,37,.4);animation:ob-bigpop .55s cubic-bezier(.34,1.56,.64,1) both">{{ bigText }}</span>
       </div>
     </sc-if>
 
     <sc-if value="{{ hasWinner }}" hint-placeholder-val="{{ false }}">
-      <div style="position:absolute;inset:0;background:rgba(42,38,33,.55);z-index:120;display:grid;place-items:center">
+      <div style="position:absolute;left:0;top:0;bottom:0;right:{{ shWR }}px;background:rgba(42,38,33,.55);z-index:120;display:grid;place-items:center">
         <div style="background:#fdf8ef;border-radius:26px;padding:40px 48px;text-align:center;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;align-items:center;gap:10px;animation:ob-bigpop .6s cubic-bezier(.34,1.56,.64,1) both">
           <div style="width:54px;height:54px;border-radius:50%;background:{{ winnerColor }};color:#fdf8ef;display:grid;place-items:center;font-family:var(--font-heading);font-size:24px">{{ winnerInitial }}</div>
           <div style="font-family:var(--font-heading);font-size:42px;line-height:1.1">{{ winnerTitle }}</div>
@@ -290,15 +352,65 @@ a{color:var(--color-accent)}a:hover{color:var(--color-accent-700)}
     </sc-if>
 
     <button class="btn btn-ghost" onClick="{{ restart }}" style="position:absolute;right:{{ ngR }}px;top:{{ ngT }}px;border-radius:999px;padding:8px 16px;font-size:12.5px;z-index:45;background:rgba(253,248,239,.7);cursor:pointer">New game</button>
+
+    <sc-if value="{{ histSide }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ toggleHist }}" aria-label="Move history" style="position:absolute;right:{{ shWR }}px;top:{{ histT }}px;transition:right .35s cubic-bezier(.2,.7,.3,1);writing-mode:vertical-rl;border-radius:999px 0 0 999px;padding:18px 9px 18px 12px;background:#fdf8ef;border:1.5px solid rgba(32,30,29,.16);border-right:0;box-shadow:var(--shadow-md);cursor:pointer;font-family:var(--font-heading);font-size:12.5px;letter-spacing:.05em;color:var(--color-neutral-700);z-index:46">Moves · {{ histCount }}</button>
+    </sc-if>
+    <sc-if value="{{ histBottom }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ toggleHist }}" aria-label="Move history" style="position:absolute;right:{{ ngR }}px;top:{{ histT }}px;border-radius:999px;padding:7px 15px;background:#fdf8ef;border:1.5px solid rgba(32,30,29,.16);box-shadow:var(--shadow-sm);cursor:pointer;font-family:var(--font-heading);font-size:12px;letter-spacing:.04em;color:var(--color-neutral-700);z-index:46">Moves · {{ histCount }}</button>
+    </sc-if>
   </div>
+
+  <sc-if value="{{ histOpen }}" hint-placeholder-val="{{ false }}">
+    <div class="ob-sheet" style="position:absolute;top:{{ hsT }}px;left:{{ hsLeft }}px;right:0;bottom:0;border-radius:{{ hsRad }};background:#fdf8ef;box-shadow:var(--shadow-lg);z-index:200;display:flex;flex-direction:column;animation:{{ hsAnim }};overflow:hidden">
+      <div style="display:flex;align-items:center;gap:12px;padding:16px 18px 12px;border-bottom:1px solid var(--color-divider);flex:none">
+        <span style="font-family:var(--font-heading);font-size:19px;flex:1">Moves</span>
+        <span style="font-size:11.5px;font-weight:600;color:var(--color-neutral-500);white-space:nowrap">{{ histCount }} of 200 kept</span>
+        <button onClick="{{ closeHist }}" aria-label="Close" style="width:32px;height:32px;border-radius:50%;background:var(--color-neutral-200);border:0;cursor:pointer;display:grid;place-items:center;flex:none;padding:0">
+          <span style="width:11px;height:11px;border-right:2.4px solid var(--color-neutral-700);border-bottom:2.4px solid var(--color-neutral-700);transform:rotate(-45deg);margin-top:-3px"></span>
+        </button>
+      </div>
+      <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column-reverse;gap:3px;padding:12px 14px 14px">
+        <sc-for list="{{ histRows }}" as="e" hint-placeholder-count="7">
+          <div>
+            <sc-if value="{{ e.row }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;gap:9px;padding:7px 12px 7px 9px;border-radius:14px;border-left:{{ e.rule }};background:{{ e.bg }}">
+                <span style="width:{{ histWho }}px;height:{{ histWho }}px;border-radius:50%;background:{{ e.dot }};color:#fdf8ef;display:grid;place-items:center;font-family:var(--font-heading);font-size:{{ histTimeFs }}px;flex:none">{{ e.initial }}</span>
+                <span style="font-size:{{ histFs }}px;line-height:1.35;flex:1;text-wrap:pretty">{{ e.text }}</span>
+                <span style="font-size:{{ histTimeFs }}px;color:var(--color-neutral-500);font-variant-numeric:tabular-nums;flex:none">{{ e.time }}</span>
+              </div>
+            </sc-if>
+            <sc-if value="{{ e.divider }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:10px;margin:10px 2px">
+                <span style="flex:1;height:1px;background:var(--color-divider)"></span>
+                <span style="font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--color-neutral-600);background:var(--color-neutral-200);border-radius:999px;padding:4px 12px;white-space:nowrap">{{ e.text }}</span>
+                <span style="flex:1;height:1px;background:var(--color-divider)"></span>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+        <sc-if value="{{ histTrimmed }}" hint-placeholder-val="{{ false }}">
+          <div style="border-top:2px dashed var(--color-neutral-300);margin:4px 2px 10px;padding-top:10px;font-size:11.5px;color:var(--color-neutral-500);font-weight:600;text-wrap:pretty">Earlier moves are gone — the room keeps the last 200.</div>
+        </sc-if>
+        <sc-if value="{{ histEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:13px;color:var(--color-neutral-500);padding:6px 4px;text-wrap:pretty">Nothing yet. Every play, draw and call in this room will show up here.</div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;speed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:1.8,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Animation&quot;},&quot;handIdle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Breathe all&quot;,&quot;options&quot;:[&quot;Breathe all&quot;,&quot;Bob playable&quot;,&quot;Still&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Animation&quot;},&quot;spectatorView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Dim seat&quot;,&quot;options&quot;:[&quot;Dim seat&quot;,&quot;Podium badges&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Spectator&quot;},&quot;feltColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#dfe6cd&quot;,&quot;options&quot;:[&quot;#dfe6cd&quot;,&quot;#e8dcc0&quot;,&quot;#d5dcc0&quot;,&quot;#e7d3b8&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Table&quot;},&quot;callLabel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;UNO!&quot;,&quot;options&quot;:[&quot;UNO!&quot;,&quot;Last card!&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Call&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Normal&quot;,&quot;options&quot;:[&quot;Normal&quot;,&quot;Large&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Accessibility&quot;},&quot;players&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:4,&quot;min&quot;:2,&quot;max&quot;:4,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Table&quot;},&quot;space&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Auto&quot;,&quot;options&quot;:[&quot;Auto&quot;,&quot;Landscape&quot;,&quot;Portrait&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Table&quot;},&quot;feltColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#dfe6cd&quot;,&quot;options&quot;:[&quot;#dfe6cd&quot;,&quot;#e8dcc0&quot;,&quot;#d5dcc0&quot;,&quot;#e7d3b8&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Table&quot;},&quot;input&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Auto (pointer)&quot;,&quot;options&quot;:[&quot;Auto (pointer)&quot;,&quot;Two-row fan&quot;,&quot;Touch drum&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Hand&quot;},&quot;hand&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Deal (live)&quot;,&quot;options&quot;:[&quot;Deal (live)&quot;,&quot;7 cards&quot;,&quot;12 cards&quot;,&quot;20 cards&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Hand&quot;},&quot;handIdle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Breathe all&quot;,&quot;options&quot;:[&quot;Breathe all&quot;,&quot;Bob playable&quot;,&quot;Still&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Hand&quot;},&quot;historyState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Live&quot;,&quot;options&quot;:[&quot;Live&quot;,&quot;Trimmed&quot;,&quot;After rematch&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;History&quot;},&quot;speed&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:1.8,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Animation&quot;},&quot;spectatorView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Dim seat&quot;,&quot;options&quot;:[&quot;Dim seat&quot;,&quot;Podium badges&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Spectator&quot;},&quot;callLabel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;UNO!&quot;,&quot;options&quot;:[&quot;UNO!&quot;,&quot;Last card!&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Call&quot;}}">
 class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.uid = 0; this.gen = 0;
+    // Motion contract — one beat is the existing card flight, the smallest
+    // motion at this table that reads as complete. Beats stride at BEAT-140,
+    // so only the tail rest overlaps: never two movements at once.
+    this.BEAT = 620; this.STRIDE = 480; this.OPEN = 160; this.CLOSE = 200;
+    this.jour = []; this.jseq = 0; this.trimmed = false;
     this.SEATS = [
       { name: 'Beno', initial: 'B', color: '#c23b2e' },
       { name: 'Sana', initial: 'S', color: '#2e6f8a' },
@@ -309,38 +421,100 @@ class Component extends DCLogic {
       vh: typeof window !== 'undefined' ? window.innerHeight : 800
     });
   }
+  /** Seat anchors on a perspective ellipse about the table centre. 0deg is
+      straight across from the viewer; positive is clockwise. */
+  arc(angles, mx, cy, Rx, Ry, ss) {
+    const r = Math.round;
+    return angles.map(a => {
+      const t = a * Math.PI / 180;
+      const px = mx + Math.sin(t) * Rx, py = cy - Math.cos(t) * Ry;
+      return { x: r(px - 110), y: r(py - 52 * ss), cx: r(px), cy: r(py), ang: a };
+    });
+  }
   L() {
     const vw = this.state.vw, vh = this.state.vh;
-    const portrait = vw < 720 || vh > vw * 1.15;
+    const force = this.props.space ?? 'Auto';
+    const portrait = force === 'Portrait' ? true : force === 'Landscape' ? false : (vw < 720 || vh > vw * 1.15);
     const r = Math.round;
+    const nOpp = Math.max(1, Math.min(3, (this.props.players ?? 4) - 1));
+    const lg = (this.props.size ?? 'Normal') === 'Large';
     if (portrait) {
       const k = Math.min(vw / 640, vh / 1120, 1.15);
       const W = r(vw / k), H = r(vh / k), mx = W / 2;
-      const pileY = r(H * 0.36);
+      // Felt and seat ring are both true circles; the angle set is what keeps
+      // the outermost seats inside a 640-wide space.
+      const tR = r(W * 0.34), ss = .74;
+      const tcy = r(H * 0.32), sR = tR + 58;
+      // High enough that the pile's lower corners stay inside the round felt.
+      const pileY = r(H * 0.30);
+      const railY = H - 260, hubT = railY + 22;
+      // Same 20% rule as landscape: the hand stops at the table's bottom fifth.
+      const anchorY = r(tcy + 0.6 * tR + 520 + 87);
       return {
-        W, H, scale: k,
-        ringL: r(mx - 175), ringT: pileY - 97,
-        pileX: r(mx - 122), pileY, discX: r(mx + 18), discY: pileY,
-        cx: mx, anchorY: H + 368, R: 520, spreadTot: 46,
+        W, H, scale: k, portrait,
+        tblL: r(mx - tR), tblT: r(tcy - tR), tblW: tR * 2, tblH: tR * 2,
+        rimW: Math.max(14, r(tR * 0.088)),
+        feltL: r(mx - tR) + Math.max(14, r(tR * 0.088)), feltT: r(tcy - tR) + Math.max(14, r(tR * 0.088)),
+        feltD: tR * 2 - 2 * Math.max(14, r(tR * 0.088)),
+        ringL: r(mx - tR + 26), ringT: r(tcy - tR + 26), ringW: tR * 2 - 52, ringH: tR * 2 - 52,
+        pileX: r(mx - 122), pileY, discX: r(mx + 18), discY: pileY, pileHintT: -30,
+        cx: mx, anchorY, R: 520, spreadTot: 46, rowGap: 40, rowShift: 15,
+        railY, hubT, hubL: r(mx - 38), drumStep: 66, domeT: railY - 44, domeL: r(mx - 86),
         glowL: r(W * 0.06), glowR: r(W * 0.06), tintX: mx, tintY: pileY + 78,
-        seatScale: .74,
-        seats: [{ x: r(W * 0.16 - 110), y: 52, cx: r(W * 0.16), cy: 110 }, { x: r(mx - 110), y: 40, cx: mx, cy: 96 }, { x: r(W * 0.84 - 110), y: 52, cx: r(W * 0.84), cy: 110 }],
+        seatScale: ss,
+        seats: this.arc(nOpp === 1 ? [0] : nOpp === 2 ? [-46, 46] : [-60, 0, 60], mx, tcy, sR, sR, ss),
         pendTop: pileY - 180, toastTop: pileY - 125, pickTop: pileY + 190, chipX: r(mx - 65), chipY: pileY + 174,
-        youL: 14, youB: 12, unoL: 14, unoB: 200, endR: 14, endB: 16, bigFs: 88, ngR: 16, ngT: 12
+        meW: lg ? 320 : 250, meB: 12, meBDrum: 90, unoL: 14, unoB: 236, endR: 14, endB: 16,
+        bigFs: 88, ngR: 16, ngT: 12, histSide: false, histT: 54
       };
     }
     const k = Math.min(vw / 1180, vh / 720, 1.15);
-    const W = r(vw / k), H = r(vh / k), mx = W / 2, my = H / 2;
+    const W = r(vw / k), H = r(vh / k), my = H / 2;
+    // The drum needs the bottom third, so the table and the piles ride up.
+    const dm = this.drumMode();
+    // The history sheet is 372 REAL px, mounted outside the scaled stage, so it
+    // costs 372/k design px. The table does not sit under it — it recentres
+    // into what is left. Only anchors move; nothing reflows.
+    const shW = this.state.histOpen ? Math.min(r(372 / k), r(W * 0.42)) : 0;
+    const availW = W - shW, mx = r(availW / 2);
+    // In drum mode the felt is smaller and rides up, so its near rim clears the
+    // drum apron: a round table plus a drum will not both fit 720px otherwise.
+    // The floor is not cosmetic: below it the pile+discard cluster no longer
+    // fits inside a CIRCLE (its far corner is hypot(dx, dy) from the centre, not
+    // dx), and the piles end up straddling the wooden rim.
+    const tcy = r(H * (dm ? 0.43 : 0.47)), ss = 1;
+    // Capped by tcy-140 as well: past that the far seat's own fan leaves the top
+    // of the stage. Floored so the central cluster stays inside a round felt.
+    const tR = Math.max(dm ? 150 : 170,
+      r(Math.min(H * (dm ? 0.24 : 0.32), availW * (shW ? 0.30 : 0.28), tcy - 140)));
+    const sR = tR + 88;
+    const railY = H - 164, hubT = railY + 14;
+    // The central pair is a tight cluster in both modes: a round felt small
+    // enough to leave the hand its 80% would otherwise let them cross the rim.
+    const pdx = 118, ddx = 14;
+    // The hand may cover at most the bottom 20% of the table, so the arc pivot
+    // is derived from the table, not from H. 78 = half a card, 9 = playable lift.
+    const anchorY = r(tcy + 0.6 * tR + 520 + 87);
     return {
-      W, H, scale: k,
-      ringL: r(mx - 175), ringT: r(my - 205),
-      pileX: r(mx - 162), pileY: r(my - 117), discX: r(mx + 58), discY: r(my - 110),
-      cx: mx, anchorY: H + 310, R: 520, spreadTot: 60,
-      glowL: r(W * 0.21), glowR: r(W * 0.21), tintX: mx, tintY: r(my - 30),
-      seatScale: 1,
-      seats: [{ x: r(W * 0.15 - 110), y: 36, cx: r(W * 0.15), cy: 88 }, { x: r(mx - 110), y: 18, cx: mx, cy: 70 }, { x: r(W * 0.85 - 110), y: 36, cx: r(W * 0.85), cy: 88 }],
+      W, H, scale: k, portrait, shW,
+      tblL: r(mx - tR), tblT: r(tcy - tR), tblW: tR * 2, tblH: tR * 2,
+      rimW: Math.max(14, r(tR * 0.088)),
+      feltL: r(mx - tR) + Math.max(14, r(tR * 0.088)), feltT: r(tcy - tR) + Math.max(14, r(tR * 0.088)),
+      feltD: tR * 2 - 2 * Math.max(14, r(tR * 0.088)),
+      ringL: r(mx - tR + 28), ringT: r(tcy - tR + 28), ringW: tR * 2 - 56, ringH: tR * 2 - 56,
+      pileX: r(mx - pdx), pileY: r(my - (dm ? 150 : 117)), discX: r(mx + ddx), discY: r(my - (dm ? 143 : 110)),
+      // Above the pile, not below: below it the hand's own cards cover it.
+      pileHintT: -30,
+      cx: mx, anchorY, R: 520, spreadTot: shW ? 52 : 60, rowGap: 40, rowShift: 16,
+      railY, hubT, hubL: r(mx - 38), drumStep: 78, domeT: railY - 44, domeL: r(mx - 86),
+      glowL: r(mx - 342), glowR: r(W - mx - 342), tintX: mx, tintY: r(my - 30),
+      seatScale: ss,
+      // With the sheet open the felt is narrower, so the side seats pull in and
+      // up — otherwise the hand's outer cards reach their pills.
+      seats: this.arc(nOpp === 1 ? [0] : nOpp === 2 ? (shW ? [-44, 44] : [-58, 58]) : (shW ? [-56, 0, 56] : [-84, 0, 84]), mx, tcy, sR, sR, ss),
       pendTop: r(my - 212), toastTop: r(my - 160), pickTop: r(my - 130), chipX: r(mx + 182), chipY: r(my - 55),
-      youL: 30, youB: 26, unoL: 34, unoB: 120, endR: 34, endB: 32, bigFs: 120, ngR: 24, ngT: 20
+      meW: lg ? 340 : 260, meB: 12, meBDrum: 14, unoL: 34, unoB: 150, endR: shW + 34, endB: 32,
+      bigFs: 120, ngR: shW + 24, ngT: 20, histSide: true, histT: r(my - 70)
     };
   }
   shuffleArr(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
@@ -367,7 +541,8 @@ class Component extends DCLogic {
       chain: null, pending: null, bigText: '+4',
       shakeId: null, hoverId: null, toast: '', finished: [], over: false,
       oppFly: null, oppDraw: null, bigCounter: false, shaking: false,
-      noTrans: false, tintOffs: null, tintLeaving: false, shuffling: false
+      noTrans: false, tintOffs: null, tintLeaving: false, shuffling: false,
+      drumPos: 0, drumSnap: false, histOpen: false, jn: 0, round: 1
     };
   }
   T(fn, ms) { const g = this.gen; setTimeout(() => { if (this.gen === g) fn(); }, ms); }
@@ -375,9 +550,88 @@ class Component extends DCLogic {
   componentDidMount() {
     this._onR = () => this.setState({ vw: window.innerWidth, vh: window.innerHeight });
     window.addEventListener('resize', this._onR);
+    this.coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    this.reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this._onK = e => this.onKey(e);
+    window.addEventListener('keydown', this._onK);
     this.deal();
+    this.syncHand();
   }
-  componentWillUnmount() { window.removeEventListener('resize', this._onR); }
+  componentDidUpdate(pp) { if (pp.hand !== this.props.hand) this.syncHand(); }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this._onR);
+    window.removeEventListener('keydown', this._onK);
+  }
+  /** Journal — the same shape the server already keeps: seq, ts, actor, line. */
+  log(kind, who, text) {
+    this.jour.push({ seq: ++this.jseq, ts: new Date(), kind, who, text });
+    if (this.jour.length > 200) { this.jour.shift(); this.trimmed = true; }
+    this.setState(s => ({ jn: s.jn + 1 }));
+  }
+  actorName(p) { return p === 0 ? 'You' : this.SEATS[p - 1].name; }
+  /** Hand-size presets — the tablet cases the fan was never designed for. */
+  syncHand() {
+    const m = /^(\d+)/.exec(this.props.hand || '');
+    if (!m) return;
+    const want = +m[1];
+    this.setState(s => {
+      let h = s.hand.filter(c => !c.leaving).map(c => Object.assign({}, c, { fresh: false }));
+      if (h.length > want) h = h.slice(0, want);
+      while (h.length < want) {
+        const raw = this.deck.pop() || { v: String(h.length % 10), col: ['red', 'blue', 'yellow', 'green'][h.length % 4] };
+        h.push({ id: ++this.uid, v: raw.v, col: raw.col, fresh: false, leaving: false });
+      }
+      return { hand: h, pileCount: this.deck.length, drumPos: Math.min(s.drumPos, want - 1) };
+    });
+  }
+  drumMode() {
+    const m = this.props.input ?? 'Auto (pointer)';
+    return m === 'Touch drum' ? true : m === 'Two-row fan' ? false : !!this.coarse;
+  }
+  liveHand() { return this.state.hand.filter(h => !h.leaving); }
+  /** One index cursor drives both hands: the fan peeks it, the drum focuses it. */
+  moveCursor(d) {
+    const live = this.liveHand(); if (!live.length) return;
+    const n = live.length;
+    const i = Math.max(0, Math.min(n - 1, Math.round(this.state.drumPos) + d));
+    this.setState({ drumPos: i, hoverId: live[i].id });
+  }
+  onKey(e) {
+    if (this.state.over || this.state.pickingColor) return;
+    const live = this.liveHand(); if (!live.length) return;
+    const k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowLeft') { e.preventDefault(); this.moveCursor(k === 'ArrowRight' ? 1 : -1); }
+    else if (k === 'Home') { e.preventDefault(); this.setState({ drumPos: 0, hoverId: live[0].id }); }
+    else if (k === 'End') { e.preventDefault(); this.setState({ drumPos: live.length - 1, hoverId: live[live.length - 1].id }); }
+    else if (k === 'Enter' || k === ' ') {
+      const c = live[Math.max(0, Math.min(live.length - 1, Math.round(this.state.drumPos)))];
+      if (c) { e.preventDefault(); this.playCard(c.id); }
+    }
+  }
+  drumDown(e) {
+    if (!this.drumMode()) return;
+    this._drag = { x: e.clientX, start: this.state.drumPos, moved: 0 };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+  }
+  drumMove(e) {
+    if (!this._drag) return;
+    const dx = e.clientX - this._drag.x;
+    this._drag.moved = Math.max(this._drag.moved, Math.abs(dx));
+    const n = this.liveHand().length, per = this.L().drumStep;
+    let p = this._drag.start - dx / per;
+    // Rubber band past either end, 0.55 of the overshoot.
+    if (p < 0) p = -Math.pow(-p, 0.62) * 0.55;
+    else if (p > n - 1) p = (n - 1) + Math.pow(p - (n - 1), 0.62) * 0.55;
+    this.setState({ drumPos: p });
+  }
+  drumUp() {
+    if (!this._drag) return;
+    const n = this.liveHand().length;
+    this._lastMoved = this._drag.moved; this._drag = null;
+    const snap = Math.max(0, Math.min(n - 1, Math.round(this.state.drumPos)));
+    this.setState({ drumPos: snap, drumSnap: true });
+    this.T(() => this.setState({ drumSnap: false }), this.reduce ? 0 : 300);
+  }
   deal() {
     this.state.hand.forEach((c, i) => this.T(() => this.setState(s => ({ hand: s.hand.map(h => h.id === c.id ? Object.assign({}, h, { fresh: false }) : h) })), 250 + i * 150));
     this.T(() => this.setState({ busy: false }), 250 + this.state.hand.length * 150 + 400);
@@ -389,13 +643,14 @@ class Component extends DCLogic {
     if (d.col === 'wild') return this.state.calledColor ? c.col === this.state.calledColor : true;
     return c.col === d.col || c.v === d.v;
   }
-  np(from, steps, dir) { return ((from + dir * steps) % 4 + 4) % 4; }
-  actives() { return [0, 1, 2, 3].filter(p => this.state.finished.indexOf(p) < 0); }
-  stepP(p, dir) { do { p = (p + dir + 4) % 4; } while (this.state.finished.indexOf(p) >= 0); return p; }
+  nSeats() { return Math.max(2, Math.min(4, this.props.players ?? 4)); }
+  np(from, steps, dir) { const N = this.nSeats(); return ((from + dir * steps) % N + N) % N; }
+  actives() { const N = this.nSeats(); const a = []; for (let p = 0; p < N; p++) if (this.state.finished.indexOf(p) < 0) a.push(p); return a; }
+  stepP(p, dir) { const N = this.nSeats(); do { p = (p + dir + N) % N; } while (this.state.finished.indexOf(p) >= 0); return p; }
   ordinal(k) { return ['1st', '2nd', '3rd', '4th'][k]; }
   finishPlayer(p) {
     const fin = this.state.finished.concat([p]);
-    if (fin.length >= 3) { this.setState({ finished: fin, over: true, unoWindow: false, busy: true, activeSeat: null }); return true; }
+    if (fin.length >= this.nSeats() - 1) { this.setState({ finished: fin, over: true, unoWindow: false, busy: true, activeSeat: null }); return true; }
     this.setState({ finished: fin });
     this.showToast((p === 0 ? 'You' : this.SEATS[p - 1].name) + ' finished ' + this.ordinal(fin.length - 1) + ' — watching from here', 2400);
     return false;
@@ -423,6 +678,19 @@ class Component extends DCLogic {
       this.T(() => this.setState({ calledColor: col, tintOffs: this.mkTint(), tintLeaving: false }), 600);
     } else this.setState({ calledColor: col, tintOffs: this.mkTint(), tintLeaving: false });
   }
+  /** Touch commit gate: a tap on an unfocused card only brings it to focus, so
+      the only card that can be spent is the big, outlined, fully visible one. */
+  tapCard(id) {
+    if (this._lastMoved > 8) { this._lastMoved = 0; return; }
+    const live = this.liveHand(), i = live.findIndex(h => h.id === id);
+    if (i < 0) return;
+    if (this.drumMode() && Math.round(this.state.drumPos) !== i) {
+      this.setState({ drumPos: i, hoverId: id, drumSnap: true });
+      this.T(() => this.setState({ drumSnap: false }), this.reduce ? 0 : 300);
+      return;
+    }
+    this.playCard(id);
+  }
   playCard(id) {
     const st = this.state;
     if (st.turn !== 0 || st.busy || st.over || st.pickingColor) return;
@@ -446,6 +714,7 @@ class Component extends DCLogic {
         hand: s.hand.filter(h => h.id !== id)
       }));
       this.T(() => this.setState({ noTrans: false }), 60);
+      this.log('play', 0, 'You played ' + this.cardLabel(c));
       if (left === 0) { if (!this.finishPlayer(0)) this.finalizeYou(chain, true); return; }
       if (left === 1 && !this.state.called) {
         this.setState({ unoWindow: true });
@@ -471,6 +740,7 @@ class Component extends DCLogic {
   unoPenalty() {
     this.setState({ unoWindow: false });
     this.showToast('Missed ' + (this.props.callLabel ?? 'UNO!') + ' — draw 2', 2000);
+    this.log('catch', 0, 'You were caught without calling');
     this.giveCards(0, 2, () => {});
   }
   draw() {
@@ -488,7 +758,13 @@ class Component extends DCLogic {
     if (!raw) return;
     const c = { id: ++this.uid, v: raw.v, col: raw.col, fresh: true, leaving: false };
     this.setState(s => ({ hand: s.hand.concat([c]), drew: true, busy: true, called: false, unoWindow: false }));
+    this.log('draw', 0, 'You drew a card');
     this.T(() => this.setState(s => ({ hand: s.hand.map(h => h.id === c.id ? Object.assign({}, h, { fresh: false }) : h), busy: false })), 60);
+  }
+  cardLabel(c) {
+    const N = { S: 'skip', R: 'reverse', W: 'a wild', '+2': '+2', '+4': 'wild +4' };
+    const base = N[c.v] || c.v;
+    return c.col === 'wild' ? base : c.col + ' ' + base;
   }
   endTurn() {
     const st = this.state;
@@ -501,7 +777,7 @@ class Component extends DCLogic {
   passTurn(from) {
     if (this.state.over) return;
     const to = this.stepP(from, this.state.dir);
-    this.T(() => this.startTurn(to), 450 / this.spd());
+    this.T(() => this.startTurn(to), this.STRIDE / this.spd());
   }
   applyPlay(from, v, count) {
     if (this.state.over) return;
@@ -529,31 +805,41 @@ class Component extends DCLogic {
     }
     let to = from;
     for (let k = 0; k < steps; k++) to = this.stepP(to, dir);
-    this.T(() => this.startTurn(to), 450 / this.spd());
+    this.T(() => this.startTurn(to), this.STRIDE / this.spd());
   }
   startTurn(p) {
     if (this.state.over) return;
-    if (p === 0) this.setState({ turn: 0, activeSeat: null, busy: false, drew: false });
-    else {
+    if (p === 0) {
+      // The drum opens on the leftmost playable card, so the common case
+      // ("play the one obvious card") is still a single tap.
+      const live = this.liveHand();
+      const fi = live.findIndex(c => this.playable(c, this.state.discard));
+      this.setState({ turn: 0, activeSeat: null, busy: false, drew: false, drumPos: fi < 0 ? 0 : fi });
+    } else {
       this.setState({ turn: p, activeSeat: p - 1, busy: true });
-      this.T(() => this.aiAct(p), 900 / this.spd());
+      this.T(() => this.aiAct(p), (this.OPEN + 380) / this.spd());
     }
   }
   giveCards(target, n, done) {
     if (target === 0) {
+      // Burst compression: card 1 gets a full beat, the rest share one sweep,
+      // and the +N counter carries the count so the beat cost stays flat.
+      const stag = Math.min(90, 540 / Math.max(1, n));
       let i = 0;
       const step = () => {
-        if (i >= n) { this.T(done, 450); return; }
+        if (i >= n) { this.T(done, this.STRIDE); return; }
         const raw = this.popCard();
         if (!raw) { done(); return; }
         const c = { id: ++this.uid, v: raw.v, col: raw.col, fresh: true, leaving: false };
         this.setState(s => ({ hand: s.hand.concat([c]), called: false, unoWindow: false }));
         this.T(() => this.setState(s => ({ hand: s.hand.map(h => h.id === c.id ? Object.assign({}, h, { fresh: false }) : h) })), 60);
-        i++; this.T(step, 300);
+        i++; this.T(step, (i === 1 ? this.BEAT : stag) / this.spd());
       };
+      this.log('draw', 0, 'You drew ' + n + (n === 1 ? ' card' : ' cards'));
       step();
     } else {
       const seat = target - 1; let i = 0;
+      if (n > 0) this.log('draw', target, this.SEATS[seat].name + ' drew ' + n + (n === 1 ? ' card' : ' cards'));
       const step = () => {
         if (i >= n) { this.T(done, 250); return; }
         const raw = this.popCard();
@@ -597,6 +883,7 @@ class Component extends DCLogic {
       this.T(() => {
         hand.push(raw);
         this.setState(s => ({ oppDraw: null, counts: s.counts.map((c, j) => j === seat ? hand.length : c) }));
+        this.log('draw', p, this.SEATS[seat].name + ' drew a card');
         if (this.playable(raw, this.state.discard)) this.T(() => this.aiThrowChain(p, hand.filter(c => c.v === raw.v)), 420 / this.spd());
         else this.passTurn(p);
       }, 50 + 560 / this.spd() + 150);
@@ -619,11 +906,12 @@ class Component extends DCLogic {
           counts: s.counts.map((c, j) => j === seat ? hand.length : c),
           calledColor: isWild ? s.calledColor : null
         }));
+        this.log('play', p, this.SEATS[seat].name + ' played ' + this.cardLabel(card));
         i++;
         if (hand.length === 0) { if (!this.finishPlayer(p)) this.finishAiPlay(p, v, i); return; }
-        if (i < cards.length) { this.T(throwOne, 300 / this.spd()); return; }
+        if (i < cards.length) { this.T(throwOne, (this.STRIDE - 180) / this.spd()); return; }
         this.finishAiPlay(p, v, i);
-      }, 50 + 620 / this.spd() + 180);
+      }, 50 + this.BEAT / this.spd() + 180);
     };
     throwOne();
   }
@@ -638,17 +926,25 @@ class Component extends DCLogic {
   }
   restart() {
     this.gen++; clearTimeout(this._toastT);
-    this.setState(Object.assign(this.fresh(), { noTrans: true }), () => {
+    const nr = this.state.round + 1;
+    this.jour.push({ seq: ++this.jseq, ts: new Date(), kind: 'divider', who: -1, text: 'Round ' + nr + ' · seats renumbered' });
+    this.setState(Object.assign(this.fresh(), { noTrans: true, round: nr, jn: this.state.jn + 1, histOpen: this.state.histOpen }), () => {
       this.T(() => this.setState({ noTrans: false }), 60);
       this.deal();
+      this.syncHand();
     });
   }
   faceOf(c) {
     const C = { red: '#c23b2e', blue: '#2e6f8a', yellow: '#e0a020', green: '#66923f', wild: '#6b5f4a' };
+    const bg = (this.props.size ?? 'Normal') === 'Large';
     const isSkip = c.v === 'S', isRev = c.v === 'R', isWild = c.col === 'wild' && c.v === 'W';
     return {
       v: c.v, bg: C[c.col], isText: !isSkip && !isRev && !isWild, isSkip, isRev, isWild,
-      num: c.col === 'wild' ? '#4d4335' : C[c.col], fs: c.v.length > 1 ? 34 : 42
+      num: c.col === 'wild' ? '#4d4335' : C[c.col],
+      fs: Math.round((c.v.length > 1 ? 34 : 42) * (bg ? 1.2 : 1)),
+      // Corner badge: the only mark guaranteed to sit inside both the fan's
+      // left-edge sliver and the drum's visible top band.
+      cfs: Math.round((c.v.length > 1 ? 15 : 21) * (bg ? 1.45 : 1))
     };
   }
   renderVals() {
@@ -665,50 +961,90 @@ class Component extends DCLogic {
     const R = L.R, cx = L.cx, anchorY = L.anchorY;
     const hi = live.findIndex(h => h.id === st.hoverId);
     const idleMode = this.props.handIdle ?? 'Breathe all';
+    const drum = this.drumMode();
+    // "Large" — for low vision: nothing small anywhere, and the focused drum
+    // card grows too, since one big card at a time is the readable hand.
+    const big = (this.props.size ?? 'Normal') === 'Large';
+    const cardK = big ? 1.18 : 1;
+    // Two rows from 11 cards — exactly where the single arc's total spread locks
+    // and every further card starts subdividing the same wedge.
+    const rows = !drum && n >= 11 ? 2 : 1;
+    const backN = rows === 2 ? Math.ceil(n / 2) : n;
+    const fidx = Math.max(0, Math.min(n - 1, Math.round(st.drumPos)));
     const handView = st.hand.map((c, idx) => {
       const p = this.playable(c, st.discard) && you && !st.busy;
-      let tf;
-      if (c.leaving) tf = 'translate(' + L.discX + 'px,' + L.discY + 'px) rotate(' + ((c.id % 11) - 5) + 'deg)';
-      else if (c.fresh) tf = 'translate(' + L.pileX + 'px,' + L.pileY + 'px) rotate(0deg)';
-      else {
-        const i = live.indexOf(c);
-        const spread = n > 1 ? Math.min(6.5, L.spreadTot / (n - 1)) : 0;
-        const a0 = (i - (n - 1) / 2) * spread, rad = a0 * Math.PI / 180;
-        let x = cx + Math.sin(rad) * R - 52;
-        let y = anchorY - Math.cos(rad) * R - 78;
+      const i = live.indexOf(c);
+      const hovered = st.hoverId === c.id && !c.leaving && !c.fresh && !drum;
+      let tf, z = 10 + idx, op = 1, focused = false;
+      if (c.leaving) { tf = 'translate(' + L.discX + 'px,' + L.discY + 'px) rotate(' + ((c.id % 11) - 5) + 'deg)'; z = 60; }
+      else if (c.fresh) { tf = 'translate(' + L.pileX + 'px,' + L.pileY + 'px) rotate(0deg)'; }
+      else if (drum) {
+        // Cards ride an arc over the drum: the focus card rises clear of the
+        // apron, its neighbours sink behind it and behind the hub.
+        focused = i === fidx;
+        const off = i - st.drumPos, t = Math.min(Math.abs(off), 4.4);
+        const sc = Math.max(0.44, 1 - t * 0.155) * cardK;
+        const rise = 1 - Math.cos(Math.min(t / 4.4, 1) * Math.PI / 2);
+        const bot = L.railY + 14 + rise * 80 - (focused && p ? 10 : 0);
+        const ty = bot - 78 - 78 * sc;
+        tf = 'translate(' + (cx + off * L.drumStep - 52).toFixed(1) + 'px,' + ty.toFixed(1) + 'px) rotate(' + (off * 2.2).toFixed(2) + 'deg) scale(' + sc.toFixed(3) + ')';
+        z = 30 + Math.round((4.4 - t) * 10);
+        op = t > 3.6 ? Math.max(0, (4.4 - t) / 0.8) : 1;
+      } else {
+        const row = rows === 2 && i >= backN ? 1 : 0;
+        const rn = row === 0 ? backN : n - backN, ri = row === 0 ? i : i - backN;
+        const spread = rn > 1 ? Math.min(6.5, L.spreadTot / (rn - 1)) : 0;
+        const a0 = (ri - (rn - 1) / 2) * spread, rad = a0 * Math.PI / 180;
+        const x = cx + Math.sin(rad) * R - 52 + (row === 0 ? -L.rowShift : L.rowShift);
+        // Two rows push DOWN, they do not lift up: the back row keeps the
+        // single-row arc, so the hand's top edge is pinned at any card count.
+        let y = anchorY - Math.cos(rad) * R - 78 + (row === 1 ? L.rowGap : 0);
         let a = a0, scale = '';
         if (p) y -= 9;
-        if (hi >= 0) {
-          const dd = i - hi;
-          if (dd === 0) { y -= 52; a = a0 * .3; scale = ' scale(1.06)'; }
-          else { const push = [0, 26, 14, 6][Math.min(Math.abs(dd), 3)]; x += Math.sign(dd) * push; }
-        }
+        // No neighbour shove: two rows make the gap, so nothing has to buckle.
+        if (hovered) { y -= 52; a = a0 * .3; scale = ' scale(1.06)'; }
         tf = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) rotate(' + a.toFixed(2) + 'deg)' + scale;
+        z = (row === 1 ? 90 : 10) + idx;
       }
+      if (hovered) z = 200;
       if (p && !c.leaving) playableCount++;
       const shaking = st.shakeId === c.id;
-      const hovered = st.hoverId === c.id && !c.leaving && !c.fresh;
       return Object.assign(this.faceOf(c), {
-        tf,
-        z: c.leaving ? 60 : (hovered ? 50 : 10 + idx),
-        veil: you && !st.busy && !p && !c.leaving ? 1 : 0,
+        tf, z, op,
+        // Flights always keep the beat; only drum scrubbing uses the snap curve.
+        trans: st.noTrans ? 'none' : ((c.leaving || c.fresh || !drum)
+          ? 'transform ' + (this.BEAT / 1000 / sp).toFixed(2) + 's cubic-bezier(.34,1.45,.64,1), opacity .25s ease'
+          : (this._drag || this.reduce ? 'opacity .25s ease' : 'transform .3s cubic-bezier(.17,.84,.44,1), opacity .25s ease')),
+        veil: you && !st.busy && !p && !c.leaving ? 1 : (drum && !you && !c.leaving ? .55 : 0),
         outline: p && !c.leaving ? '3px solid var(--color-accent)' : 'none',
-        shadow: c.leaving ? '0 18px 34px rgba(46,43,37,.3)' : '0 8px 18px rgba(46,43,37,.2)',
-        anim: shaking ? 'ob-shake .5s ease-in-out' : (c.leaving && c.heavy ? 'ob-heavy ' + (0.66 / sp).toFixed(2) + 's cubic-bezier(.45,0,.55,1) both' : hovered || c.leaving || idleMode === 'Still' ? 'none'
+        shadow: c.leaving ? '0 18px 34px rgba(46,43,37,.3)' : (drum && focused ? '0 16px 32px rgba(46,43,37,.3)' : '0 8px 18px rgba(46,43,37,.2)'),
+        anim: shaking ? 'ob-shake .5s ease-in-out' : (c.leaving && c.heavy ? 'ob-heavy ' + (0.66 / sp).toFixed(2) + 's cubic-bezier(.45,0,.55,1) both' : hovered || c.leaving || drum || idleMode === 'Still' ? 'none'
           : (idleMode === 'Bob playable' && p ? 'ob-bob 1.6s ease-in-out ' + (idx % 4) * .2 + 's infinite'
           : 'ob-breathe 3.2s ease-in-out ' + (idx % 5) * .3 + 's infinite')),
-        cursor: you ? 'pointer' : 'default',
-        click: () => this.playCard(c.id),
-        enter: () => this.setState({ hoverId: c.id }),
-        leave: () => this.setState(s => s.hoverId === c.id ? { hoverId: null } : null)
+        cursor: you || drum ? 'pointer' : 'default',
+        sel: (drum ? focused : hovered) ? 'true' : 'false',
+        aria: this.cardLabel(c) + (you ? (p ? ' — playable' : ' — not playable') : ''),
+        click: () => this.tapCard(c.id),
+        enter: () => { if (!drum) this.setState({ hoverId: c.id }); },
+        leave: () => { if (!drum) this.setState(s => s.hoverId === c.id ? { hoverId: null } : null); }
       });
     });
-    const seats = this.SEATS.map((s, i) => {
+    const seats = this.SEATS.slice(0, L.seats.length).map((s, i) => {
+      const A = L.seats[i], mir = A.ang < -6;
       const m = Math.min(st.counts[i], 9);
       const fi = st.finished.indexOf(i + 1), out = fi >= 0;
       const active = st.activeSeat === i && st.turn !== 0 && !out;
       return {
-        name: s.name, initial: s.initial, color: s.color, x: L.seats[i].x, y: L.seats[i].y,
+        name: s.name, initial: s.initial, color: s.color, x: A.x, y: A.y,
+        // The avatar always faces the middle of the table, so the pill mirrors.
+        dir: mir ? 'row-reverse' : 'row',
+        pad: mir ? '5px 5px 5px 16px' : '5px 16px 5px 5px',
+        tabRad: mir ? '999px 999px 4px 999px' : '999px 999px 999px 4px',
+        tabMargin: mir ? '0 -70px -6px 0' : '0 0 -6px -70px',
+        // Held cards angle away from the middle, like a real hand at that seat.
+        fanRot: (A.ang * 0.15).toFixed(1),
+        nameFs: big ? 19 : 13.5, statusFs: big ? 15 : 11,
+        avD: big ? 52 : 38, avFs: big ? 22 : 16,
         active, uno: st.counts[i] === 1 && !out,
         op: out && dimStyle ? .45 : 1,
         rankOn: out && !st.over,
@@ -727,33 +1063,89 @@ class Component extends DCLogic {
     const felt = this.props.feltColor ?? '#dfe6cd';
     const NAMES = { red: 'Red called', blue: 'Blue called', yellow: 'Yellow called', green: 'Green called' };
     const flySec = 0.6 / sp;
-    const DIAM = [270, 480, 760, 1090], OPS = [.5, .32, .2, .12];
-    const offs = st.tintOffs || [0, 1, 2, 3].map(() => ({ dx: 0, dy: 0 }));
+    const RGB = { red: '194,59,46', blue: '46,111,138', yellow: '224,160,32', green: '102,146,63' };
     const flySeat = st.oppFly ? L.seats[st.oppFly.seat] : null;
     const drawSeat = st.oppDraw ? L.seats[st.oppDraw.seat] : null;
     const champ = st.over ? st.finished[0] : null;
-    const order = st.over ? st.finished.concat([0, 1, 2, 3].filter(p => st.finished.indexOf(p) < 0)) : [];
+    const all = []; for (let q = 0; q < this.nSeats(); q++) all.push(q);
+    const order = st.over ? st.finished.concat(all.filter(p => st.finished.indexOf(p) < 0)) : [];
+    const histMode = this.props.historyState ?? 'Live';
+    const rawJour = this.jour.slice();
+    if (histMode === 'After rematch' && !rawJour.some(e => e.kind === 'divider'))
+      rawJour.splice(Math.max(0, rawJour.length - 4), 0, { seq: -1, ts: new Date(), kind: 'divider', who: -1, text: 'Round 2 · seats renumbered' });
+    const trimmed = this.trimmed || histMode === 'Trimmed';
+    const histRows = rawJour.slice(-70).map(e => {
+      const mine = e.who === 0, hh = e.ts.getHours(), mm = e.ts.getMinutes();
+      return {
+        seq: e.seq, text: e.text, divider: e.kind === 'divider', row: e.kind !== 'divider',
+        rule: mine ? '3px solid var(--color-accent)' : '3px solid transparent',
+        bg: mine ? 'var(--color-accent-100)' : 'transparent',
+        initial: e.who <= 0 ? 'M' : this.SEATS[e.who - 1].initial,
+        dot: e.who <= 0 ? '#e0a020' : this.SEATS[e.who - 1].color,
+        time: (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm
+      };
+    });
     return {
       stageW: L.W, stageH: L.H, stageScale: L.scale.toFixed(3),
-      ringL: L.ringL, ringT: L.ringT, glowL: L.glowL, glowR: L.glowR,
+      tblL: L.tblL, tblT: L.tblT, tblW: L.tblW, tblH: L.tblH,
+      ringL: L.ringL, ringT: L.ringT, ringW: L.ringW, ringH: L.ringH,
+      ringRx: (L.ringW - 3) / 2, ringRy: (L.ringH - 3) / 2, ringCx: L.ringW / 2, ringCy: L.ringH / 2,
+      glowL: L.glowL, glowR: L.glowR,
       seatScale: L.seatScale, pileX: L.pileX, pileY: L.pileY, discX: L.discX, discY: L.discY,
       pendTop: L.pendTop, toastTop: L.toastTop, pickTop: L.pickTop, chipX: L.chipX, chipY: L.chipY,
-      youL: L.youL, youB: L.youB, unoL: L.unoL, unoB: L.unoB, endR: L.endR, endB: L.endB,
+      meL: L.cx - Math.round(L.meW / 2), meW: L.meW, meB: drum ? L.meBDrum : L.meB,
+      unoL: L.unoL, unoB: drum ? L.meBDrum + 74 : L.unoB, endR: L.endR, endB: drum ? L.meBDrum : L.endB,
       bigFs: L.bigFs, ngR: L.ngR, ngT: L.ngT,
+      drumOn: drum, fanOn: !drum,
+      railY: L.railY, domeL: L.domeL, domeT: L.domeT, hubL: L.hubL, hubT: L.hubT,
+      // Large mode: no small type anywhere, bigger icons, bigger ranks.
+      big,
+      meNameFs: big ? 21 : 14, meStatusFs: big ? 16 : 11.5,
+      meAvD: big ? 60 : 46, meAvIn: big ? 50 : 38, meAvFs: big ? 24 : 17,
+      badgeD: big ? 44 : 30, ovalW: big ? 74 : 62, ovalH: big ? 106 : 92,
+      gsz: big ? 26 : 18, dotCols: big ? '10px 10px' : '7px 7px',
+      dotD: big ? 10 : 7, dotGap: big ? 3.5 : 2.5,
+      miniFs: big ? 20 : 14, mgsz: big ? 18 : 13,
+      mdotD: big ? 7 : 5, mdotCols: big ? '7px 7px' : '5px 5px', mdotGap: big ? 2.5 : 2,
+      pileFs: big ? 17 : 12, toastFs: big ? 18 : 13.5, pendFs: big ? 20 : 15,
+      chipFs: big ? 16 : 12, chipDot: big ? 15 : 11,
+      histFs: big ? 17 : 13, histTimeFs: big ? 14 : 11, histWho: big ? 28 : 22,
+      hubSpin: 'rotate(' + (st.drumPos * 26).toFixed(1) + 'deg)',
+      hubInk: you ? 'var(--color-accent)' : 'var(--color-neutral-400)',
+      arrowT: L.hubT + 16, arrowLL: L.hubL - 58, arrowRL: L.hubL + 96,
+      drumDown: e => this.drumDown(e), drumMove: e => this.drumMove(e), drumUp: () => this.drumUp(),
+      stepPrev: () => this.moveCursor(-1), stepNext: () => this.moveCursor(1),
+      cursorLabel: (fidx + 1) + ' / ' + Math.max(1, n),
+      cxPx: L.cx, shWR: L.shW || 0,
+      histSide: L.histSide, histBottom: !L.histSide, histT: L.histT, histOpen: st.histOpen,
+      histCount: this.jour.length, histTrimmed: trimmed, histEmpty: !histRows.length,
+      histRows: histRows.slice().reverse(),
+      // Mounted outside the transform-scaled stage, so it lives in real pixels.
+      hsT: L.histSide ? 0 : Math.round(st.vh * 0.38),
+      hsLeft: L.histSide ? Math.max(0, st.vw - 372) : 0,
+      hsRad: L.histSide ? '26px 0 0 26px' : '26px 26px 0 0',
+      hsAnim: L.histSide ? 'ob-sheetin .28s cubic-bezier(.2,.7,.3,1) both' : 'ob-sheetup .28s cubic-bezier(.2,.7,.3,1) both',
+      toggleHist: () => this.setState(s => ({ histOpen: !s.histOpen })),
+      closeHist: () => this.setState({ histOpen: false }),
       feltBg: felt,
       ringDir: st.dir === 1 ? 'normal' : 'reverse',
       hasTint: !!st.calledColor,
-      tintCircles: st.calledColor ? [3, 2, 1, 0].map(i => { const dm = DIAM[i]; return ({
-        d: dm, bg: C[st.calledColor], op: OPS[i],
-        left: Math.round(L.tintX + offs[i].dx - dm / 2),
-        top: Math.round(L.tintY + offs[i].dy - dm / 2),
-        anim: st.tintLeaving ? 'ob-tintout .55s cubic-bezier(.5,0,.75,.6) ' + (i * 0.05).toFixed(2) + 's both' : 'ob-tint 1.05s cubic-bezier(.25,.7,.3,1) ' + (i * 0.09).toFixed(2) + 's both'
-      }); }) : [],
+      // The called colour floods the felt as one soft gradient clipped to the
+      // table, instead of four hard circles spilling onto the ground.
+      tintGrad: st.calledColor
+        ? 'radial-gradient(circle at 50% 44%, rgba(' + RGB[st.calledColor] + ',.60) 0%, rgba(' + RGB[st.calledColor] + ',.34) 36%, rgba(' + RGB[st.calledColor] + ',.12) 62%, rgba(' + RGB[st.calledColor] + ',0) 82%)'
+        : 'none',
+      tintAnim: st.tintLeaving
+        ? 'ob-tintout .55s cubic-bezier(.5,0,.75,.6) both'
+        : 'ob-tint 1.05s cubic-bezier(.25,.7,.3,1) both',
+      feltL: L.feltL, feltT: L.feltT, feltD: L.feltD, rimW: L.rimW, pileHintT: L.pileHintT,
       stageAnim: st.shaking ? 'ob-quake .65s ease-in-out' : 'none',
       callLabel: this.props.callLabel ?? 'UNO!',
       flyT: flySec.toFixed(2) + 's',
       handTrans: st.noTrans ? 'none' : 'transform ' + flySec.toFixed(2) + 's cubic-bezier(.34,1.45,.64,1)',
       yourTurn: you,
+      // In the drum the accent hub already says "your turn"; two badges is one too many.
+      turnTab: you && !drum,
       handView, seats,
       disc: Object.assign(this.faceOf(d), {
         rot: (d.v.charCodeAt(0) % 9) - 4,
@@ -778,14 +1170,18 @@ class Component extends DCLogic {
       pileCount: st.pileCount,
       pileCursor: you && !st.busy && (st.pending ? true : (!st.drew && !st.chain)) ? 'pointer' : 'default',
       pileHintColor: you && (st.pending || (!st.drew && !st.chain)) ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
-      ringBg: you ? 'conic-gradient(var(--color-accent) 72%, var(--color-neutral-200) 0)' : 'var(--color-neutral-200)',
+      // The dial exists only when there is something real to count: the catch
+      // window, on the same 2s clock as the call button's drain bar.
+      ringOn: st.unoWindow,
       pillBorder: you ? 'var(--color-accent)' : 'transparent',
+      pillBg: you ? 'var(--color-accent-100)' : '#fdf8ef',
+      pillHalo: you ? '0 0 0 9px rgba(198,113,57,.15), var(--shadow-md)' : 'var(--shadow-md)',
       shuffling: st.shuffling,
       toastOn: !!st.toast, toastText: st.toast,
       unoWindow: st.unoWindow,
       unoLive: you && n <= 2 && n > 0 && !st.called,
       canEnd: you && !st.busy && (st.drew || !!st.chain),
-      statusText: you ? (st.pending ? 'Stack a ' + st.pending.v + ' or take +' + st.pending.n : (st.chain ? 'Play another ' + st.chain.v + ' or end turn' : (st.drew ? 'Play a card or end your turn' : 'Your turn · ' + playableCount + ' playable'))) : (youSpec ? 'Watching · finished ' + myRank : (st.over ? 'Round over' : 'Waiting…')),
+      statusText: (you ? (st.pending ? 'Stack a ' + st.pending.v + ' or take +' + st.pending.n : (st.chain ? 'Play another ' + st.chain.v + ' or end turn' : (st.drew ? 'Play a card or end your turn' : 'Your turn · ' + playableCount + ' playable'))) : (youSpec ? 'Watching · finished ' + myRank : (st.over ? 'Round over' : 'Waiting…'))) + (drum && n ? ' · ' + (fidx + 1) + '/' + n : ''),
       statusColor: you ? 'var(--color-accent-700)' : 'var(--color-neutral-500)',
       isSpec: youSpec && !st.over,
       specFlag: 'WATCHING · ' + myRank.toUpperCase(),
@@ -803,7 +1199,7 @@ class Component extends DCLogic {
       })),
       endTurn: () => this.endTurn(),
       drawClick: () => this.draw(),
-      callUno: () => { this.setState({ called: true, unoWindow: false }); this.showToast((this.props.callLabel ?? 'UNO!') + ' called'); },
+      callUno: () => { this.setState({ called: true, unoWindow: false }); this.showToast((this.props.callLabel ?? 'UNO!') + ' called'); this.log('call', 0, 'You called ' + (this.props.callLabel ?? 'UNO!')); },
       restart: () => this.restart()
     };
   }

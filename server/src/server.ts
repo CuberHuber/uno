@@ -17,7 +17,9 @@ import { registerGameMetrics } from './metrics.js';
 import { registerGaRelay } from './ga-relay.js';
 import { createUmamiSender } from './umami.js';
 
-export interface ServerLimits { create: RateLimiter; join: RateLimiter; pin: RateLimiter; action: RateLimiter }
+export interface ServerLimits {
+  create: RateLimiter; join: RateLimiter; pin: RateLimiter; action: RateLimiter; history: RateLimiter;
+}
 export const defaultLimits = (): ServerLimits => ({
   create: new RateLimiter(10, 60_000),
   join: new RateLimiter(20, 60_000),
@@ -27,6 +29,15 @@ export const defaultLimits = (): ServerLimits => ({
   // single thread the server has. A full local round costs about twenty frames
   // a seat, so this window is six times the busiest legal play.
   action: new RateLimiter(120, 10_000),
+  // Reading the journal is not acting on it, and it must not be paid for out of
+  // the same purse: an open move list refreshes itself on every accepted
+  // transaction, so sharing the action budget let a reader rate-limit their own
+  // moves. It is also far the most expensive thing a seated socket can ask for
+  // — the whole journal, up to MAX_TRANSACTIONS entries, for a request of a few
+  // bytes — so it gets a much smaller one of its own. Comfortably above what a
+  // busy four-player table makes an open panel fetch, nowhere near what the
+  // move budget would have allowed.
+  history: new RateLimiter(30, 10_000),
 });
 
 export interface BuildOptions {
@@ -194,6 +205,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     ? {
         create: new RateLimiter(1e9, 60_000), join: new RateLimiter(1e9, 60_000),
         pin: new RateLimiter(1e9, 60_000), action: new RateLimiter(1e9, 10_000),
+        history: new RateLimiter(1e9, 10_000),
       }
     : defaultLimits();
   const { app, io, store, analytics } = await buildServer(undefined, limits, { logger });

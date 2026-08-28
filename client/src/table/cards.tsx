@@ -17,6 +17,8 @@ export interface Face {
   v: string; bg: string;
   isText: boolean; isSkip: boolean; isRev: boolean; isWild: boolean;
   num: string; fs: number;
+  /** Rank size inside the corner badge — the one place a fanned card still shows. */
+  cfs: number;
 }
 
 export const faceOf = (c: Card): Face => {
@@ -27,6 +29,7 @@ export const faceOf = (c: Card): Face => {
     v, bg: SUIT[suit]!, isText: !isSkip && !isRev && !isWild, isSkip, isRev, isWild,
     num: suit === 'wild' ? '#4d4335' : SUIT[suit]!,
     fs: v.length > 1 ? 34 : 42,
+    cfs: v.length > 1 ? 15 : 21,
   };
 };
 
@@ -54,11 +57,25 @@ const WildDots = ({ dot, gap }: { dot: number; gap: number }) => (
   </span>
 );
 
-const corner = (side: 'tl' | 'br', child: ReactNode, pad: [number, number]) => (
+/** The small rotated index in the bottom-right, as it always was. */
+const corner = (child: ReactNode, pad: [number, number]) => (
   <span style={{
-    position: 'absolute',
-    ...(side === 'tl' ? { top: pad[0], left: pad[1] } : { bottom: pad[0], right: pad[1], transform: 'rotate(180deg)' }),
+    position: 'absolute', bottom: pad[0], right: pad[1], transform: 'rotate(180deg)',
     fontFamily: 'var(--font-heading)', fontSize: 14, color: CREAM, display: 'grid',
+  }}>{child}</span>
+);
+
+/** The top-left badge: a cream disc carrying the rank in the suit's own colour.
+ *
+ *  This corner is the only region inside both the fanned hand's left-edge sliver
+ *  and a card's visible top band, so it is the one place a rank can be read when
+ *  the hand is deep. It replaces a 14px cream index that vanished against the
+ *  card at anything past ten cards. */
+const badge = (child: ReactNode) => (
+  <span style={{
+    position: 'absolute', top: 3, left: 3, width: 30, height: 30, borderRadius: '50%',
+    background: CREAM, boxShadow: '0 1px 3px rgba(42,38,33,.28)',
+    display: 'grid', placeItems: 'center', zIndex: 2,
   }}>{child}</span>
 );
 
@@ -73,14 +90,18 @@ export function CardFront({ face, rim = INK }: { face: Face; rim?: string }) {
         width: '100%', height: '100%', boxSizing: 'border-box', borderRadius: 10,
         border: `2.5px solid ${rim}`, display: 'grid', placeItems: 'center', position: 'relative',
       }}>
-        {face.isText && corner('tl', face.v, [2, 7])}
-        {face.isText && corner('br', face.v, [2, 7])}
-        {face.isSkip && corner('tl', <SkipSvg size={13} width={3.4} />, [4, 7])}
-        {face.isSkip && corner('br', <SkipSvg size={13} width={3.4} />, [4, 7])}
-        {face.isRev && corner('tl', <RevSvg size={13} width={3.4} />, [4, 7])}
-        {face.isRev && corner('br', <RevSvg size={13} width={3.4} />, [4, 7])}
-        {face.isWild && corner('tl', <WildDots dot={5} gap={2} />, [5, 7])}
-        {face.isWild && corner('br', <WildDots dot={5} gap={2} />, [5, 7])}
+        {badge(
+          face.isWild ? <WildDots dot={7} gap={2.5} />
+            : face.isSkip ? <span style={{ color: face.num, display: 'grid' }}><SkipSvg size={18} width={3.2} /></span>
+              : face.isRev ? <span style={{ color: face.num, display: 'grid' }}><RevSvg size={18} width={3.2} /></span>
+                : <span style={{
+                    fontFamily: 'var(--font-heading)', fontSize: face.cfs, lineHeight: 1, color: face.num,
+                  }}>{face.v}</span>,
+        )}
+        {face.isText && corner(face.v, [2, 7])}
+        {face.isSkip && corner(<SkipSvg size={13} width={3.4} />, [4, 7])}
+        {face.isRev && corner(<RevSvg size={13} width={3.4} />, [4, 7])}
+        {face.isWild && corner(<WildDots dot={5} gap={2} />, [5, 7])}
         <div style={{
           width: 62, height: 92, borderRadius: '50%', background: CREAM,
           transform: 'rotate(-16deg)', display: 'grid', placeItems: 'center',

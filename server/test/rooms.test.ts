@@ -63,7 +63,6 @@ describe('starting and playing', () => {
     // hand the winner a single matching card to finish immediately
     const top = g.discard.at(-1)!;
     g.players[g.turn]!.hand = [{ id: 9999, color: top.color ?? 'red', value: top.value }];
-    if (g.mustChooseColor) { g.mustChooseColor = false; g.currentColor = 'red'; g.players[g.turn]!.hand = [{ id: 9999, color: 'red', value: '5' }]; }
     const turnSeat = g.turn;
     const token = turnSeat === 0 ? a.token : (store.getRoom(room.code)!.players[turnSeat]!.token);
     const r = store.act(room.code, token, { type: 'play', cardIds: [9999] } as never);
@@ -92,7 +91,7 @@ describe('house rules', () => {
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
     expect(store.viewFor(room.code, 0).rules).toEqual(CLASSIC_RULES);
-    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
+    expect(store.setRules(room.code, a.token, { ...CLASSIC_RULES, stacking: true, forcePlay: true }).ok).toBe(true);
     expect(store.viewFor(room.code, 1).rules).toEqual({ ...CLASSIC_RULES, stacking: true, forcePlay: true });
   });
 
@@ -102,7 +101,7 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.setRules(room.code, b.token, { stacking: true, forcePlay: false }).ok).toBe(false);
+    expect(store.setRules(room.code, b.token, { ...CLASSIC_RULES, stacking: true, forcePlay: false }).ok).toBe(false);
     expect(store.viewFor(room.code, 0).rules.stacking).toBe(false);
   });
 
@@ -112,10 +111,10 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: true }).ok).toBe(true);
+    expect(store.setRules(room.code, a.token, { ...CLASSIC_RULES, stacking: true, forcePlay: true }).ok).toBe(true);
     expect(store.startGame(room.code, a.token).ok).toBe(true);
     expect(store.getRoom(room.code)!.game!.rules).toEqual({ ...CLASSIC_RULES, stacking: true, forcePlay: true });
-    expect(store.setRules(room.code, a.token, { stacking: false, forcePlay: false }).ok).toBe(false);
+    expect(store.setRules(room.code, a.token, { ...CLASSIC_RULES, stacking: false, forcePlay: false }).ok).toBe(false);
     expect(store.viewFor(room.code, 1).rules.stacking).toBe(true);
   });
 
@@ -125,7 +124,7 @@ describe('house rules', () => {
     const a = store.join(room.code, 'Mira');
     const b = store.join(room.code, 'Jonas');
     if (!a.ok || !b.ok) throw new Error('join failed');
-    expect(store.setRules(room.code, a.token, { stacking: true, forcePlay: false }).ok).toBe(true);
+    expect(store.setRules(room.code, a.token, { ...CLASSIC_RULES, stacking: true, forcePlay: false }).ok).toBe(true);
     expect(store.startGame(room.code, a.token).ok).toBe(true);
     store.getRoom(room.code)!.phase = 'roundEnd';
     expect(store.rematch(room.code, a.token).ok).toBe(true);
@@ -242,7 +241,7 @@ function seatRoom(store: RoomStore, names: string[], seed = 42) {
 function forceWin(store: RoomStore, code: string): number {
   const g = store.getRoom(code)!.game!;
   g.pendingDraw = 0; g.pendingDrawKind = null; g.pendingDrawn = null; g.catchWindow = null;
-  g.mustChooseColor = false; g.currentColor = 'red';
+  g.currentColor = 'red';
   g.players[g.turn]!.hand = [{ id: 9999, color: 'red', value: '5' }];
   const seat = g.turn;
   const r = store.act(code, store.getRoom(code)!.players[seat]!.token, { type: 'play', cardIds: [9999] } as never);

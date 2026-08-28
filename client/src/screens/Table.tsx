@@ -2,21 +2,27 @@
 // design/Ochre Eights - Full Game Flexible.dc.html onto the real protocol.
 // The server stays authoritative; effects and view diffs drive the choreography.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { isPlayable, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
+import { isNumberCard, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
 import { track } from '../analytics';
 import HelpSheet from '../components/HelpSheet';
+import MovesSheet from '../components/MovesSheet';
 import PauseOverlay from '../components/PauseOverlay';
+import SoundSettings from '../components/SoundSettings';
 import { cue } from '../sound';
 import RulesSlide, { hasSeenSlide, markSlideSeen } from './RulesSlide';
 import { useT, type MsgKey } from '../i18n';
 import { useStore } from '../store';
 import { initialOf, roundsPlayed, ruleChips, seatColor } from '../ui';
 import { CardFront, faceOf, PileBack, SUIT, type Face } from '../table/cards';
-import { seatSlots, stageLayout } from '../table/layout';
+import { stageLayout } from '../table/layout';
 
 const FLY_MS = 620;
 const DRAW_MS = 460;
-const isNumberCard = (c: Card) => /^\d$/.test(c.value);
+/** Start-to-start of consecutive beats, from the redesign's timing contract. One
+ *  beat is the 620ms flight; the next starts 480ms in, so the 140ms of overlap
+ *  falls inside the previous beat's rest. A spectator never sees two things move
+ *  at once, and a three-action turn still does not read as three separate turns. */
+const STRIDE_MS = 480;
 
 interface FlyClone { id: number; card: Card; from: string; delay: number; heavy: boolean }
 interface OppAnim { key: number; kind: 'fly' | 'draw'; slot: number; card: Card | null }
@@ -47,7 +53,7 @@ function Flight({ from, to, ms, delay = 0, z, ease, anim, onDone, children }: {
 }
 
 export default function Table() {
-  const { view, actions, rejection, effect } = useStore();
+  const { view, actions, rejection, effects, consumeEffect } = useStore();
   const { t, tn, terr, locale } = useT();
 
   // Viewport → stage geometry (fixed design space, scaled).
@@ -57,7 +63,10 @@ export default function Table() {
     window.addEventListener('resize', onR);
     return () => window.removeEventListener('resize', onR);
   }, []);
-  const L = stageLayout(vp.w, vp.h);
+  // The seat ring's angles depend on how many opponents there are, so the count
+  // has to reach the layout. `seats` includes you.
+  const [movesOpen, setMovesOpen] = useState(false);
+  const L = stageLayout(vp.w, vp.h, (view?.seats.length ?? 4) - 1, movesOpen);
 
   const viewRef = useRef<RoomStateView | null>(view);
   viewRef.current = view;
@@ -117,17 +126,28 @@ export default function Table() {
     () => (view?.seats ?? []).filter((s) => s.seat !== yourSeat),
     [view?.seats, yourSeat],
   );
-  const slots = seatSlots(opponents.length);
+  // One anchor per opponent now, in seating order — the arc already accounts for
+  // how many there are, so there is no fixed slot table to index through.
   const slotOfSeat = (seat: number): number => {
     const k = opponents.findIndex((s) => s.seat === seat);
-    return k === -1 ? 1 : (slots[k] ?? 1);
+    return k === -1 ? 0 : k;
   };
 
   // ── Effects → choreography ────────────────────────────────────────────────
-  const processed = useRef<Effect | null>(effect);
+  //
+  // One at a time, oldest first. The head is animated, then dropped a stride
+  // later, which promotes the next one — so a burst that arrives in a single
+  // network flush is played out as a sequence instead of collapsing into its
+  // last member. Everything below reads `head.e` and is otherwise unchanged.
+  const head = effects[0] ?? null;
+  const effect = head?.e ?? null;
   useEffect(() => {
-    if (!effect || effect === processed.current) return;
-    processed.current = effect;
+    if (!head) return;
+    const done = setTimeout(() => consumeEffect(head.seq), STRIDE_MS);
+    return () => clearTimeout(done);
+  }, [head?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!effect) return;
     const v = viewRef.current;
     if (!v) return;
     const nameOf = (seat: number) => (seat === v.yourSeat ? t('t.you') : v.seats.find((s) => s.seat === seat)?.name ?? 'Player');
@@ -205,10 +225,23 @@ export default function Table() {
     } else if (effect.type === 'caught') {
       showToast(t('t.caught', { name: nameOf(effect.seat) }));
       buzz(100); cue('caught');
-    } else if (effect.type === 'win') {
-      cue('win');
     }
-  }, [effect]); // eslint-disable-line react-hooks/exhaustive-deps
+    // 'win' is deliberately absent: the same packet that carries it flips the phase
+    // to roundEnd, and React batches the two, so this component can be gone before
+    // the effect runs. The cue is fired from the store, where nothing unmounts.
+  }, [head?.seq]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The deal, heard by everyone at the table. It used to be the host's lobby button,
+  // so every guest — who never pressed it — was dealt into silence. Once per round,
+  // and only while no card has moved yet, so a mid-game reconnect stays quiet.
+  const dealt = useRef(false);
+  useEffect(() => {
+    const n = view?.hand.length ?? 0;
+    if (dealt.current || !n || !view) return;
+    if (view.seats.some((s) => s.cardCount !== n)) return;
+    dealt.current = true;
+    cue('deal');
+  }, [view?.hand.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rejected move: cards snap back, culprit shakes, reason toasts.
   useEffect(() => {
@@ -262,7 +295,7 @@ export default function Table() {
     const v = view;
     if (!v?.topCard) return;
     const wild = v.topCard.value === 'wild' || v.topCard.value === 'wild4';
-    const target = wild && v.currentColor && !v.mustChooseColor ? v.currentColor : null;
+    const target = wild && v.currentColor ? v.currentColor : null;
     const mkOffs = () => [0, 1, 2, 3].map((i) => ({
       dx: (Math.random() - 0.5) * (30 + i * 45),
       dy: (Math.random() - 0.5) * (24 + i * 36),
@@ -281,7 +314,7 @@ export default function Table() {
       const t = setTimeout(() => setTint(null), 620);
       return () => clearTimeout(t);
     }
-  }, [view?.topCard?.id, view?.currentColor, view?.mustChooseColor]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view?.topCard?.id, view?.currentColor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Selection dies with the turn or a hand change.
   useEffect(() => { setPicked([]); }, [view?.turnSeat, view?.hand.length]);
@@ -322,20 +355,33 @@ export default function Table() {
   const topIsWild = view.topCard.value === 'wild' || view.topCard.value === 'wild4';
   const calledHex = view.currentColor ? SUIT[view.currentColor]! : '#2a2621';
 
+  // Two rows from eleven cards — exactly where a single arc's total spread locks
+  // and every further card starts subdividing the same wedge. Below eleven the
+  // geometry is the old one, unchanged.
+  //
+  // The rows separate by pushing the FRONT row down rather than lifting the back
+  // row up, so the hand's top edge is the single-row arc at every card count —
+  // which is what keeps the table's bottom fifth the most the hand ever covers.
   const fanPos = (i: number, n: number) => {
-    const spread = n > 1 ? Math.min(6.5, L.spreadTot / (n - 1)) : 0;
-    const a0 = (i - (n - 1) / 2) * spread;
+    const rows = n >= 11 ? 2 : 1;
+    const backN = rows === 2 ? Math.ceil(n / 2) : n;
+    const row = rows === 2 && i >= backN ? 1 : 0;
+    const rn = row === 0 ? backN : n - backN;
+    const ri = row === 0 ? i : i - backN;
+    const spread = rn > 1 ? Math.min(6.5, L.spreadTot / (rn - 1)) : 0;
+    const a0 = (ri - (rn - 1) / 2) * spread;
     const rad = (a0 * Math.PI) / 180;
-    return { x: L.cx + Math.sin(rad) * L.R - 52, y: L.anchorY - Math.cos(rad) * L.R - 78, a: a0 };
+    return {
+      x: L.cx + Math.sin(rad) * L.R - 52 + (row === 0 ? -L.rowShift : L.rowShift),
+      y: L.anchorY - Math.cos(rad) * L.R - 78 + (row === 1 ? L.rowGap : 0),
+      a: a0, row,
+    };
   };
   const discTf = (id: number) => `translate(${L.discX}px, ${L.discY}px) rotate(${(id % 11) - 5}deg)`;
 
-  const canPlay = (c: Card) =>
-    yourTurn && !view.mustChooseColor && leaving.length === 0 &&
-    (view.pendingDrawnCardId === null || view.pendingDrawnCardId === c.id) &&
-    (view.pendingDraw > 0
-      ? c.value === view.pendingDrawKind
-      : isPlayable(c, view.topCard!, view.currentColor));
+  // Playability is the round's answer, not ours: the view carries the ids. The
+  // only thing left here is the local one — a card mid-flight is not clickable.
+  const canPlay = (c: Card) => leaving.length === 0 && view.legal.includes(c.id);
 
   const firstPicked = picked.length ? hand.find((h) => h.id === picked[0]) : undefined;
   const stackAddable = (c: Card) =>
@@ -367,7 +413,7 @@ export default function Table() {
   };
 
   const onCardClick = (c: Card) => {
-    if (!yourTurn || view.mustChooseColor || leaving.length > 0) return;
+    if (!yourTurn || leaving.length > 0) return;
     if (picked.includes(c.id)) { setPicked((p) => p.filter((id) => id !== c.id)); return; }
     if (picked.length > 0 && stackAddable(c)) { setPicked((p) => [...p, c.id]); return; }
     if (!canPlay(c)) { shake(c.id); return; }
@@ -383,7 +429,7 @@ export default function Table() {
     playNow([c.id]);
   };
 
-  const canDraw = yourTurn && !view.mustChooseColor && view.pendingDrawnCardId === null && leaving.length === 0;
+  const canDraw = yourTurn && view.pendingDrawnCardId === null && leaving.length === 0;
   const canPass = yourTurn && view.pendingDrawnCardId !== null && !view.rules.forcePlay && picked.length === 0;
   const canCall = !!you && !you.calledLastCard && hand.length > 0 &&
     ((yourTurn && hand.length <= 2) || view.catchableSeat === view.yourSeat);
@@ -397,27 +443,31 @@ export default function Table() {
   for (const c of live) if (canPlay(c)) playableCount++;
 
   const turnName = view.seats.find((s) => s.seat === view.turnSeat)?.name;
-  const statusText = view.mustChooseColor
-    ? t('table.flipWild')
-    : yourTurn
-      ? view.pendingDraw > 0
-        ? t('st.answer', { n: view.pendingDraw })
-        : view.pendingDrawnCardId !== null
-          ? t('st.drawn')
-          : picked.length > 0
-            ? t('st.throwing', { n: picked.length })
-            : t('st.turn', { n: playableCount })
-      : t('st.waiting', { name: turnName ?? '…' });
+  const statusText = yourTurn
+    ? view.pendingDraw > 0
+      ? t('st.answer', { n: view.pendingDraw })
+      : view.pendingDrawnCardId !== null
+        ? t('st.drawn')
+        : picked.length > 0
+          ? t('st.throwing', { n: picked.length })
+          : t('st.turn', { n: playableCount })
+    : t('st.waiting', { name: turnName ?? '…' });
 
-  const pickerOpen = view.mustChooseColor || wildIds !== null || (forcedWildId !== null && wildIds === null);
+  const pickerOpen = wildIds !== null || (forcedWildId !== null && wildIds === null);
   const onPickColor = (c: Color) => {
-    if (view.mustChooseColor) { actions.chooseColor(c); return; }
     if (wildIds) { playNow(wildIds, c); return; }
     if (forcedWildId !== null) playNow([forcedWildId], c);
   };
 
   const oppAnim = oppQueue[0] ?? null;
-  const oppAnimSeat = oppAnim ? L.seats[oppAnim.slot === -1 ? 1 : oppAnim.slot]! : null;
+  // The seats ring is only as long as there are opponents, so index 1 is a real
+  // anchor from three players up. A force-played flight (slot -1) flies from the
+  // pile and never reads this, but the render guard below still asks for it — and
+  // an undefined anchor there would drop the one `onDone` that shifts the queue,
+  // wedging every later animation for the rest of the round.
+  const oppAnimSeat = oppAnim
+    ? (L.seats[oppAnim.slot === -1 ? 1 : oppAnim.slot] ?? L.seats[0] ?? null)
+    : null;
 
   return (
     <main className="stage-wrap">
@@ -425,17 +475,42 @@ export default function Table() {
         width: L.W, height: L.H,
         transform: `translate(-50%, -50%) scale(${L.scale.toFixed(3)})`,
         ['--stage-k' as never]: L.scale.toFixed(3),
-        background: 'var(--felt)',
+        background: 'var(--color-bg)',
         animation: quaking ? 'ob-quake .65s ease-in-out' : 'none',
       }}>
-        {/* direction ring */}
+        {/* The table itself. It used to be the stage's background colour; the
+            sketch draws a real piece of furniture, so the felt is now a rimmed
+            disc sitting on the ground and the seats sit around it. */}
         <div style={{
-          position: 'absolute', left: L.ringL, top: L.ringT, width: 350, height: 350,
-          borderRadius: '50%', border: '3px dashed rgba(42,38,33,.16)',
-          animation: 'ob-spin 26s linear infinite',
-          animationDirection: view.direction === 1 ? 'normal' : 'reverse',
-          pointerEvents: 'none', zIndex: 1,
-        }} />
+          position: 'absolute', left: L.tblL, top: L.tblT, width: L.tblW, height: L.tblH,
+          borderRadius: '50%', padding: L.rimW, boxSizing: 'border-box',
+          background: 'linear-gradient(96deg, var(--color-accent-900) 0%, var(--color-accent-800) 24%, '
+            + 'var(--color-accent-900) 49%, var(--color-accent-800) 74%, var(--color-accent-900) 100%)',
+          boxShadow: '0 24px 54px rgba(46,43,37,.26), inset 0 0 0 2px rgba(42,38,33,.30), '
+            + 'inset 0 2px 0 rgba(247,237,220,.10)',
+          zIndex: 0, pointerEvents: 'none',
+          transition: 'left .35s cubic-bezier(.2,.7,.3,1), top .35s cubic-bezier(.2,.7,.3,1),'
+            + ' width .35s cubic-bezier(.2,.7,.3,1), height .35s cubic-bezier(.2,.7,.3,1)',
+        }}>
+          <div style={{
+            width: '100%', height: '100%', borderRadius: '50%', background: 'var(--felt)',
+            boxShadow: 'inset 0 0 0 3px rgba(42,38,33,.10), inset 0 8px 22px rgba(42,38,33,.16)',
+          }} />
+        </div>
+
+        {/* Direction ring — absorbed into the rim. It no longer spins as a shape:
+            the dashes march instead, so the rim and the direction are one object. */}
+        <svg className="ob-march-ring" width={L.ringW} height={L.ringH}
+          viewBox={`0 0 ${L.ringW} ${L.ringH}`}
+          style={{
+            position: 'absolute', left: L.ringL, top: L.ringT, zIndex: 1, pointerEvents: 'none',
+            animation: 'ob-dashmarch 3.2s linear infinite',
+            animationDirection: view.direction === 1 ? 'normal' : 'reverse',
+            transition: 'left .35s cubic-bezier(.2,.7,.3,1), top .35s cubic-bezier(.2,.7,.3,1)',
+          }}>
+          <ellipse cx={L.ringW / 2} cy={L.ringH / 2} rx={L.ringW / 2 - 2} ry={L.ringH / 2 - 2}
+            fill="none" stroke="rgba(42,38,33,.22)" strokeWidth="3" strokeDasharray="13 13" />
+        </svg>
 
         {/* called-colour tint splash (pops in, folds away on colour change) */}
         {tint && (
@@ -469,7 +544,10 @@ export default function Table() {
 
         {/* opponent seats */}
         {opponents.map((s, k) => {
-          const slot = L.seats[slots[k]!]!;
+          const slot = L.seats[k] ?? L.seats[0]!;
+          // The avatar always faces the middle of the table, so a seat left of
+          // centre wears its pill the other way round.
+          const mir = slot.ang < -6;
           const active = view.turnSeat === s.seat;
           const m = Math.min(s.cardCount, 9);
           return (
@@ -477,8 +555,13 @@ export default function Table() {
               position: 'absolute', left: slot.x, top: slot.y, width: 220,
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
               zIndex: 8, transform: `scale(${L.seatScale})`, transformOrigin: 'top center',
+              transition: 'left .35s cubic-bezier(.2,.7,.3,1), top .35s cubic-bezier(.2,.7,.3,1)',
             }}>
-              <div style={{ position: 'relative', width: 200, height: 78 }}>
+              {/* Held cards angle away from the middle, like a real hand at that seat. */}
+              <div style={{
+                position: 'relative', width: 200, height: 78,
+                transform: `rotate(${(slot.ang * 0.15).toFixed(1)}deg)`, transformOrigin: '50% 118%',
+              }}>
                 {Array.from({ length: m }, (_, j) => {
                   const off = j - (m - 1) / 2;
                   return (
@@ -500,10 +583,17 @@ export default function Table() {
                   }}>{t('table.uno')}</span>
                 )}
               </div>
-              {active && <span className="march-badge" style={{ margin: '0 0 -6px', position: 'relative', zIndex: 2 }}>{t('table.playing')}</span>}
+              {active && (
+                <span className="march-badge" style={{
+                  margin: mir ? '0 -70px -6px 0' : '0 0 -6px -70px', position: 'relative', zIndex: 2,
+                  borderRadius: mir ? '999px 999px 4px 999px' : '999px 999px 999px 4px',
+                }}>{t('table.playing')}</span>
+              )}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10, background: '#fdf8ef',
-                borderRadius: 999, padding: '5px 16px 5px 5px', boxShadow: 'var(--shadow-md)',
+                flexDirection: mir ? 'row-reverse' : 'row',
+                borderRadius: 999, padding: mir ? '5px 5px 5px 16px' : '5px 16px 5px 5px',
+                boxShadow: 'var(--shadow-md)',
                 border: `2px solid ${active ? 'var(--color-accent)' : 'transparent'}`, boxSizing: 'border-box',
               }}>
                 <div style={{
@@ -668,25 +758,44 @@ export default function Table() {
           </Flight>
         ))}
 
-        {/* you: badge + pill */}
+        {/* You: badge + pill. It used to sit in the bottom-left corner, nowhere
+            near your own cards; it now sits centred under the hand, at the bright
+            core of the your-turn glow, so marker and glow read as one idea. */}
         <div style={{
-          position: 'absolute', left: L.youL, bottom: L.youB,
-          display: 'flex', flexDirection: 'column', alignItems: 'flex-start', zIndex: 40,
+          position: 'absolute', left: L.cx - L.meW / 2, bottom: L.meB, width: L.meW,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          // Above the hand, not below it: the front row of a two-row fan reaches
+          // the stage floor, and at twenty cards it buried this pill entirely.
+          zIndex: 120,
+          transition: 'left .35s cubic-bezier(.2,.7,.3,1)',
         }}>
           {yourTurn && (
-            <span className="march-badge" style={{ fontSize: 12, padding: '5px 14px', margin: '0 0 -6px 14px', position: 'relative', zIndex: 2 }}>
+            <span className="march-badge" style={{ fontSize: 12, padding: '5px 14px', margin: '0 0 -6px', position: 'relative', zIndex: 2 }}>
               {t('table.yourTurn')}
             </span>
           )}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 11, background: '#fdf8ef',
-            borderRadius: 999, padding: '6px 18px 6px 6px', boxShadow: 'var(--shadow-md)',
+            display: 'flex', alignItems: 'center', gap: 11,
+            background: yourTurn ? 'var(--color-accent-100)' : '#fdf8ef',
+            borderRadius: 999, padding: '6px 18px 6px 6px',
+            boxShadow: yourTurn
+              ? 'var(--shadow-md), 0 0 0 9px rgba(198,113,57,.15)'
+              : 'var(--shadow-md)',
             border: `2px solid ${yourTurn ? 'var(--color-accent)' : 'transparent'}`, boxSizing: 'border-box',
           }}>
+            {/* The ring only exists while there is something to count. It used to
+                be a conic gradient frozen at 72% — a dial that never turned. */}
             <div style={{
               width: 46, height: 46, borderRadius: '50%', display: 'grid', placeItems: 'center',
-              background: yourTurn ? 'conic-gradient(var(--color-accent) 72%, var(--color-neutral-200) 0)' : 'var(--color-neutral-200)',
+              background: 'var(--color-neutral-200)', position: 'relative',
             }}>
+              {view.catchableSeat === view.yourSeat && (
+                <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden="true"
+                  style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
+                  <circle cx="23" cy="23" r="21" fill="none" stroke="var(--color-accent)" strokeWidth="4"
+                    strokeLinecap="round" strokeDasharray="132" className="ob-dial" />
+                </svg>
+              )}
               <div style={{
                 width: 38, height: 38, borderRadius: '50%', background: seatColor(view.yourSeat),
                 color: '#fdf8ef', display: 'grid', placeItems: 'center',
@@ -710,18 +819,20 @@ export default function Table() {
           const addable = stackAddable(c);
           const fresh = freshIds.has(c.id);
           let tf: string;
+          let row = 0;
           if (fresh) {
             tf = `translate(${L.pileX}px, ${L.pileY}px) rotate(0deg)`;
           } else {
-            let { x, y, a } = fanPos(i, live.length);
+            const pos = fanPos(i, live.length);
+            const { x } = pos;
+            let { y, a } = pos;
+            row = pos.row;
             let scale = '';
             if (p) y -= 9;
-            if (isPicked) { y -= 52; a *= 0.3; scale = ' scale(1.06)'; }
-            else if (hi >= 0) {
-              const dd = i - hi;
-              if (dd === 0) { y -= 52; a *= 0.3; scale = ' scale(1.06)'; }
-              else { const push = [0, 26, 14, 6][Math.min(Math.abs(dd), 3)]!; x += Math.sign(dd) * push; }
-            }
+            // No neighbour shove any more: past ten cards that push was wider
+            // than the gap between cards and the fan visibly buckled. Two rows
+            // make the gap instead, so nothing has to be shoved aside.
+            if (isPicked || (hi >= 0 && i === hi)) { y -= 52; a *= 0.3; scale = ' scale(1.06)'; }
             tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) rotate(${a.toFixed(2)}deg)${scale}`;
           }
           const hovered = hoverId === c.id && !fresh;
@@ -733,7 +844,9 @@ export default function Table() {
               style={{
                 position: 'absolute', left: 0, top: 0, width: 104, height: 156,
                 transform: tf, transition: `transform ${FLY_MS}ms cubic-bezier(.34,1.45,.64,1)`,
-                zIndex: hovered || isPicked ? 50 : 10 + i,
+                // The front row is nearer the player, so it draws over the back
+                // one; back cards show through the gaps between front cards.
+                zIndex: hovered || isPicked ? 200 : (row === 1 ? 90 : 10) + i,
                 cursor: yourTurn ? 'pointer' : 'default',
               }}>
               <div style={{
@@ -767,7 +880,7 @@ export default function Table() {
         {/* action buttons */}
         {picked.length > 0 ? (
           <div style={{ position: 'absolute', right: L.endR, bottom: L.endB, display: 'flex', gap: 10, zIndex: 45 }}>
-            <button type="button" className="btn ghost-pill" onClick={() => setPicked([])}>{t('table.clear')}</button>
+            <button type="button" className="btn ghost-pill" onClick={() => { cue('press'); setPicked([]); }}>{t('table.clear')}</button>
             <button type="button" className="btn end-btn" onClick={() => playNow(picked)}>
               {t('table.discardN', { n: picked.length })}
             </button>
@@ -775,7 +888,7 @@ export default function Table() {
         ) : canPass ? (
           <button type="button" className="btn end-btn"
             style={{ position: 'absolute', right: L.endR, bottom: L.endB, zIndex: 45 }}
-            onClick={actions.pass}>
+            onClick={() => { cue('press'); actions.pass(); }}>
             {t('table.endTurn')}
           </button>
         ) : null}
@@ -783,7 +896,7 @@ export default function Table() {
         {(canCatch || canCall) && (
           <button type="button" className="btn uno-btn"
             style={{ position: 'absolute', left: L.unoL, bottom: L.unoB, zIndex: 45 }}
-            onClick={canCatch ? actions.catchCall : actions.call}>
+            onClick={() => { cue('press'); if (canCatch) actions.catchCall(); else actions.call(); }}>
             {canCatch ? t('table.catch') : t('table.uno')}
             {view.catchableSeat === view.yourSeat && !canCatch && (
               <span style={{
@@ -808,15 +921,14 @@ export default function Table() {
             animation: 'ob-pop .45s cubic-bezier(.34,1.56,.64,1) both',
           }}>
             <span style={{ fontSize: 13, fontWeight: 700 }}>
-              {view.mustChooseColor
-                ? t('table.flipWild')
-                : forcedWildId !== null && wildIds === null
-                  ? t('table.forcedWild')
-                  : t('table.chooseColour')}
+              {forcedWildId !== null && wildIds === null
+                ? t('table.forcedWild')
+                : t('table.chooseColour')}
             </span>
             <div style={{ display: 'flex', gap: 12 }}>
               {(['red', 'blue', 'yellow', 'green'] as Color[]).map((c) => (
-                <button key={c} type="button" aria-label={c} onClick={() => onPickColor(c)} style={{
+                <button key={c} type="button" aria-label={c}
+                  onClick={() => { cue('press'); onPickColor(c); }} style={{
                   width: 46, height: 46, borderRadius: '50%', background: SUIT[c],
                   border: '3px solid #fdf8ef', boxShadow: '0 0 0 2px rgba(0,0,0,.14)',
                   cursor: 'pointer', transition: 'transform .15s',
@@ -827,7 +939,7 @@ export default function Table() {
         )}
 
         {/* called-colour chip */}
-        {topIsWild && view.currentColor && !view.mustChooseColor && (
+        {topIsWild && view.currentColor && (
           <div style={{
             position: 'absolute', left: L.chipX, top: L.chipY, display: 'flex', gap: 7,
             alignItems: 'center', background: '#fdf8ef', borderRadius: 999, padding: '5px 13px',
@@ -866,7 +978,10 @@ export default function Table() {
               it opens nothing until it is asked to. */}
           <button type="button" className="btn btn-ghost ghost-pill"
             aria-label={t('rules.helpOpen')} title={t('rules.helpOpen')}
-            onClick={() => { track('help_open'); setHelpOpen(true); }}>?</button>
+            onClick={() => { cue('press'); track('help_open'); setHelpOpen(true); }}>?</button>
+          {/* The switch belongs on the felt too: until now the only way to reach it was
+              to leave the game and go back to the landing. */}
+          <SoundSettings className="sound-left" />
         </div>
         <a className="btn btn-ghost ghost-pill" href="/"
           style={{ position: 'absolute', right: L.ngR, top: L.ngT, zIndex: 45 }}>
@@ -876,6 +991,15 @@ export default function Table() {
       {/* Outside .stage on purpose: the stage is transform-scaled, which would trap
           the sheet's position:fixed scrim inside it. */}
       <HelpSheet open={helpOpen} rules={view.rules} onClose={() => setHelpOpen(false)} />
+      {/* The felt's right edge was carrying nothing; the top-left chip cluster
+          and the top-right Leave are both left alone. */}
+      {!movesOpen && (
+        <button type="button" className="moves-tab" aria-expanded={false}
+          onClick={() => { cue('press'); setMovesOpen(true); }}>
+          {t('moves.open')}
+        </button>
+      )}
+      <MovesSheet open={movesOpen} onClose={() => setMovesOpen(false)} />
       {/* Everyone reads it, the host included: they picked the house rules on the create
           screen, but nobody has yet been shown how the base game runs. */}
       {slideOpen && (

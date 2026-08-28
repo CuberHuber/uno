@@ -5,7 +5,7 @@ import { buildServer, defaultLimits, installProcessGuards } from '../src/server.
 import { RoomStore } from '../src/rooms.js';
 import { RateLimiter } from '../src/limiter.js';
 import {
-  MAX_CARD_IDS, isSeat, isSeq, parseAck, parseColor, parseJoin, parsePin, parsePlay, parseRules,
+  MAX_CARD_IDS, isSeat, isSeq, parseAck, parseJoin, parsePin, parsePlay, parseRules,
   parseSeat,
 } from '../src/wire.js';
 
@@ -53,11 +53,7 @@ test('cardIds must be a bounded array of whole ids', () => {
   expect(parsePlay({ cardIds: [4, 9] })).toEqual({ ok: true, value: { cardIds: [4, 9] } });
 });
 
-test('a colour is one of four, on play and on choose', () => {
-  for (const hostile of ['purple', 'RED', '', 0, null, {}]) {
-    expect(parseColor({ color: hostile })).toEqual({ ok: false, error: 'wild_needs_color' });
-  }
-  expect(parseColor({ color: 'red' })).toEqual({ ok: true, value: { color: 'red' } });
+test('a colour is one of four, on play', () => {
   expect(parsePlay({ cardIds: [1], chosenColor: 'purple' }))
     .toEqual({ ok: false, error: 'wild_needs_color' });
   expect(parsePlay({ cardIds: [1], chosenColor: 'blue' }))
@@ -124,6 +120,7 @@ beforeAll(async () => {
     // Entry limiters out of the way (one IP runs every client here); the action
     // budget is the one under test, shrunk so the test needs 25 frames, not 130.
     create: wide(), join: wide(), pin: wide(), action: new RateLimiter(ACTION_BUDGET, 60_000),
+    history: wide(),
   });
   await ctx.app.listen({ port: 0 });
   const address = ctx.app.server.address();
@@ -200,8 +197,6 @@ test('play and colour frames are refused at the boundary', async () => {
     ['playCards', undefined, 'bad_request'],
     ['playCards', { cardIds: Array.from({ length: 200 }, (_, i) => i) }, 'bad_stack'],
     ['playCards', { cardIds: [1], chosenColor: 'purple' }, 'wild_needs_color'],
-    ['chooseColor', { color: 'purple' }, 'wild_needs_color'],
-    ['chooseColor', undefined, 'wild_needs_color'],
     ['setRules', { rules: 'all' }, 'bad_request'],
     ['setPin', { pin: 1234 }, 'bad_pin'],
   ];
