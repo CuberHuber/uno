@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isNumberCard, type Card, type Color, type Effect, type RoomStateView } from '@uno/shared';
 import { track } from '../analytics';
 import HelpSheet from '../components/HelpSheet';
+import MovesSheet from '../components/MovesSheet';
 import PauseOverlay from '../components/PauseOverlay';
 import SoundSettings from '../components/SoundSettings';
 import { cue } from '../sound';
@@ -64,7 +65,8 @@ export default function Table() {
   }, []);
   // The seat ring's angles depend on how many opponents there are, so the count
   // has to reach the layout. `seats` includes you.
-  const L = stageLayout(vp.w, vp.h, (view?.seats.length ?? 4) - 1);
+  const [movesOpen, setMovesOpen] = useState(false);
+  const L = stageLayout(vp.w, vp.h, (view?.seats.length ?? 4) - 1, movesOpen);
 
   const viewRef = useRef<RoomStateView | null>(view);
   viewRef.current = view;
@@ -982,6 +984,15 @@ export default function Table() {
       {/* Outside .stage on purpose: the stage is transform-scaled, which would trap
           the sheet's position:fixed scrim inside it. */}
       <HelpSheet open={helpOpen} rules={view.rules} onClose={() => setHelpOpen(false)} />
+      {/* The felt's right edge was carrying nothing; the top-left chip cluster
+          and the top-right Leave are both left alone. */}
+      {!movesOpen && (
+        <button type="button" className="moves-tab" aria-expanded={false}
+          onClick={() => { cue('press'); setMovesOpen(true); }}>
+          {t('moves.open')}
+        </button>
+      )}
+      <MovesSheet open={movesOpen} onClose={() => setMovesOpen(false)} />
       {/* Everyone reads it, the host included: they picked the house rules on the create
           screen, but nobody has yet been shown how the base game runs. */}
       {slideOpen && (

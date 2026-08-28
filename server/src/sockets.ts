@@ -114,6 +114,34 @@ export function attachSockets(
       seq: missed.seq, entries: [], truncated: true, crossedRebuild: false, seats, you: player.id,
     };
   };
+  /** The whole journal as one seat may read it — what the in-room move list
+   *  shows, as opposed to `catchUpFor`, which answers "what did I miss" once on
+   *  a reconnect and only for the gap.
+   *
+   *  It never acknowledges. Moving the seat's pointer here would tell the server
+   *  a player has seen changes they have only *listed*, and the next real
+   *  reconnect would then be answered with a gap that starts too late. */
+  const historyFor = (code: string, seat: number): CatchUpView | null => {
+    const room = store.getRoom(code);
+    const player = room?.players[seat];
+    if (!room || !player) return null;
+    const seats: SeatRecord[] = room.players.map((p, i) => ({ seat: i, playerId: p.id, name: p.name }));
+    // From the very beginning. If the cap has since eaten the front of the
+    // journal, ask again from the oldest entry still held and say so — a list
+    // with a hole in it would read as "nothing else happened".
+    let found = store.historySince(code, seat, 0);
+    let truncated = false;
+    if (!found.ok && found.error === 'history_truncated') {
+      truncated = true;
+      found = store.historySince(code, seat, Math.max(0, found.firstSeq - 1));
+    }
+    if (!found.ok) return null;
+    const entries: SeatTransaction[] = found.entries;
+    return {
+      seq: found.seq, entries, truncated, crossedRebuild: found.crossedRebuild,
+      seats, you: player.id,
+    };
+  };
   const emitEffects = (code: string, effects: Effect[] | undefined) => {
     const room = store.getRoom(code);
     if (!room || !effects) return;
@@ -315,6 +343,19 @@ export function attachSockets(
       (at, v) => store.continueWithout(at.code, at.token, v.seat),
       (at, v) => analytics?.playerKicked(at.code, v.seat),
     ));
+
+    socket.on('getHistory', safely((ack?: unknown) => {
+      const answer = typeof ack === 'function' ? (ack as (v: CatchUpView | null) => void) : undefined;
+      const at = seated();
+      if (!at) return answer?.(null);
+      if (!limits.action.allow(socket.id)) { rejectBudget(); return answer?.(null); }
+      // The seat is re-derived from the token, as it is for the acknowledgement:
+      // a rematch compacts the table, and the number this socket wrote down when
+      // it sat would then name somebody else's journal.
+      const here = store.resume(at.code, at.token);
+      if (!here.ok) return answer?.(null);
+      answer?.(historyFor(at.code, here.seat));
+    }));
 
     socket.on('ackHistory', (p: unknown) => handle(
       p, parseAck,

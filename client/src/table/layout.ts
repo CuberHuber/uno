@@ -29,6 +29,9 @@ export interface StageLayout {
   meW: number; meB: number;
   unoL: number; unoB: number; endR: number; endB: number;
   bigFs: number; ngR: number; ngT: number;
+  /** Design-space width the open move sheet takes from the stage; 0 when shut
+   *  and always 0 in portrait, where the sheet comes up from the bottom. */
+  shW: number;
   portrait: boolean;
 }
 
@@ -56,7 +59,13 @@ const ANGLES = {
   portrait: [[0], [-46, 46], [-60, 0, 60]],
 };
 
-export function stageLayout(vw: number, vh: number, opponents = 3): StageLayout {
+/** With the move sheet open the seats pull in and up: a narrower felt puts the
+ *  hand's outer cards where the side pills were. */
+const ANGLES_NARROW = [[0], [-44, 44], [-56, 0, 56]];
+
+export function stageLayout(
+  vw: number, vh: number, opponents = 3, histOpen = false,
+): StageLayout {
   const portrait = vw < 720 || vh > vw * 1.15;
   const r = Math.round;
   const nOpp = Math.max(1, Math.min(3, opponents));
@@ -96,11 +105,16 @@ export function stageLayout(vw: number, vh: number, opponents = 3): StageLayout 
       pendTop: pileY - 180, toastTop: pileY - 125, pickTop: pileY + 190,
       chipX: r(mx - 65), chipY: pileY + 174,
       meW: 250, meB: 12, unoL: 14, unoB: 236, endR: 14, endB: 16,
-      bigFs: 88, ngR: 16, ngT: 12,
+      bigFs: 88, ngR: 16, ngT: 12, shW: 0,
     };
   }
   const k = Math.min(vw / 1180, vh / 720, 1.15);
-  const W = r(vw / k), H = r(vh / k), mx = r(W / 2), my = H / 2;
+  const W = r(vw / k), H = r(vh / k), my = H / 2;
+  // The move sheet is 372 REAL px, mounted outside the transform-scaled stage,
+  // so it costs 372/k DESIGN px. The table does not sit under it — it recentres
+  // into what is left. Only anchors move; nothing reflows.
+  const shW = histOpen ? Math.min(r(372 / k), r(W * 0.42)) : 0;
+  const availW = W - shW, mx = r(availW / 2);
   const tcy = r(H * 0.47), ss = 1;
   // Capped by tcy-140 as well: past that the far seat's own fan of backs leaves
   // the top of the stage. Floored because below 170 the pile+discard cluster no
@@ -108,7 +122,7 @@ export function stageLayout(vw: number, vh: number, opponents = 3): StageLayout 
   // centre, not dx — and the piles end up straddling the rim.
   // 150, not the prototype's 140: at 140 the far seat's block lands at exactly
   // y = 0 and its fan's rotated outer corners are shaved off by the stage edge.
-  const tR = Math.max(170, r(Math.min(H * 0.32, W * 0.28, tcy - 150)));
+  const tR = Math.max(170, r(Math.min(H * 0.32, availW * (shW ? 0.30 : 0.28), tcy - 150)));
   const sR = tR + 88;
   const rimW = Math.max(14, r(tR * 0.088));
   // The central pair is a tight cluster: a round felt small enough to leave the
@@ -121,13 +135,15 @@ export function stageLayout(vw: number, vh: number, opponents = 3): StageLayout 
     ringL: r(mx - tR + 28), ringT: r(tcy - tR + 28), ringW: tR * 2 - 56, ringH: tR * 2 - 56,
     pileX: r(mx - 118), pileY: r(my - 117), discX: r(mx + 14), discY: r(my - 110),
     pileHintT: -30,
-    cx: mx, anchorY, R: 520, spreadTot: 60, rowGap: 40, rowShift: 16,
+    cx: mx, anchorY, R: 520, spreadTot: shW ? 52 : 60, rowGap: 40, rowShift: 16,
     glowL: r(mx - 342), glowR: r(W - mx - 342), tintX: mx, tintY: r(my - 30),
     seatScale: ss,
-    seats: arc(angles, mx, tcy, sR, ss),
+    seats: arc(shW ? ANGLES_NARROW[nOpp - 1]! : angles, mx, tcy, sR, ss),
     pendTop: r(my - 212), toastTop: r(my - 160), pickTop: r(my - 130),
     chipX: r(mx + 182), chipY: r(my - 55),
-    meW: 260, meB: 26, unoL: 34, unoB: 150, endR: 34, endB: 32,
-    bigFs: 120, ngR: 24, ngT: 20,
+    meW: 260, meB: 26, unoL: 34, unoB: 150,
+    // Right-anchored furniture measures from the sheet's inner edge.
+    endR: shW + 34, endB: 32,
+    bigFs: 120, ngR: shW + 24, ngT: 20, shW,
   };
 }

@@ -182,6 +182,13 @@ export interface ClientToServerEvents {
    *  ever goes forward, so a late acknowledgement from a socket that has since
    *  been replaced cannot re-open a gap that is already closed. */
   ackHistory: (p: { seq: number }) => void;
+  /** "Show me the whole journal." The move list a player opens in the room, as
+   *  opposed to `catchUp`, which answers "what did I miss" exactly once on a
+   *  reconnect and only covers the gap.
+   *
+   *  Read-only by design: unlike `ackHistory` it never moves the seat's pointer,
+   *  so opening the panel cannot close a gap the player has not actually seen. */
+  getHistory: (ack: (v: CatchUpView | null) => void) => void;
 }
 
 export interface ServerToClientEvents {

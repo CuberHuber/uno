@@ -27,6 +27,9 @@ export interface Store {
   /** Drop the effect the table has finished animating. */
   consumeEffect: (seq: number) => void;
   catchUp: CatchUpView | null; // what happened while we were away; null when nothing did
+  /** Where the room's journal stands. The move list refreshes off this rather
+   *  than off every snapshot: it rises exactly when something was written. */
+  historyHead: number;
   dismissCatchUp: () => void;
   join: (code: string, name?: string, pin?: string) => void;
   actions: {
@@ -40,6 +43,9 @@ export interface Store {
     catchCall: () => void;
     rematch: () => void;
     continueWithout: (seat: number) => void;
+    /** The room's whole move journal, for the in-room list. Read-only on the
+     *  server: asking never moves this seat's catch-up pointer. */
+    getHistory: (then: (v: CatchUpView | null) => void) => void;
   };
 }
 
@@ -71,6 +77,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [effects, setEffects] = useState<PendingEffect[]>([]);
   const effectSeq = useRef(0);
   const [catchUp, setCatchUp] = useState<CatchUpView | null>(null);
+  const [historyHead, setHistoryHead] = useState(0);
 
   // Our own transport state, for the "connection lost" banner: PauseOverlay
   // only covers OTHER players dropping; before this, your own drop just froze
@@ -135,6 +142,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       socket.emit('ackHistory', { seq });
     };
     const onHead = (p: { seq: number }) => {
+      // Recorded before the acknowledgement bookkeeping below, which returns
+      // early once the pointer is level — the open move list still wants to know
+      // the journal grew.
+      setHistoryHead((h) => (p.seq > h ? p.seq : h));
       if (p.seq === acked.current || p.seq === pending) return;
       pending = p.seq;
       if (timer === null) timer = setTimeout(flush, ACK_COALESCE_MS);
@@ -245,13 +256,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     catchCall: () => socket.emit('catchLastCard'),
     rematch: () => socket.emit('rematch'),
     continueWithout: (seat) => socket.emit('continueWithout', { seat }),
+    getHistory: (then) => socket.emit('getHistory', then),
   }), []);
 
   return (
     <Ctx.Provider value={{
       view, error, joinError, rejection, selfDisconnected, effects,
       consumeEffect: (seq) => setEffects((q) => q.filter((p) => p.seq !== seq)),
-      catchUp, dismissCatchUp: () => setCatchUp(null), join, actions,
+      catchUp, historyHead, dismissCatchUp: () => setCatchUp(null), join, actions,
     }}>
       {children}
     </Ctx.Provider>
